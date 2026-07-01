@@ -21,7 +21,7 @@
             <p class="eyebrow">Private prevention log</p>
             <h1>Health Dashboard</h1>
           </div>
-          <div class="topbar-actions">
+          <div class="topbar-actions hidden" data-private aria-hidden="true">
             <button class="ghost-button" id="exportChatGptButton" type="button">Export for ChatGPT</button>
             <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
             <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
@@ -30,25 +30,6 @@
             <button class="ghost-button danger" id="resetButton" type="button">Clear data</button>
           </div>
         </header>
-
-        <section class="status-strip" aria-label="Tracker overview">
-          <article>
-            <span class="metric" id="totalResults">0</span>
-            <span class="label">tracked measurements</span>
-          </article>
-          <article>
-            <span class="metric attention" id="flaggedResults">0</span>
-            <span class="label">range warnings</span>
-          </article>
-          <article>
-            <span class="metric attention" id="dueSoonResults">0</span>
-            <span class="label">due or overdue</span>
-          </article>
-          <article>
-            <span class="metric" id="latestDate">-</span>
-            <span class="label">latest measurement</span>
-          </article>
-        </section>
 
         <section class="auth-panel hidden" id="authPanel" aria-label="Account login">
           <div class="panel-heading">
@@ -73,7 +54,26 @@
           </form>
         </section>
 
-        <section class="profile-section" aria-label="People">
+        <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
+          <article>
+            <span class="metric" id="totalResults">0</span>
+            <span class="label">tracked measurements</span>
+          </article>
+          <article>
+            <span class="metric attention" id="flaggedResults">0</span>
+            <span class="label">range warnings</span>
+          </article>
+          <article>
+            <span class="metric attention" id="dueSoonResults">0</span>
+            <span class="label">due or overdue</span>
+          </article>
+          <article>
+            <span class="metric" id="latestDate">-</span>
+            <span class="label">latest measurement</span>
+          </article>
+        </section>
+
+        <section class="profile-section hidden" data-private aria-hidden="true" aria-label="People">
           <form class="profile-panel" id="profileForm">
             <div class="panel-heading">
               <h2>People</h2>
@@ -117,7 +117,7 @@
           <div class="profile-cards" id="profileCards"></div>
         </section>
 
-        <section class="schedule-section" aria-label="Due measurements">
+        <section class="schedule-section hidden" data-private aria-hidden="true" aria-label="Due measurements">
           <div class="panel-heading">
             <h2>Due soon</h2>
             <span class="privacy-note">Amber means due soon, red means overdue</span>
@@ -125,11 +125,11 @@
           <div class="schedule-grid" id="schedulePanel"></div>
         </section>
 
-        <section class="content-grid">
+        <section class="content-grid hidden" data-private aria-hidden="true">
           <form class="entry-panel" id="resultForm">
             <div class="panel-heading">
               <h2>Add measurement</h2>
-              <span class="privacy-note">Saved in this browser only</span>
+              <span class="privacy-note">Saved in your private account</span>
             </div>
 
             <label>
@@ -236,7 +236,7 @@
           </section>
         </section>
 
-        <section class="notes-band">
+        <section class="notes-band hidden" data-private aria-hidden="true">
           <p>
             Designed for long-term prevention and trend analysis. Lab tracking remains blood and urine only; STI and immunoserology tests are intentionally excluded.
           </p>
@@ -271,5 +271,6 @@
     <script src="supabase-config.js?v=0.16"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js?v=0.16"></script>
+    <script src="privacy-guard.js?v=0.17"></script>
   </body>
 </html>
