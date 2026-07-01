@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+*.log
+health-dashboard-backup-secrets*
+supabase-service-role*
+service-role*
+backup-tool/secrets*

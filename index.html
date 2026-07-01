@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#236f62" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Preventative Health Dashboard</title>
+    <link rel="manifest" href="manifest.webmanifest?v=0.15" />
+    <link rel="icon" href="app-icon.svg?v=0.15" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.15" />
+    <link rel="stylesheet" href="styles.css?v=0.15" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Private prevention log</p>
+            <h1>Health Dashboard</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="exportChatGptButton" type="button">Export for ChatGPT</button>
+            <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
+            <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
+            <button class="ghost-button" id="exportReviewPackButton" type="button">Review pack</button>
+            <button class="ghost-button" id="exportCsvButton" type="button">Export CSV</button>
+            <button class="ghost-button danger" id="resetButton" type="button">Clear data</button>
+          </div>
+        </header>
+
+        <section class="status-strip" aria-label="Tracker overview">
+          <article>
+            <span class="metric" id="totalResults">0</span>
+            <span class="label">tracked measurements</span>
+          </article>
+          <article>
+            <span class="metric attention" id="flaggedResults">0</span>
+            <span class="label">range warnings</span>
+          </article>
+          <article>
+            <span class="metric attention" id="dueSoonResults">0</span>
+            <span class="label">due or overdue</span>
+          </article>
+          <article>
+            <span class="metric" id="latestDate">-</span>
+            <span class="label">latest measurement</span>
+          </article>
+        </section>
+
+        <section class="auth-panel hidden" id="authPanel" aria-label="Account login">
+          <div class="panel-heading">
+            <div>
+              <h2>Account</h2>
+              <span class="privacy-note" id="authStatus">Sign in to use private cloud sync.</span>
+            </div>
+          </div>
+          <form class="auth-form" id="authForm">
+            <label>
+              Email
+              <input id="authEmail" type="email" autocomplete="email" />
+            </label>
+            <label>
+              Password
+              <input id="authPassword" type="password" autocomplete="current-password" />
+            </label>
+            <div class="auth-actions">
+              <button class="primary-button" id="passwordSignInButton" type="submit">Sign in</button>
+              <button class="ghost-button" id="magicLinkButton" type="button">Email magic link</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="profile-section" aria-label="People">
+          <form class="profile-panel" id="profileForm">
+            <div class="panel-heading">
+              <h2>People</h2>
+              <span class="privacy-note">Stable details used for age and context</span>
+            </div>
+            <div class="profile-grid">
+              <fieldset data-profile-fieldset="ben">
+                <legend>Ben</legend>
+                <label>
+                  Name
+                  <input id="benName" type="text" value="Ben" />
+                </label>
+                <label>
+                  Date of birth
+                  <input id="benDob" type="date" />
+                </label>
+                <label>
+                  Height
+                  <input id="benHeight" type="number" inputmode="decimal" step="0.1" min="0" placeholder="cm" />
+                </label>
+              </fieldset>
+              <fieldset data-profile-fieldset="angelika">
+                <legend>Angelika</legend>
+                <label>
+                  Name
+                  <input id="angelikaName" type="text" value="Angelika" />
+                </label>
+                <label>
+                  Date of birth
+                  <input id="angelikaDob" type="date" />
+                </label>
+                <label>
+                  Height
+                  <input id="angelikaHeight" type="number" inputmode="decimal" step="0.1" min="0" placeholder="cm" />
+                </label>
+              </fieldset>
+            </div>
+            <button class="primary-button" type="submit">Save people</button>
+          </form>
+
+          <div class="profile-cards" id="profileCards"></div>
+        </section>
+
+        <section class="schedule-section" aria-label="Due measurements">
+          <div class="panel-heading">
+            <h2>Due soon</h2>
+            <span class="privacy-note">Amber means due soon, red means overdue</span>
+          </div>
+          <div class="schedule-grid" id="schedulePanel"></div>
+        </section>
+
+        <section class="content-grid">
+          <form class="entry-panel" id="resultForm">
+            <div class="panel-heading">
+              <h2>Add measurement</h2>
+              <span class="privacy-note">Saved in this browser only</span>
+            </div>
+
+            <label>
+              Person
+              <select id="personInput" required></select>
+            </label>
+
+            <label>
+              Result date
+              <input id="dateInput" type="date" required />
+            </label>
+
+            <label>
+              Sample / measurement date
+              <input id="sampleDateInput" type="date" required />
+            </label>
+
+            <label>
+              Metric
+              <select id="markerInput" required></select>
+            </label>
+
+            <div class="inline-fields">
+              <label>
+                Value
+                <input id="valueInput" type="text" required />
+              </label>
+              <label>
+                Unit
+                <input id="unitInput" type="text" readonly />
+              </label>
+            </div>
+
+            <div class="inline-fields">
+              <label>
+                Reference lower limit
+                <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" />
+              </label>
+              <label>
+                Reference upper limit
+                <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
+              </label>
+            </div>
+            <div class="range-tools">
+              <span id="rangeHint">First entry can set the saved range for this person and metric.</span>
+              <button class="mini-button hidden" id="rangeEditButton" type="button">Edit range</button>
+            </div>
+
+            <label>
+              Notes
+              <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
+            </label>
+
+            <button class="primary-button" type="submit">Add to tracker</button>
+          </form>
+
+          <section class="results-panel" aria-live="polite">
+            <div class="panel-heading">
+              <h2>Trends</h2>
+              <label class="compact-select">
+                Metric
+                <select id="trendMetricInput"></select>
+              </label>
+            </div>
+            <div class="trend-grid" id="trendPanel"></div>
+
+            <div class="panel-heading">
+              <h2>Results</h2>
+              <div class="filters" role="group" aria-label="Filter results">
+                <button class="filter-button active" data-filter="all" type="button">All</button>
+                <button class="filter-button" data-filter="flagged" type="button">Flagged</button>
+                <button class="filter-button" data-filter="due" type="button">Due</button>
+                <button class="filter-button" data-filter="latest" type="button">Latest</button>
+              </div>
+            </div>
+
+            <div class="marker-summary" id="markerSummary"></div>
+            <div class="empty-state" id="emptyState">
+              <strong>No results yet</strong>
+              <span>Add your first measurement to start tracking long-term trends.</span>
+            </div>
+            <div class="results-table-wrap">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Result date</th>
+                    <th>Sample date</th>
+                    <th>Metric</th>
+                    <th>Value</th>
+                    <th>Range</th>
+                    <th>Status</th>
+                    <th>Due</th>
+                    <th>Previous</th>
+                    <th>Abs change</th>
+                    <th>% change</th>
+                    <th>Trend</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="notes-band">
+          <p>
+            Designed for long-term prevention and trend analysis. Lab tracking remains blood and urine only; STI and immunoserology tests are intentionally excluded.
+          </p>
+        </section>
+
+        <footer class="account-sync-footer" aria-label="Account and sync">
+          <span class="sync-status" id="syncStatus">Local mode</span>
+          <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
+          <span class="version-chip" id="appVersion">v0.15</span>
+          <button class="mini-button" id="signOutButton" type="button" disabled>Sign out</button>
+        </footer>
+      </section>
+    </main>
+
+    <section class="modal hidden" id="importReviewModal" role="dialog" aria-modal="true" aria-labelledby="importReviewTitle">
+      <div class="modal-panel">
+        <div class="panel-heading">
+          <div>
+            <h2 id="importReviewTitle">Review import</h2>
+            <span class="privacy-note">Confirm extracted measurements before saving</span>
+          </div>
+          <button class="mini-button" id="cancelImportButton" type="button">Cancel</button>
+        </div>
+        <div class="import-review" id="importReviewContent"></div>
+        <div class="modal-actions">
+          <button class="ghost-button" id="discardImportButton" type="button">Discard</button>
+          <button class="primary-button" id="confirmImportButton" type="button">Import reviewed data</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="supabase-config.js?v=0.15"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js?v=0.15"></script>
+  </body>
+</html>
