@@ -202,8 +202,8 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.15"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.15"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.16"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.16"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -211,12 +211,12 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.15"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.15"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.15"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.15"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.15"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.15", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.16"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.16"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.16"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.16"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.16"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.16", "footer should show app version");
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 

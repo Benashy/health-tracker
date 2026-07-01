@@ -2,7 +2,7 @@
 
 ## Current Parked State
 
-- App version: `v0.15`.
+- App version: `v0.16`.
 - Current app still runs locally with browser localStorage when Supabase is not configured.
 - Cloud login/sync code is present and activates once `supabase-config.js` contains the project URL and public anon key.
 - Next work should create the GitHub repo and Supabase project, then fill the config.
