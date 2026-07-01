@@ -37,9 +37,15 @@ Next time, move this app from a local-only browser tracker to a proper hosted ap
 - Preserve stored per-person, per-metric reference ranges with explicit edit flow.
 - Preserve trend summaries: latest, change, highest, lowest, history, and chart.
 - Add personal targets per user, such as target weight, target waist circumference, or fitness goals.
+- Add a Current Health Snapshot as the first page after login, with overall status, current priorities, risk factors, reassuring results, next scheduled review, and latest key metrics.
 - Add a health events timeline per user.
+- Support timeline categories for investigations, findings, procedures, vaccinations, lifestyle milestones, medication/supplement changes, and aviation medical events.
 - Add GP/clinician notes per user.
 - Add PDF blood report upload and storage later, most likely using Supabase Storage.
+- Preserve original source documents and allow documents to attach to timeline events, blood test entries, metrics, and user profiles.
+- Add measurement instructions for waist, weight, blood pressure, and blood tests so repeat readings are consistent.
+- Add optional reminders and follow-ups for annual bloods, home measurements, GP review, colonoscopy, ECG, CAC consideration, and abnormal-result follow-up.
+- Keep escalation language calm and non-diagnostic: green for routine tracking, amber for monitoring or GP discussion, red for clinician review.
 - Add year-on-year comparison views once enough dated data exists.
 - Keep tracking blood and urine results only.
 - Continue excluding STI and immunoserology tests.

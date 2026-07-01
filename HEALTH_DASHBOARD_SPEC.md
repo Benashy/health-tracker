@@ -86,6 +86,36 @@ Due colours:
 - Amber: due soon.
 - Red: due or overdue.
 
+## Measurement Instructions
+
+Add a measurement instructions section so repeat readings are more consistent.
+
+Waist circumference:
+
+- Measure first thing in the morning if possible.
+- Measure after using the bathroom and before eating or drinking.
+- Measure at the level of the navel.
+- Stand relaxed and measure at the end of a normal exhale.
+- Record in centimetres.
+
+Weight:
+
+- Measure first thing in the morning.
+- Measure after using the bathroom and before food or drink.
+- Use the same scales where practical.
+
+Blood pressure:
+
+- Sit quietly for 5 minutes.
+- Keep feet flat on the floor and arm supported.
+- Take 2-3 readings.
+- Store the average.
+- Record time of day where useful.
+
+Blood tests:
+
+- Store date, sample time, fasting status, lab name, units, reference range, and source report where available.
+
 ## Dates And Reference Ranges
 
 - Result date is the date the result/report is available.
@@ -129,17 +159,112 @@ The dashboard should support:
 
 The longer-term dashboard should support:
 
-- Current health summary per signed-in user.
+- Current Health Snapshot as the first page each user sees.
+- Overall health summary with a non-diagnostic status such as Excellent, Good, or Needs Review.
+- Current priorities such as target weight, waist reduction, blood pressure maintenance, annual bloods, LDL/ApoB monitoring, or GP follow-up.
+- Known long-term risk factors such as elevated Lipoprotein(a), family history, or known diagnoses.
+- Recent reassuring results such as normal blood pressure, HbA1c, ECG, testosterone, kidney function, or liver function.
+- Next scheduled review such as home measurements, annual bloods, GP review, ECG, or CAC consideration.
+- Latest key metric cards for weight, waist, blood pressure, resting heart rate, VO2 Max, LDL, ApoB, HbA1c, vitamin D, and testosterone if tracked.
 - Historical trend charts.
 - Year-on-year comparisons.
 - Automatic highlighting of significant changes.
-- PDF blood report upload and storage when Supabase Storage is added.
+- Document upload and storage when Supabase Storage is added.
 - Manual measurement entry.
 - Timeline of health events.
 - GP or clinician notes.
 - Personal targets such as target weight, target waist circumference, or fitness goals.
+- Optional reminders and follow-ups.
 
 These features should stay in service of prevention and longitudinal comparison. The app should avoid nudging users toward unnecessary tests, and optional investigations should remain conditional or infrequent unless clinically indicated.
+
+## Health Timeline
+
+Add a dedicated Health Timeline page per user. It should create a chronological record of significant health events that complement the numeric dashboard.
+
+Timeline categories should include:
+
+- Investigations: blood tests, ECG, echocardiogram, MRI, CT scan, CAC scan, colonoscopy, endoscopy, ultrasound, and X-ray.
+- Health findings: elevated Lipoprotein(a), high cholesterol, normal ECG, normal colonoscopy, vitamin D deficiency, iron deficiency, thyroid abnormality, testosterone abnormality, hypertension, diabetes, and prediabetes.
+- Medical procedures: colonoscopy, surgery, biopsy, hospital admission, and specialist consultation.
+- Vaccinations: COVID, influenza, tetanus, and travel vaccinations.
+- Lifestyle milestones: target weight achieved, started regular exercise, significant weight loss, stopped smoking, reduced alcohol, and fitness milestone achieved.
+- Medication and supplement changes: started, stopped, changed dose, started supplementation, or discontinued supplementation.
+- Aviation medical: Class 1 medical renewal, ECG, exercise ECG, restrictions added or removed, and medical follow-up completed.
+
+For each event store:
+
+- Date.
+- User.
+- Category.
+- Title.
+- Short summary.
+- Detailed notes.
+- Related documents.
+- Related blood results or metrics.
+- Doctor, hospital, or clinic if relevant.
+- Follow-up required: yes/no.
+- Follow-up due date.
+- Status: Open, Closed, or Monitoring.
+
+Display the timeline vertically with date, category icon, title, brief summary, expandable details, attached files, and related metrics.
+
+## Documents
+
+Allow upload and storage of original source documents so numerical entries can be checked later.
+
+Document types should include:
+
+- Blood test PDFs.
+- ECG reports.
+- Imaging reports.
+- Colonoscopy reports.
+- GP letters.
+- Specialist letters.
+- Insurance or aviation medical documents.
+
+Each document should be attachable to:
+
+- A timeline event.
+- A blood test entry.
+- A specific metric.
+- A user profile.
+
+## Reminders And Follow-Ups
+
+Optional reminders should include:
+
+- Annual bloods due.
+- Home measurements due.
+- GP review due.
+- Repeat colonoscopy due.
+- ECG due.
+- CAC scan consideration.
+- Weight or waist recheck.
+- Follow-up after abnormal result.
+
+Each reminder should store:
+
+- User.
+- Due date.
+- Reason.
+- Related timeline event.
+- Status: pending, complete, or dismissed.
+
+## Escalation Language
+
+The dashboard must not diagnose. It should use calm, practical language:
+
+- Green: continue routine tracking.
+- Amber: monitor trend, consider repeat test, or consider routine GP discussion.
+- Red: recommend GP or clinician review.
+
+Trend interpretation should consider the metric direction and target context:
+
+- Lower LDL is usually better.
+- Higher vitamin D is only better up to a sensible range.
+- Lower blood pressure is not always better if too low.
+- Weight should be interpreted against target, not automatically treated as lower-is-better.
 
 ## Future Hosted Architecture
 
