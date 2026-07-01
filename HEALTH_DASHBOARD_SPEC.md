@@ -16,13 +16,16 @@ Create a long-term preventative health dashboard focused on trend analysis rathe
 The existing blood and urine tracking remains in place. The following have been added on top:
 
 - Two person profiles: Ben and Angelika.
-- Baseline profile details: name, date of birth, calculated age, and height.
+- Baseline profile details: name, date of birth, calculated age, sex, and height.
 - Repeat body metrics: weight and waist circumference.
 - Vitals and fitness: systolic blood pressure, diastolic blood pressure, resting heart rate, VO2 Max.
 - Cardiovascular markers: ApoB and Lipoprotein(a), in addition to existing lipid metrics.
 - Hormone panel: total testosterone and SHBG.
 - Conditional hormone escalation metrics: LH, FSH, prolactin, oestradiol.
 - One-off or infrequent investigations: ECG and coronary artery calcium score.
+- Per-user notes, personal targets, health events, GP/clinician notes, and uploaded report references are planned future scope.
+
+Each person must have a completely independent profile, history, trends, targets, notes, and reference ranges. No measurement, target, note, uploaded report, or trend calculation should ever be shared or mixed between users.
 
 ## Priority Notes
 
@@ -48,7 +51,7 @@ Medium priority:
 
 Lower priority:
 
-- BMI is intentionally not tracked
+- BMI is intentionally not tracked for now, following the current product preference. If reintroduced later, it should be calculated only and never treated as a primary target.
 - ECG history
 - Other investigations only if clinically indicated
 
@@ -121,6 +124,22 @@ The dashboard should support:
 - ChatGPT-friendly Markdown export that explains the dashboard purpose, selected scope, people, range warnings, due/overdue items, latest values, and all measurements.
 - ChatGPT import via strict JSON so a lab report can be interpreted outside the app, then loaded back into the dashboard.
 - Review pack export for GP/clinician/ChatGPT focusing only on warnings, due items, and meaningful changes.
+
+## Future Dashboard Features
+
+The longer-term dashboard should support:
+
+- Current health summary per signed-in user.
+- Historical trend charts.
+- Year-on-year comparisons.
+- Automatic highlighting of significant changes.
+- PDF blood report upload and storage when Supabase Storage is added.
+- Manual measurement entry.
+- Timeline of health events.
+- GP or clinician notes.
+- Personal targets such as target weight, target waist circumference, or fitness goals.
+
+These features should stay in service of prevention and longitudinal comparison. The app should avoid nudging users toward unnecessary tests, and optional investigations should remain conditional or infrequent unless clinically indicated.
 
 ## Future Hosted Architecture
 

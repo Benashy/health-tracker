@@ -25,9 +25,10 @@ Next time, move this app from a local-only browser tracker to a proper hosted ap
 - Add Supabase row-level security so each person sees only their own measurements by default.
 - Treat this as a preventative health dashboard, not only a blood results tracker.
 - Store profile details inside each user's private dashboard JSON: name, date of birth, and height.
+- Add sex to each user's stable profile details so reference ranges and context can be person-specific.
 - Keep profiles clickable as dashboard filters, with edit controls for correcting stable profile details.
 - Include vitals, fitness metrics, cardiovascular markers, hormone panel markers, and one-off/infrequent investigations in the cloud data.
-- Do not add BMI.
+- Do not add BMI as a primary tracked metric. If added later, keep it calculated-only and secondary.
 - Preserve per-metric schedule intervals and due/overdue states.
 - Preserve CSV export and ChatGPT-friendly Markdown export.
 - Preserve ChatGPT JSON import.
@@ -35,6 +36,11 @@ Next time, move this app from a local-only browser tracker to a proper hosted ap
 - Preserve review pack export focused on abnormal, near-limit, overdue, or materially changed results.
 - Preserve stored per-person, per-metric reference ranges with explicit edit flow.
 - Preserve trend summaries: latest, change, highest, lowest, history, and chart.
+- Add personal targets per user, such as target weight, target waist circumference, or fitness goals.
+- Add a health events timeline per user.
+- Add GP/clinician notes per user.
+- Add PDF blood report upload and storage later, most likely using Supabase Storage.
+- Add year-on-year comparison views once enough dated data exists.
 - Keep tracking blood and urine results only.
 - Continue excluding STI and immunoserology tests.
 
