@@ -124,6 +124,40 @@ Blood tests:
 - Reference ranges are stored per person and metric after first entry.
 - Saved reference ranges should be locked during ordinary entry and changed only through an explicit edit action.
 
+## Source Confidence
+
+Every metric, timeline event, document-linked entry, and health note should include source confidence metadata so lower-confidence entries are not over-interpreted.
+
+For each applicable entry store:
+
+- Source type.
+- Source confidence.
+- Source notes.
+- Linked source document if available.
+
+Source types:
+
+- Lab Report / PDF: high confidence. Examples include ApoB, Lipoprotein(a), HbA1c, testosterone, vitamin D, kidney function, and liver function.
+- Clinician Report: high confidence. Examples include ECG result, colonoscopy result, imaging report, GP summary, and specialist letter.
+- Manual Measurement: medium to high confidence. Examples include weight, waist circumference, and home blood pressure. Confidence depends on consistent technique, timing, and device.
+- Wearable Estimate: medium confidence. Examples include Apple Watch VO2 Max, wearable resting heart rate, and sleep data. Useful for trends but not equivalent to formal clinical testing.
+- Calculated Value: inherits confidence from source data. Examples include percentage change, trend direction, average blood pressure, and BMI if ever reintroduced as calculated-only.
+- User Note: subjective confidence. Examples include symptoms, lifestyle notes, tiredness, libido changes, and training notes.
+
+Display source confidence subtly:
+
+- Small labels such as Lab-confirmed, Manual entry, Wearable estimate, Clinician report, Calculated, or User note.
+- Tooltips explaining reliability where useful.
+- Avoid cluttering the main dashboard or making lower-confidence data feel alarming.
+
+Use source confidence to avoid over-interpreting weaker data. For example:
+
+- Apple Watch VO2 Max is useful for long-term trends but should not be treated as equivalent to a formal cardiopulmonary exercise test.
+- ApoB from a lab PDF is high-confidence and suitable for year-on-year comparison.
+- Waist circumference is useful, but small changes should be interpreted cautiously unless the measurement method is consistent.
+
+The dashboard should preserve the original report or document wherever possible so entered values can be verified later.
+
 ## Trends
 
 Each metric should have a trend view showing:

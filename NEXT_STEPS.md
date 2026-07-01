@@ -36,6 +36,9 @@ Next time, move this app from a local-only browser tracker to a proper hosted ap
 - Preserve review pack export focused on abnormal, near-limit, overdue, or materially changed results.
 - Preserve stored per-person, per-metric reference ranges with explicit edit flow.
 - Preserve trend summaries: latest, change, highest, lowest, history, and chart.
+- Add source confidence metadata to metrics, timeline events, documents, and notes: source type, confidence, source notes, and linked source document.
+- Show subtle confidence labels such as Lab-confirmed, Clinician report, Manual entry, Wearable estimate, Calculated, or User note.
+- Use confidence to avoid over-interpreting wearable estimates, inconsistent manual measurements, and subjective notes.
 - Add personal targets per user, such as target weight, target waist circumference, or fitness goals.
 - Add a Current Health Snapshot as the first page after login, with overall status, current priorities, risk factors, reassuring results, next scheduled review, and latest key metrics.
 - Add a health events timeline per user.
