@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.16" />
-    <link rel="icon" href="app-icon.svg?v=0.16" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.16" />
-    <link rel="stylesheet" href="styles.css?v=0.16" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.19" />
+    <link rel="icon" href="app-icon.svg?v=0.19" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.19" />
+    <link rel="stylesheet" href="styles.css?v=0.19" />
   </head>
   <body>
     <main class="app-shell">
@@ -52,6 +52,18 @@
               <button class="ghost-button" id="magicLinkButton" type="button">Email magic link</button>
             </div>
           </form>
+        </section>
+
+        <section class="onboarding-panel hidden" id="onboardingPanel" data-private aria-hidden="true" aria-label="Getting started">
+          <div>
+            <p class="eyebrow">Today</p>
+            <h2 id="onboardingTitle">Ready for your first measurement</h2>
+            <span class="privacy-note" id="onboardingText">Add a recent result or import a reviewed ChatGPT file.</span>
+          </div>
+          <div class="onboarding-actions">
+            <button class="ghost-button" id="focusEntryButton" type="button">Add measurement</button>
+            <button class="ghost-button" id="focusImportButton" type="button">Import file</button>
+          </div>
         </section>
 
         <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
@@ -132,20 +144,27 @@
               <span class="privacy-note">Saved in your private account</span>
             </div>
 
-            <label>
+            <label class="person-field" id="personField">
               Person
               <select id="personInput" required></select>
             </label>
 
             <label>
-              Result date
+              Report date
               <input id="dateInput" type="date" required />
             </label>
 
             <label>
-              Sample / measurement date
+              Sample date
               <input id="sampleDateInput" type="date" required />
             </label>
+
+            <label>
+              Find metric
+              <input id="metricSearchInput" type="search" autocomplete="off" placeholder="Type to narrow the metric list" />
+            </label>
+
+            <div class="quick-metrics" id="quickMetricPanel" aria-label="Common metrics"></div>
 
             <label>
               Metric
@@ -181,6 +200,39 @@
             <label>
               Notes
               <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
+            </label>
+
+            <div class="source-grid">
+              <label>
+                Source
+                <select id="sourceTypeInput">
+                  <option value="Lab Report / PDF">Lab report / PDF</option>
+                  <option value="Clinician Report">Clinician report</option>
+                  <option value="Manual Measurement">Manual measurement</option>
+                  <option value="Wearable Estimate">Wearable estimate</option>
+                  <option value="Calculated Value">Calculated value</option>
+                  <option value="User Note">User note</option>
+                </select>
+              </label>
+              <label>
+                Confidence
+                <select id="sourceConfidenceInput">
+                  <option value="High">High</option>
+                  <option value="Medium to High">Medium to high</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Subjective">Subjective</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Source note
+              <input id="sourceNotesInput" type="text" placeholder="e.g. fasting lab report, home BP cuff, Apple Watch" />
+            </label>
+
+            <label>
+              Source document
+              <input id="sourceDocumentInput" type="text" placeholder="Report name or link, if available" />
             </label>
 
             <button class="primary-button" type="submit">Add to tracker</button>
@@ -245,8 +297,8 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.16</span>
-          <button class="mini-button" id="signOutButton" type="button" disabled>Sign out</button>
+          <span class="version-chip" id="appVersion">v0.19</span>
+          <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
     </main>
@@ -268,9 +320,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.16"></script>
+    <script src="supabase-config.js?v=0.19"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.16"></script>
-    <script src="privacy-guard.js?v=0.17"></script>
+    <script src="app.js?v=0.19"></script>
+    <script src="privacy-guard.js?v=0.19"></script>
   </body>
 </html>

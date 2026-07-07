@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.16";
+const APP_VERSION = "v0.19";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -11,6 +11,37 @@ const DATA_VERSION = 1;
 const defaultProfiles = [
   { id: "ben", name: "Ben", date_of_birth: "", height_cm: "" },
   { id: "angelika", name: "Angelika", date_of_birth: "", height_cm: "" },
+];
+
+const sourceConfidenceByType = {
+  "Lab Report / PDF": "High",
+  "Clinician Report": "High",
+  "Manual Measurement": "Medium to High",
+  "Wearable Estimate": "Medium",
+  "Calculated Value": "Medium",
+  "User Note": "Subjective",
+};
+
+const manualSourceMetrics = new Set([
+  "Weight",
+  "Waist circumference",
+  "Blood pressure systolic",
+  "Blood pressure diastolic",
+]);
+
+const wearableSourceMetrics = new Set(["Resting heart rate", "VO2 Max"]);
+const clinicianSourceMetrics = new Set(["ECG", "Coronary artery calcium score"]);
+const commonMetricNames = [
+  "Weight",
+  "Waist circumference",
+  "Blood pressure systolic",
+  "Blood pressure diastolic",
+  "LDL",
+  "HDL",
+  "Triglycerides",
+  "HbA1c IFCC",
+  "Vitamin D",
+  "Ferritin",
 ];
 
 const metrics = [
@@ -125,11 +156,19 @@ const authStatus = document.querySelector("#authStatus");
 const authEmail = document.querySelector("#authEmail");
 const authPassword = document.querySelector("#authPassword");
 const magicLinkButton = document.querySelector("#magicLinkButton");
+const onboardingPanel = document.querySelector("#onboardingPanel");
+const onboardingTitle = document.querySelector("#onboardingTitle");
+const onboardingText = document.querySelector("#onboardingText");
+const focusEntryButton = document.querySelector("#focusEntryButton");
+const focusImportButton = document.querySelector("#focusImportButton");
 const profileForm = document.querySelector("#profileForm");
 const profileCards = document.querySelector("#profileCards");
+const personField = document.querySelector("#personField");
 const personInput = document.querySelector("#personInput");
 const form = document.querySelector("#resultForm");
 const metricInput = document.querySelector("#markerInput");
+const metricSearchInput = document.querySelector("#metricSearchInput");
+const quickMetricPanel = document.querySelector("#quickMetricPanel");
 const trendMetricInput = document.querySelector("#trendMetricInput");
 const trendPanel = document.querySelector("#trendPanel");
 const unitInput = document.querySelector("#unitInput");
@@ -141,6 +180,10 @@ const testDateInput = document.querySelector("#dateInput");
 const sampleDateInput = document.querySelector("#sampleDateInput");
 const valueInput = document.querySelector("#valueInput");
 const notesInput = document.querySelector("#notesInput");
+const sourceTypeInput = document.querySelector("#sourceTypeInput");
+const sourceConfidenceInput = document.querySelector("#sourceConfidenceInput");
+const sourceNotesInput = document.querySelector("#sourceNotesInput");
+const sourceDocumentInput = document.querySelector("#sourceDocumentInput");
 const resultsBody = document.querySelector("#resultsBody");
 const emptyState = document.querySelector("#emptyState");
 const tableWrap = document.querySelector(".results-table-wrap");
@@ -549,6 +592,7 @@ function renderSyncFooter() {
     const modeText = navigator.onLine ? "Cloud sync" : "Offline: viewing saved data";
     syncStatus.textContent = `${label} · ${modeText}`;
     syncStatus.className = `sync-status ${cloudState.lastError || cloudState.conflict ? "error" : navigator.onLine ? "ok" : "warn"}`;
+    signOutButton.classList.remove("hidden");
     signOutButton.disabled = false;
     signOutButton.title = "Sign out of this private account.";
     return;
@@ -563,6 +607,7 @@ function renderSyncFooter() {
       : "Offline local view";
   syncStatus.textContent = `${updateText} · ${modeText}`;
   syncStatus.className = `sync-status ${navigator.onLine ? "neutral" : "warn"}`;
+  signOutButton.classList.add("hidden");
   signOutButton.disabled = true;
   signOutButton.title = cloudState.enabled ? "Sign in before signing out." : "Sign out will be enabled after Supabase login is configured.";
 }
@@ -584,6 +629,7 @@ function normaliseResult(result, profiles = state.profiles) {
   const profileId = result.profile_id === "angelica" ? "angelika" : result.profile_id;
   const profile = profiles.find((item) => item.id === profileId) ?? profiles[0];
   const metricMeta = getMetricMeta(result.metric);
+  const sourceType = result.source_type ?? getDefaultSourceType(result.metric);
   return {
     ...result,
     profile_id: profile.id,
@@ -592,6 +638,10 @@ function normaliseResult(result, profiles = state.profiles) {
     cadence: result.cadence ?? metricMeta.cadence,
     interval_days: result.interval_days ?? metricMeta.intervalDays,
     trend_goal: result.trend_goal ?? metricMeta.goal,
+    source_type: sourceType,
+    source_confidence: result.source_confidence ?? getSourceConfidence(sourceType),
+    source_notes: result.source_notes ?? "",
+    linked_source_document: result.linked_source_document ?? "",
   };
 }
 
@@ -599,8 +649,11 @@ function populatePeople() {
   personInput.innerHTML = state.profiles
     .map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`)
     .join("");
+  personField.classList.toggle("single-profile", state.profiles.length === 1);
   if (state.activeProfileId && getProfile(state.activeProfileId)) {
     personInput.value = state.activeProfileId;
+  } else if (state.profiles.length === 1) {
+    personInput.value = state.profiles[0].id;
   }
 }
 
@@ -655,8 +708,14 @@ function renderProfiles() {
 }
 
 function populateMetrics() {
-  const groups = groupBy(metrics, "group");
-  metricInput.innerHTML = Object.entries(groups)
+  const selectedValue = metricInput.value;
+  const searchTerm = metricSearchInput.value.trim().toLowerCase();
+  const filteredMetrics = metrics.filter((item) => {
+    if (!searchTerm) return true;
+    return `${item.name} ${item.group} ${item.cadence}`.toLowerCase().includes(searchTerm);
+  });
+  const filteredGroups = groupBy(filteredMetrics.length ? filteredMetrics : metrics, "group");
+  metricInput.innerHTML = Object.entries(filteredGroups)
     .map(([group, groupMetrics]) => {
       const options = groupMetrics
         .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
@@ -664,7 +723,29 @@ function populateMetrics() {
       return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
     })
     .join("");
+  if (filteredMetrics.some((item) => item.name === selectedValue)) metricInput.value = selectedValue;
   syncMetricDefaults();
+  renderQuickMetrics();
+}
+
+function renderQuickMetrics() {
+  quickMetricPanel.innerHTML = commonMetricNames
+    .filter((name) => getMetric(name))
+    .map((name) => `
+      <button class="quick-metric-button ${metricInput.value === name ? "active" : ""}" data-metric-name="${escapeHtml(name)}" type="button">
+        ${escapeHtml(name)}
+      </button>
+    `)
+    .join("");
+}
+
+function selectMetric(name) {
+  if (!getMetric(name)) return;
+  metricSearchInput.value = "";
+  populateMetrics();
+  metricInput.value = name;
+  syncMetricDefaults();
+  renderQuickMetrics();
 }
 
 function syncMetricDefaults() {
@@ -677,6 +758,29 @@ function syncMetricDefaults() {
   valueInput.placeholder =
     selectedMetric.type === "numeric" ? "Result value" : `e.g. ${selectedMetric.normal ?? "Normal"}`;
   syncRangeDefaults();
+  syncSourceDefaults();
+}
+
+function getDefaultSourceType(metricName) {
+  if (manualSourceMetrics.has(metricName)) return "Manual Measurement";
+  if (wearableSourceMetrics.has(metricName)) return "Wearable Estimate";
+  if (clinicianSourceMetrics.has(metricName)) return "Clinician Report";
+  return "Lab Report / PDF";
+}
+
+function getSourceConfidence(sourceType) {
+  return sourceConfidenceByType[sourceType] ?? "Medium";
+}
+
+function syncSourceDefaults() {
+  const selectedMetric = getMetric(metricInput.value);
+  if (!selectedMetric) return;
+  sourceTypeInput.value = getDefaultSourceType(selectedMetric.name);
+  syncSourceConfidence();
+}
+
+function syncSourceConfidence() {
+  sourceConfidenceInput.value = getSourceConfidence(sourceTypeInput.value);
 }
 
 function getMetric(name) {
@@ -1035,6 +1139,7 @@ function render() {
   dueSoonResults.textContent = dueCount;
   latestDate.textContent = latest ? formatDate(latest.sample_date) : "-";
 
+  renderOnboarding(scopedResults, flaggedCount, dueCount);
   renderProfiles();
   renderSchedule();
   renderSummary();
@@ -1055,7 +1160,7 @@ function render() {
           <td>${escapeHtml(result.person_name)}</td>
           <td>${formatDate(result.test_date)}</td>
           <td>${formatDate(result.sample_date)}</td>
-          <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span>${notes}</td>
+          <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span><span class="source-badge">${escapeHtml(result.source_confidence)} · ${escapeHtml(result.source_type)}</span>${notes}</td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
           <td>${range}</td>
           <td><span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span></td>
@@ -1069,6 +1174,25 @@ function render() {
       `;
     })
     .join("");
+}
+
+function renderOnboarding(scopedResults, flaggedCount, dueCount) {
+  if (!cloudState.user) return;
+  const profileName = state.profiles[0]?.name ?? "Your profile";
+  const hasProfile = profilesAreComplete(state.profiles);
+  onboardingPanel.classList.toggle("hidden", scopedResults.length > 0 && hasProfile);
+  if (!hasProfile) {
+    onboardingTitle.textContent = `${profileName}: profile details`;
+    onboardingText.textContent = "Complete date of birth and height before adding measurements.";
+    return;
+  }
+  if (!scopedResults.length) {
+    onboardingTitle.textContent = `${profileName}: ready for first measurement`;
+    onboardingText.textContent = "Add a result manually or import a reviewed ChatGPT JSON file.";
+    return;
+  }
+  onboardingTitle.textContent = `${profileName}: ${scopedResults.length} measurements`;
+  onboardingText.textContent = `${flaggedCount} warnings · ${dueCount} due or overdue`;
 }
 
 function saveRangeForResult(result) {
@@ -1329,6 +1453,10 @@ function addResult(event) {
     percentage_change_since_previous_test: null,
     trend_direction: "first",
     notes: notesInput.value.trim(),
+    source_type: sourceTypeInput.value,
+    source_confidence: sourceConfidenceInput.value,
+    source_notes: sourceNotesInput.value.trim(),
+    linked_source_document: sourceDocumentInput.value.trim(),
   };
 
   state.results.push(result);
@@ -1338,6 +1466,7 @@ function addResult(event) {
   setTodayDefaults();
   populatePeople();
   syncMetricDefaults();
+  syncSourceDefaults();
   render();
 }
 
@@ -1402,6 +1531,10 @@ function exportCsv() {
     "percentage_change_since_previous_test",
     "trend_direction",
     "notes",
+    "source_type",
+    "source_confidence",
+    "source_notes",
+    "linked_source_document",
   ];
   const rows = state.results
     .sort((a, b) => a.sample_date.localeCompare(b.sample_date) || a.metric.localeCompare(b.metric))
@@ -1426,12 +1559,13 @@ function exportForChatGpt() {
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const latestResults = getLatestResultsForExport(scopedResults);
   const importSchema = getChatGptImportInstructions();
+  const exportScope = getExportScopeLabel();
 
   const lines = [
     "# Preventative Health Dashboard Export",
     "",
     `Exported: ${now}`,
-    "Scope: all available data for Ben and Angelika",
+    `Scope: all available data for ${exportScope}`,
     "",
     "## Purpose",
     "",
@@ -1501,12 +1635,13 @@ function exportReviewPack() {
   const warnings = state.results.filter((result) => ["Outside range", "Near limit"].includes(result.status_vs_range));
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const materialChanges = getMaterialChanges(state.results);
+  const exportScope = getExportScopeLabel();
 
   const lines = [
     "# Preventative Health Review Pack",
     "",
     `Exported: ${now}`,
-    "Scope: focused review pack for Ben and Angelika",
+    `Scope: focused review pack for ${exportScope}`,
     "",
     "## Purpose",
     "",
@@ -1543,6 +1678,13 @@ function exportReviewPack() {
   );
 }
 
+function getExportScopeLabel() {
+  const names = state.profiles.map((profile) => profile.name).filter(Boolean);
+  if (names.length === 0) return "this private account";
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 function getMaterialChanges(results) {
   return results
     .filter((result) => result.previous_result !== null && result.previous_result !== undefined)
@@ -1563,7 +1705,7 @@ function getChatGptImportInstructions() {
     {
       import_type: "health_dashboard_measurements",
       version: 1,
-      notes: "Use profile_id ben or angelika. Use result_date for the report/result date and sample_date for the sample or measurement date. Use null for missing lower or upper reference limits. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
+      notes: "Use the profile_id values already present in the export. Use result_date for the report/result date and sample_date for the sample or measurement date. Use null for missing lower or upper reference limits. Include source_type, source_confidence, source_notes, and linked_source_document where available. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
       measurements: [
         {
           profile_id: "ben",
@@ -1574,6 +1716,10 @@ function getChatGptImportInstructions() {
           unit: "mg/dL",
           reference_lower_limit: null,
           reference_upper_limit: 115,
+          source_type: "Lab Report / PDF",
+          source_confidence: "High",
+          source_notes: "Optional source/context note",
+          linked_source_document: "Optional report filename or link",
           notes: "Optional source/context note",
         },
       ],
@@ -1651,6 +1797,7 @@ function prepareChatGptImport(payload) {
       prepared.skipped.push({ reason: "Missing or invalid result value", item });
       return;
     }
+    const sourceType = item.source_type || getDefaultSourceType(selectedMetric.name);
 
     const result = {
       id: getId(),
@@ -1675,6 +1822,10 @@ function prepareChatGptImport(payload) {
       percentage_change_since_previous_test: null,
       trend_direction: "first",
       notes: item.notes ?? "Imported from ChatGPT extraction.",
+      source_type: sourceType,
+      source_confidence: item.source_confidence || getSourceConfidence(sourceType),
+      source_notes: item.source_notes ?? "",
+      linked_source_document: item.linked_source_document ?? item.source_document ?? "",
     };
 
     if (!result.test_date || !result.sample_date) {
@@ -1736,6 +1887,7 @@ function renderImportReview(review) {
           <td>${escapeHtml(formatValue(result.result_value, result.unit))}</td>
           <td>${formatDate(result.sample_date)}</td>
           <td>${escapeHtml(`${result.reference_lower_limit ?? "null"} - ${result.reference_upper_limit ?? "null"}`)}</td>
+          <td>${escapeHtml(result.source_confidence)} · ${escapeHtml(result.source_type)}</td>
         </tr>
       `,
     )
@@ -1753,7 +1905,7 @@ function renderImportReview(review) {
     </div>
     ${
       review.measurements.length
-        ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Sample date</th><th>Range</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
+        ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Sample date</th><th>Range</th><th>Source</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
         : `<p>No measurements are ready to import.</p>`
     }
     ${review.measurements.length > 12 ? `<p class="privacy-note">Showing first 12 measurements only.</p>` : ""}
@@ -1810,7 +1962,7 @@ function getLatestResultsForExport(results) {
 }
 
 function formatResultForExport(result) {
-  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}; status ${result.status_vs_range}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}${result.notes ? `; notes: ${result.notes}` : ""}`;
+  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}; status ${result.status_vs_range}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}; source ${result.source_type ?? "not set"} (${result.source_confidence ?? "not set"})${result.linked_source_document ? `; document: ${result.linked_source_document}` : ""}${result.source_notes ? `; source notes: ${result.source_notes}` : ""}${result.notes ? `; notes: ${result.notes}` : ""}`;
 }
 
 function downloadText(filename, content, type) {
@@ -1841,7 +1993,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.16").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.19").catch(() => {});
   });
 }
 
@@ -1896,6 +2048,19 @@ authForm.addEventListener("submit", signInWithPassword);
 magicLinkButton.addEventListener("click", sendMagicLink);
 personInput.addEventListener("change", syncRangeDefaults);
 metricInput.addEventListener("change", syncMetricDefaults);
+metricSearchInput.addEventListener("input", populateMetrics);
+quickMetricPanel.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-metric-name]");
+  if (!button) return;
+  selectMetric(button.dataset.metricName);
+  valueInput.focus();
+});
+sourceTypeInput.addEventListener("change", syncSourceConfidence);
+focusEntryButton.addEventListener("click", () => {
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  valueInput.focus();
+});
+focusImportButton.addEventListener("click", () => importChatGptInput.click());
 trendMetricInput.addEventListener("change", () => {
   state.activeTrendKey = trendMetricInput.value;
   renderTrends();
@@ -1975,6 +2140,7 @@ populatePeople();
 populateMetrics();
 populateTrendMetrics();
 setTodayDefaults();
+syncSourceDefaults();
 renderSyncFooter();
 render();
 registerServiceWorker();

@@ -45,6 +45,14 @@ class Element {
     this.clicked = true;
   }
 
+  focus() {
+    this.focused = true;
+  }
+
+  scrollIntoView() {
+    this.scrolledIntoView = true;
+  }
+
   reset() {
     this.resetCalled = true;
   }
@@ -63,7 +71,13 @@ function createDocument() {
     "authEmail",
     "authPassword",
     "magicLinkButton",
+    "onboardingPanel",
+    "onboardingTitle",
+    "onboardingText",
+    "focusEntryButton",
+    "focusImportButton",
     "profileCards",
+    "personField",
     "benName",
     "benDob",
     "benHeight",
@@ -73,6 +87,8 @@ function createDocument() {
     "personInput",
     "resultForm",
     "markerInput",
+    "metricSearchInput",
+    "quickMetricPanel",
     "trendMetricInput",
     "trendPanel",
     "unitInput",
@@ -84,6 +100,10 @@ function createDocument() {
     "sampleDateInput",
     "valueInput",
     "notesInput",
+    "sourceTypeInput",
+    "sourceConfidenceInput",
+    "sourceNotesInput",
+    "sourceDocumentInput",
     "resultsBody",
     "emptyState",
     "totalResults",
@@ -202,21 +222,24 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.16"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.16"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.19"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.19"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
+assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
+assert(indexHtml.includes("privacy-guard.js?v=0.19"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.19"), "privacy guard should be cached with the app shell");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.16"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.16"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.16"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.16"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.16"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.16", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.19"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.19"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.19"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.19"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.19"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.19", "footer should show app version");
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 
@@ -226,15 +249,29 @@ context.syncMetricDefaults();
 assert(document.elements.lowInput.value === "", "LDL lower limit should be blank/null");
 assert(String(document.elements.highInput.value) === "115", "LDL upper default should load");
 assert(document.elements.highInput.disabled === false, "first range entry should be editable");
+assert(document.elements.sourceTypeInput.value === "Lab Report / PDF", "LDL should default to lab source");
+assert(document.elements.sourceConfidenceInput.value === "High", "lab source should be high confidence");
+
+document.elements.metricSearchInput.value = "glucose";
+context.populateMetrics();
+assert(document.elements.markerInput.innerHTML.includes("Glucose"), "metric search should retain matching options");
+context.selectMetric("Weight");
+assert(document.elements.sourceTypeInput.value === "Manual Measurement", "weight should default to manual source");
+context.selectMetric("LDL");
 
 document.elements.dateInput.value = "2026-01-15";
 document.elements.sampleDateInput.value = "2026-01-14";
 document.elements.valueInput.value = "130";
 document.elements.highInput.value = "115";
+document.elements.sourceNotesInput.value = "Imported lab PDF";
+document.elements.sourceDocumentInput.value = "Rel21832308_06_06_2026.pdf";
 context.addResult({ preventDefault() {} });
 let results = JSON.parse(store["blood-results-tracker:v3"]);
 assert(results.length === 1, "one result should be saved");
 assert(results[0].status_vs_range === "Outside range", "LDL 130 over 115 should be outside range");
+assert(results[0].source_type === "Lab Report / PDF", "source type should save");
+assert(results[0].source_confidence === "High", "source confidence should save");
+assert(results[0].linked_source_document === "Rel21832308_06_06_2026.pdf", "linked source document should save");
 assert(JSON.parse(store["health-dashboard-reference-ranges:v1"])["ben:LDL"].high === 115, "range should be saved per person and metric");
 
 document.elements.personInput.value = "ben";
@@ -267,6 +304,10 @@ const imported = context.importChatGptPayload({
       unit: "mg/dL",
       reference_lower_limit: 35,
       reference_upper_limit: 55,
+      source_type: "Lab Report / PDF",
+      source_confidence: "High",
+      source_notes: "Lab portal",
+      linked_source_document: "angelika-lipids.pdf",
     },
   ],
 });
@@ -311,14 +352,19 @@ const duplicate = context.importChatGptPayload({
 assert(duplicate.measurementCount === 0, "duplicate imports should be skipped");
 results = JSON.parse(store["blood-results-tracker:v3"]);
 assert(results.some((result) => result.profile_id === "angelika" && result.metric === "HDL"), "imported Angelika HDL should save");
+assert(results.some((result) => result.linked_source_document === "angelika-lipids.pdf"), "imported source document should save");
 
 context.exportForChatGpt();
 const exportText = context.lastBlob.parts.join("");
 assert(exportText.includes("ChatGPT Import JSON Schema"), "ChatGPT export should include import schema");
-assert(exportText.includes("Scope: all available data"), "ChatGPT export should include all data");
+assert(exportText.includes("Scope: all available data for Ben and Angelika"), "ChatGPT export should include the active profile names");
+assert(exportText.includes("Use the profile_id values already present"), "ChatGPT import guidance should avoid assuming shared profiles");
+assert(exportText.includes("source_confidence"), "ChatGPT export schema should include source confidence");
+assert(exportText.includes("source Lab Report / PDF"), "ChatGPT export should include source context");
 context.exportReviewPack();
 const reviewPack = context.lastBlob.parts.join("");
 assert(reviewPack.includes("Preventative Health Review Pack"), "review pack should export focused markdown");
+assert(reviewPack.includes("Scope: focused review pack for Ben and Angelika"), "review pack should include the active profile names");
 
 document.elements.trendMetricInput.value = "LDL";
 vm.runInContext('state.activeTrendKey = "LDL"; renderTrends();', context);
