@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.19" />
-    <link rel="icon" href="app-icon.svg?v=0.19" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.19" />
-    <link rel="stylesheet" href="styles.css?v=0.19" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.20" />
+    <link rel="icon" href="app-icon.svg?v=0.20" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.20" />
+    <link rel="stylesheet" href="styles.css?v=0.20" />
   </head>
   <body>
     <main class="app-shell">
@@ -150,14 +150,10 @@
             </label>
 
             <label>
-              Report date
+              Date
               <input id="dateInput" type="date" required />
             </label>
-
-            <label>
-              Sample date
-              <input id="sampleDateInput" type="date" required />
-            </label>
+            <input id="sampleDateInput" type="hidden" />
 
             <label>
               Find metric
@@ -268,8 +264,7 @@
                 <thead>
                   <tr>
                     <th>Person</th>
-                    <th>Result date</th>
-                    <th>Sample date</th>
+                    <th>Date</th>
                     <th>Metric</th>
                     <th>Value</th>
                     <th>Range</th>
@@ -297,7 +292,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.19</span>
+          <span class="version-chip" id="appVersion">v0.20</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
@@ -320,9 +315,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.19"></script>
+    <script src="supabase-config.js?v=0.20"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.19"></script>
-    <script src="privacy-guard.js?v=0.19"></script>
+    <script src="app.js?v=0.20"></script>
+    <script src="privacy-guard.js?v=0.20"></script>
   </body>
 </html>

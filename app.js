@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.19";
+const APP_VERSION = "v0.20";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -1158,7 +1158,6 @@ function render() {
       return `
         <tr>
           <td>${escapeHtml(result.person_name)}</td>
-          <td>${formatDate(result.test_date)}</td>
           <td>${formatDate(result.sample_date)}</td>
           <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span><span class="source-badge">${escapeHtml(result.source_confidence)} · ${escapeHtml(result.source_type)}</span>${notes}</td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
@@ -1430,12 +1429,13 @@ function addResult(event) {
   const resultValue = parseResultValue(valueInput.value, selectedMetric.type);
   if (resultValue === null || resultValue === "") return;
 
+  const measurementDate = testDateInput.value;
   const result = {
     id: getId(),
     profile_id: profile.id,
     person_name: profile.name,
-    test_date: testDateInput.value,
-    sample_date: sampleDateInput.value,
+    test_date: measurementDate,
+    sample_date: measurementDate,
     metric: selectedMetric.name,
     group: selectedMetric.group,
     metric_type: selectedMetric.type,
@@ -1705,12 +1705,11 @@ function getChatGptImportInstructions() {
     {
       import_type: "health_dashboard_measurements",
       version: 1,
-      notes: "Use the profile_id values already present in the export. Use result_date for the report/result date and sample_date for the sample or measurement date. Use null for missing lower or upper reference limits. Include source_type, source_confidence, source_notes, and linked_source_document where available. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
+      notes: "Use the profile_id values already present in the export. Prefer date for the measurement date. result_date and sample_date are also accepted for compatibility. Use null for missing lower or upper reference limits. Include source_type, source_confidence, source_notes, and linked_source_document where available. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
       measurements: [
         {
           profile_id: "ben",
-          result_date: "YYYY-MM-DD",
-          sample_date: "YYYY-MM-DD",
+          date: "YYYY-MM-DD",
           metric: "LDL",
           result_value: 123,
           unit: "mg/dL",
@@ -1803,8 +1802,8 @@ function prepareChatGptImport(payload) {
       id: getId(),
       profile_id: profile.id,
       person_name: profile.name,
-      test_date: item.result_date || item.test_date || item.sample_date,
-      sample_date: item.sample_date || item.result_date || item.test_date,
+      test_date: item.date || item.result_date || item.test_date || item.sample_date,
+      sample_date: item.date || item.sample_date || item.result_date || item.test_date,
       metric: selectedMetric.name,
       group: selectedMetric.group,
       metric_type: selectedMetric.type,
@@ -1829,7 +1828,7 @@ function prepareChatGptImport(payload) {
     };
 
     if (!result.test_date || !result.sample_date) {
-      prepared.skipped.push({ reason: "Missing result date or sample date", item });
+      prepared.skipped.push({ reason: "Missing date", item });
       return;
     }
     const duplicateKey = getMeasurementKey(result);
@@ -1905,7 +1904,7 @@ function renderImportReview(review) {
     </div>
     ${
       review.measurements.length
-        ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Sample date</th><th>Range</th><th>Source</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
+        ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Date</th><th>Range</th><th>Source</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
         : `<p>No measurements are ready to import.</p>`
     }
     ${review.measurements.length > 12 ? `<p class="privacy-note">Showing first 12 measurements only.</p>` : ""}
@@ -1993,7 +1992,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.19").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.20").catch(() => {});
   });
 }
 

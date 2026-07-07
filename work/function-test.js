@@ -222,24 +222,26 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.19"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.19"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.20"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.20"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.19"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.19"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.20"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.20"), "privacy guard should be cached with the app shell");
+assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
+assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.19"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.19"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.19"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.19"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.19"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.19", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.20"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.20"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.20"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.20"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.20"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.20", "footer should show app version");
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 
@@ -260,7 +262,6 @@ assert(document.elements.sourceTypeInput.value === "Manual Measurement", "weight
 context.selectMetric("LDL");
 
 document.elements.dateInput.value = "2026-01-15";
-document.elements.sampleDateInput.value = "2026-01-14";
 document.elements.valueInput.value = "130";
 document.elements.highInput.value = "115";
 document.elements.sourceNotesInput.value = "Imported lab PDF";
@@ -268,6 +269,7 @@ document.elements.sourceDocumentInput.value = "Rel21832308_06_06_2026.pdf";
 context.addResult({ preventDefault() {} });
 let results = JSON.parse(store["blood-results-tracker:v3"]);
 assert(results.length === 1, "one result should be saved");
+assert(results[0].test_date === "2026-01-15" && results[0].sample_date === "2026-01-15", "single date should populate both stored dates");
 assert(results[0].status_vs_range === "Outside range", "LDL 130 over 115 should be outside range");
 assert(results[0].source_type === "Lab Report / PDF", "source type should save");
 assert(results[0].source_confidence === "High", "source confidence should save");
@@ -282,12 +284,11 @@ context.toggleRangeEditing();
 assert(document.elements.highInput.disabled === false, "edit range should unlock limits");
 
 document.elements.dateInput.value = "2026-06-15";
-document.elements.sampleDateInput.value = "2026-06-14";
 document.elements.valueInput.value = "100";
 document.elements.highInput.value = "115";
 context.addResult({ preventDefault() {} });
 results = JSON.parse(store["blood-results-tracker:v3"]);
-const latestLdl = results.find((result) => result.sample_date === "2026-06-14" && result.metric === "LDL");
+const latestLdl = results.find((result) => result.sample_date === "2026-06-15" && result.metric === "LDL");
 assert(latestLdl.previous_result === 130, "previous LDL should be captured");
 assert(latestLdl.trend_direction === "Improved", "lower LDL should be improved");
 
@@ -297,8 +298,7 @@ const imported = context.importChatGptPayload({
   measurements: [
     {
       profile_id: "angelika",
-      result_date: "2026-06-20",
-      sample_date: "2026-06-19",
+      date: "2026-06-19",
       metric: "HDL",
       result_value: 60,
       unit: "mg/dL",
@@ -318,8 +318,7 @@ const reviewOnly = context.prepareChatGptImport({
   measurements: [
     {
       profile_id: "ben",
-      result_date: "2026-07-20",
-      sample_date: "2026-07-19",
+      date: "2026-07-19",
       metric: "LDL",
       result_value: 140,
       unit: "mg/dL",
@@ -339,8 +338,7 @@ const duplicate = context.importChatGptPayload({
   measurements: [
     {
       profile_id: "angelika",
-      result_date: "2026-06-20",
-      sample_date: "2026-06-19",
+      date: "2026-06-19",
       metric: "HDL",
       result_value: 60,
       unit: "mg/dL",
