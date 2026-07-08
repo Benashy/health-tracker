@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.24";
+const APP_VERSION = "v0.25";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -910,6 +910,10 @@ function getStatus(result) {
   const value = Number(result.result_value);
   const low = result.reference_lower_limit;
   const high = result.reference_upper_limit;
+  if (isTargetMetric(result.metric)) {
+    if (high === null) return "Recorded";
+    return value <= high ? "On target" : "Above target";
+  }
   if (low !== null && value < low) return "Outside range";
   if (high !== null && value > high) return "Outside range";
   if (isNearLimit(value, low, high)) return "Near limit";
@@ -1184,13 +1188,12 @@ function render() {
       const statusClass = getStatusClass(result.status_vs_range);
       const due = getDueStatus(getProfile(result.profile_id), getMetric(result.metric));
       const range = formatRangeOrTarget(result);
-      const notes = result.notes ? `<span class="notes">${escapeHtml(result.notes)}</span>` : "";
 
       return `
         <tr>
           <td>${escapeHtml(result.person_name)}</td>
           <td>${formatDate(result.sample_date)}</td>
-          <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span>${notes}</td>
+          <td><strong>${escapeHtml(result.metric)}</strong></td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
           <td>${range}</td>
           <td><span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span></td>
@@ -1458,8 +1461,8 @@ function renderSummary() {
 
 function getStatusClass(status) {
   if (status === "Outside range") return "bad";
-  if (status === "Near limit") return "near";
-  if (status === "In range") return "ok";
+  if (status === "Near limit" || status === "Above target" || status === "Below target") return "near";
+  if (status === "In range" || status === "On target") return "ok";
   return "neutral";
 }
 
@@ -2046,7 +2049,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.24").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.25").catch(() => {});
   });
 }
 
