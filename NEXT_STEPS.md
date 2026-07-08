@@ -1,61 +1,100 @@
-# Next Steps
+# Health Tracker Outstanding To-Do List
 
-## GitHub And Supabase
+Last updated: 2026-07-08
 
-Next time, move this app from a local-only browser tracker to a proper hosted app:
+When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
-- Add the project to GitHub.
-- Add Supabase as the live database.
-- Use `SUPABASE_PLAN.md` as the deployment guide.
-- Replace browser-only local storage with one private Supabase JSONB data row per user.
-- Keep structured Supabase tables as a later upgrade path only if reporting or audit needs justify them.
-- Create login using Supabase email/password first, with magic links as an optional secondary method.
-- Fill `supabase-config.js` with the Supabase project URL and public anon key once the project exists.
-- Use controlled account creation rather than a public sign-up flow.
-- Restrict access to Ben and Angelika only.
-- Start with fresh cloud accounts and do not migrate any existing local browser data.
-- Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
-- Add manual cloud refresh and clear `Updated just now / Updated X min ago` status.
-- Add stale-write protection before saving so one device cannot overwrite newer cloud data from another device.
-- Use the Supabase `updated_at` value as the save conflict token.
-- Support offline viewing as read-only unless robust conflict handling is added.
-- Keep the PWA install support, manifest, app icon, and service worker cache aligned with each release.
-- Use visible versioning and cache-busting query strings on every release.
-- Use separate Ben and Angelika logins rather than a shared account.
-- Add Supabase row-level security so each person sees only their own measurements by default.
-- Treat this as a preventative health dashboard, not only a blood results tracker.
-- Store profile details inside each user's private dashboard JSON: name, date of birth, and height.
-- Add sex to each user's stable profile details so reference ranges and context can be person-specific.
-- Keep profiles clickable as dashboard filters, with edit controls for correcting stable profile details.
-- Include vitals, fitness metrics, cardiovascular markers, hormone panel markers, and one-off/infrequent investigations in the cloud data.
-- Do not add BMI as a primary tracked metric. If added later, keep it calculated-only and secondary.
-- Preserve per-metric schedule intervals and due/overdue states.
-- Preserve CSV export and ChatGPT-friendly Markdown export.
-- Preserve ChatGPT JSON import.
-- Preserve import review before saving ChatGPT-extracted data.
-- Preserve review pack export focused on abnormal, near-limit, overdue, or materially changed results.
-- Preserve stored per-person, per-metric reference ranges with explicit edit flow.
-- Preserve trend summaries: latest, change, highest, lowest, history, and chart.
-- Add source confidence metadata to metrics, timeline events, documents, and notes: source type, confidence, source notes, and linked source document.
-- Show subtle confidence labels such as Lab-confirmed, Clinician report, Manual entry, Wearable estimate, Calculated, or User note.
-- Use confidence to avoid over-interpreting wearable estimates, inconsistent manual measurements, and subjective notes.
-- Add personal targets per user, such as target weight, target waist circumference, or fitness goals.
-- Add a Current Health Snapshot as the first page after login, with overall status, current priorities, risk factors, reassuring results, next scheduled review, and latest key metrics.
-- Add a health events timeline per user.
-- Support timeline categories for investigations, findings, procedures, vaccinations, lifestyle milestones, medication/supplement changes, and aviation medical events.
-- Add GP/clinician notes per user.
-- Add PDF blood report upload and storage later, most likely using Supabase Storage.
-- Preserve original source documents and allow documents to attach to timeline events, blood test entries, metrics, and user profiles.
-- Add measurement instructions for waist, weight, blood pressure, and blood tests so repeat readings are consistent.
-- Add optional reminders and follow-ups for annual bloods, home measurements, GP review, colonoscopy, ECG, CAC consideration, and abnormal-result follow-up.
-- Keep escalation language calm and non-diagnostic: green for routine tracking, amber for monitoring or GP discussion, red for clinician review.
-- Add year-on-year comparison views once enough dated data exists.
-- Keep tracking blood and urine results only.
+## Current Status
+
+- GitHub repo is live: `Benashy/health-tracker`.
+- GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
+- Supabase login and per-user cloud saving are in place.
+- Ben and Angelika both have separate accounts and initial profile details.
+- The app is currently usable for early testing, but the UI and workflows still need polish before heavy real-world use.
+
+## Highest Priority
+
+1. Test real use with a small number of genuine entries.
+   - Add weight, waist circumference, blood pressure, and a few representative blood markers for Ben and Angelika.
+   - Use this to identify friction in the real workflow before adding lots of data.
+
+2. Polish metric entry.
+   - Make the add-measurement flow calmer and faster.
+   - Keep body metrics, blood/urine results, cardiovascular markers, fitness metrics, and one-off investigations easy to distinguish.
+   - Keep weight and waist as target-based metrics, not clinical reference-range metrics.
+   - Preserve per-person, per-metric reference ranges and targets with explicit edit controls.
+   - Continue to avoid redundant fields that make manual entry feel heavy.
+
+3. Improve trends and charts.
+   - Make previous result, latest change, percentage change, highest, lowest, and trend direction easier to scan.
+   - Add clearer 6-month, 12-month, year-on-year, and all-time comparisons where enough data exists.
+   - Keep trend language calm and non-diagnostic.
+
+4. Review privacy and security.
+   - Re-check Supabase Row Level Security.
+   - Confirm each signed-in user can only see their own health data.
+   - Confirm only Ben and Angelika can use the live app.
+   - Keep private health data out of GitHub and browser-visible code.
+
+## Medium Priority
+
+5. Build the ChatGPT import workflow.
+   - Export all current app context in a ChatGPT-friendly format.
+   - Use that export to instruct ChatGPT how to read an uploaded blood/urine PDF.
+   - Have ChatGPT return structured JSON.
+   - Show an import confirmation screen before saving.
+   - Never import STI or immunoserology results.
+
+6. Improve the Current Health Snapshot.
+   - Add a first-page summary after login.
+   - Include current priorities, overdue items, reassuring results, recent changes, and latest key metrics.
+   - Keep it preventative, not diagnostic.
+
+7. Improve mobile and tablet UI.
+   - Make iPhone and iPad layouts first-class.
+   - Reduce table heaviness on small screens.
+   - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
+
+8. Add health events and notes.
+   - Add a per-user timeline.
+   - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
+   - Allow GP/clinician notes per user.
+
+## Later
+
+9. Add document upload/storage.
+   - Use Supabase Storage for original PDFs and source documents.
+   - Attach documents to blood results, timeline events, metrics, or profiles where useful.
+
+10. Add reminders and review scheduling.
+   - Keep reminders cautious and not excessive.
+   - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
+
+11. Add backup scheduling.
+   - Use the backup process below.
+   - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
+
+12. Consider structured database tables later.
+   - Keep the current simple per-user JSONB row while the app is evolving.
+   - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
+
+## Standing Design Rules
+
+- Prevention over diagnosis.
+- Trends over isolated values.
+- Avoid unnecessary testing.
+- Escalate investigations only when first-line markers justify it.
+- Keep blood and urine tracking only.
 - Continue excluding STI and immunoserology tests.
+- Do not add BMI as a primary tracked metric. If added later, keep it calculated-only and secondary.
+- Keep Ben and Angelika's data private and separate.
+- Use visible versioning and cache-busting on every release.
+- Support offline viewing as read-only unless robust conflict handling is added.
+- Protect against overwriting newer cloud data from another device.
 
 ## Backup Process
 
-The app's live data will be stored in Supabase, not in the GitHub website files. GitHub backs up the app code, but the actual user data needs a separate backup.
+The app's live data is stored in Supabase, not in the GitHub website files. GitHub backs up the app code, but the actual user data needs a separate backup.
 
 Use `BACKUP_PLAN.md` as the detailed backup implementation guide.
 
