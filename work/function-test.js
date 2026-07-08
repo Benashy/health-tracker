@@ -226,14 +226,14 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.21"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.21"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.24"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.24"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.21"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.21"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.24"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.24"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(!indexHtml.includes("Find metric"), "metric search box should not be visible");
@@ -247,12 +247,12 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.21"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.21"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.21"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.21"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.21"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.21", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.24"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.24"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.24"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.24"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.24"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.24", "footer should show app version");
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 
@@ -273,6 +273,7 @@ context.selectMetric("Weight");
 assert(document.elements.sourceTypeInput.value === "Manual Measurement", "weight should default to manual source");
 assert(document.elements.highLabel.textContent === "Target", "weight should use target label");
 assert(document.elements.lowField.classList.contains("hidden"), "weight should hide lower limit field");
+assert(document.elements.lowInput.disabled === true, "weight lower limit should be disabled");
 context.selectMetric("LDL");
 
 document.elements.dateInput.value = "2026-01-15";
@@ -316,6 +317,28 @@ results = JSON.parse(store["blood-results-tracker:v3"]);
 const waist = results.find((result) => result.metric === "Waist circumference");
 assert(waist.reference_lower_limit === null && waist.reference_upper_limit === 85, "target metrics should save target as upper limit");
 assert(document.elements.resultsBody.innerHTML.includes("85 cm"), "target should render cleanly in results");
+
+context.selectMetric("Weight");
+document.elements.dateInput.value = "2026-07-02";
+document.elements.valueInput.value = "82.5";
+document.elements.highInput.value = "84";
+context.addResult({ preventDefault() {} });
+context.selectMetric("Weight");
+assert(document.elements.highInput.disabled === true, "saved target should lock on repeat entry");
+context.toggleRangeEditing();
+assert(document.elements.highInput.disabled === false, "edit target should unlock target input");
+document.elements.highInput.value = "79";
+context.toggleRangeEditing();
+assert(document.elements.highInput.disabled === true, "lock target should relock target input");
+assert(JSON.parse(store["health-dashboard-reference-ranges:v1"])["ben:Weight"].high === 79, "locking target should save the new target");
+document.elements.dateInput.value = "2026-07-16";
+document.elements.valueInput.value = "82";
+context.addResult({ preventDefault() {} });
+results = JSON.parse(store["blood-results-tracker:v3"]);
+const weightRows = results.filter((result) => result.metric === "Weight").sort((a, b) => a.sample_date.localeCompare(b.sample_date));
+assert(weightRows[0].reference_upper_limit === 84, "historical weight should keep old target");
+assert(weightRows[1].reference_upper_limit === 79, "new weight should use updated target");
+assert(document.elements.resultsBody.innerHTML.includes("Delete"), "results should expose a delete action");
 
 const imported = context.importChatGptPayload({
   import_type: "health_dashboard_measurements",

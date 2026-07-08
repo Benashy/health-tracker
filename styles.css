@@ -633,16 +633,65 @@ button:focus-visible {
 
 .results-table {
   width: 100%;
-  min-width: 1380px;
+  min-width: 1180px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 th,
 td {
   border-bottom: 1px solid var(--line);
-  padding: 13px 10px;
+  padding: 12px 10px;
   text-align: left;
   vertical-align: top;
+}
+
+.results-table th:nth-child(1),
+.results-table td:nth-child(1) {
+  width: 9%;
+}
+
+.results-table th:nth-child(2),
+.results-table td:nth-child(2) {
+  width: 10%;
+  white-space: nowrap;
+}
+
+.results-table th:nth-child(3),
+.results-table td:nth-child(3) {
+  width: 19%;
+}
+
+.results-table th:nth-child(4),
+.results-table td:nth-child(4),
+.results-table th:nth-child(5),
+.results-table td:nth-child(5),
+.results-table th:nth-child(8),
+.results-table td:nth-child(8),
+.results-table th:nth-child(9),
+.results-table td:nth-child(9),
+.results-table th:nth-child(10),
+.results-table td:nth-child(10) {
+  width: 9%;
+}
+
+.results-table th:nth-child(6),
+.results-table td:nth-child(6),
+.results-table th:nth-child(7),
+.results-table td:nth-child(7),
+.results-table th:nth-child(11),
+.results-table td:nth-child(11) {
+  width: 8%;
+}
+
+.results-table th:nth-child(12),
+.results-table td:nth-child(12) {
+  width: 7%;
+  text-align: right;
+  position: sticky;
+  right: 0;
+  background: #ffffff;
+  box-shadow: -8px 0 12px rgba(255, 255, 255, 0.86);
 }
 
 th {
@@ -729,19 +778,26 @@ td {
 }
 
 .delete-button {
-  min-width: 34px;
+  min-width: 58px;
   min-height: 34px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: transparent;
+  background: #fbfcfb;
   color: var(--muted);
-  font-size: 1.2rem;
+  font-size: 0.78rem;
+  font-weight: 800;
   line-height: 1;
 }
 
 .delete-button:hover {
   border-color: var(--line);
   color: #8e2e22;
+}
+
+.delete-button.confirming {
+  border-color: #dc6a59;
+  background: var(--bad-bg);
+  color: var(--bad);
 }
 
 .empty-state {

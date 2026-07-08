@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.21";
+const APP_VERSION = "v0.24";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -563,7 +563,11 @@ function setEditingAvailability() {
     element.disabled = disabled;
   });
   importChatGptButton.disabled = disabled;
-  resetButton.disabled = disabled;
+  if (resetButton) resetButton.disabled = disabled;
+  if (!disabled && metricInput.value) {
+    syncRangeDefaults();
+    syncSourceDefaults();
+  }
 }
 
 function renderAuthPanel() {
@@ -835,7 +839,7 @@ function syncRangeDefaults() {
   lowField.classList.toggle("hidden", targetMetric);
   lowLabel.textContent = "Reference lower limit";
   highLabel.textContent = targetMetric ? "Target" : "Reference upper limit";
-  lowInput.disabled = Boolean(savedRange) && !isEditing;
+  lowInput.disabled = targetMetric || (Boolean(savedRange) && !isEditing);
   highInput.disabled = Boolean(savedRange) && !isEditing;
   rangeEditButton.classList.toggle("hidden", !savedRange);
   rangeEditButton.textContent = isEditing
@@ -1195,7 +1199,7 @@ function render() {
           <td>${formatChange(result.absolute_change_since_previous_test, result)}</td>
           <td>${formatPercent(result.percentage_change_since_previous_test, result)}</td>
           <td>${escapeHtml(result.trend_direction)}</td>
-          <td><button class="delete-button" type="button" data-id="${result.id}" aria-label="Delete result">x</button></td>
+          <td><button class="delete-button" type="button" data-id="${result.id}" aria-label="Delete result">Delete</button></td>
         </tr>
       `;
     })
@@ -1249,8 +1253,19 @@ function toggleRangeEditing() {
   if (!selectedMetric || !profile) return;
 
   const key = getRangeKey(profile.id, selectedMetric.name);
-  state.editingRangeKey = state.editingRangeKey === key ? null : key;
+  if (state.editingRangeKey === key) {
+    state.metricRanges[key] = {
+      low: isTargetMetric(selectedMetric.name) ? null : parseLimit(lowInput.value),
+      high: parseLimit(highInput.value),
+      updated_at: new Date().toISOString(),
+    };
+    state.editingRangeKey = null;
+    saveMetricRanges();
+  } else {
+    state.editingRangeKey = key;
+  }
   syncRangeDefaults();
+  renderTrends();
 }
 
 function renderTrends() {
@@ -2031,7 +2046,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.21").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.24").catch(() => {});
   });
 }
 
@@ -2171,6 +2186,17 @@ document.querySelector(".filters").addEventListener("click", (event) => {
 resultsBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-id]");
   if (!button) return;
+  if (button.dataset.confirming !== "true") {
+    resultsBody.querySelectorAll(".delete-button").forEach((item) => {
+      item.dataset.confirming = "false";
+      item.textContent = "Delete";
+      item.classList.remove("confirming");
+    });
+    button.dataset.confirming = "true";
+    button.textContent = "Confirm";
+    button.classList.add("confirming");
+    return;
+  }
   deleteResult(button.dataset.id);
 });
 
