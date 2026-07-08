@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.20";
+const APP_VERSION = "v0.21";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -31,7 +31,7 @@ const manualSourceMetrics = new Set([
 
 const wearableSourceMetrics = new Set(["Resting heart rate", "VO2 Max"]);
 const clinicianSourceMetrics = new Set(["ECG", "Coronary artery calcium score"]);
-const commonMetricNames = [
+const starterMetricNames = [
   "Weight",
   "Waist circumference",
   "Blood pressure systolic",
@@ -43,6 +43,8 @@ const commonMetricNames = [
   "Vitamin D",
   "Ferritin",
 ];
+const quickMetricLimit = 8;
+const targetMetricNames = new Set(["Weight", "Waist circumference"]);
 
 const metrics = [
   metric("Weight", "Core body metrics", "kg", null, null, "numeric", "highest", 14, "context"),
@@ -172,6 +174,9 @@ const quickMetricPanel = document.querySelector("#quickMetricPanel");
 const trendMetricInput = document.querySelector("#trendMetricInput");
 const trendPanel = document.querySelector("#trendPanel");
 const unitInput = document.querySelector("#unitInput");
+const lowField = document.querySelector("#lowField");
+const lowLabel = document.querySelector("#lowLabel");
+const highLabel = document.querySelector("#highLabel");
 const lowInput = document.querySelector("#lowInput");
 const highInput = document.querySelector("#highInput");
 const rangeEditButton = document.querySelector("#rangeEditButton");
@@ -709,12 +714,7 @@ function renderProfiles() {
 
 function populateMetrics() {
   const selectedValue = metricInput.value;
-  const searchTerm = metricSearchInput.value.trim().toLowerCase();
-  const filteredMetrics = metrics.filter((item) => {
-    if (!searchTerm) return true;
-    return `${item.name} ${item.group} ${item.cadence}`.toLowerCase().includes(searchTerm);
-  });
-  const filteredGroups = groupBy(filteredMetrics.length ? filteredMetrics : metrics, "group");
+  const filteredGroups = groupBy(metrics, "group");
   metricInput.innerHTML = Object.entries(filteredGroups)
     .map(([group, groupMetrics]) => {
       const options = groupMetrics
@@ -723,20 +723,35 @@ function populateMetrics() {
       return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
     })
     .join("");
-  if (filteredMetrics.some((item) => item.name === selectedValue)) metricInput.value = selectedValue;
+  if (metrics.some((item) => item.name === selectedValue)) metricInput.value = selectedValue;
   syncMetricDefaults();
   renderQuickMetrics();
 }
 
 function renderQuickMetrics() {
-  quickMetricPanel.innerHTML = commonMetricNames
-    .filter((name) => getMetric(name))
+  quickMetricPanel.innerHTML = getQuickMetricNames()
     .map((name) => `
       <button class="quick-metric-button ${metricInput.value === name ? "active" : ""}" data-metric-name="${escapeHtml(name)}" type="button">
         ${escapeHtml(name)}
       </button>
     `)
     .join("");
+}
+
+function getQuickMetricNames() {
+  const stats = new Map();
+  visibleResults().forEach((result) => {
+    const existing = stats.get(result.metric) ?? { count: 0, latest: "" };
+    existing.count += 1;
+    if (result.sample_date > existing.latest) existing.latest = result.sample_date;
+    stats.set(result.metric, existing);
+  });
+  const frequent = [...stats.entries()]
+    .filter(([name]) => getMetric(name))
+    .sort((a, b) => b[1].count - a[1].count || b[1].latest.localeCompare(a[1].latest) || a[0].localeCompare(b[0]))
+    .map(([name]) => name);
+  const combined = [...frequent, ...starterMetricNames.filter((name) => getMetric(name))];
+  return [...new Set(combined)].slice(0, quickMetricLimit);
 }
 
 function selectMetric(name) {
@@ -811,20 +826,31 @@ function syncRangeDefaults() {
   const key = getRangeKey(profile.id, selectedMetric.name);
   const savedRange = getSavedRange(profile.id, selectedMetric.name);
   const isEditing = state.editingRangeKey === key;
+  const targetMetric = isTargetMetric(selectedMetric.name);
   const defaultLow = selectedMetric.low ?? "";
   const defaultHigh = selectedMetric.high ?? "";
 
-  lowInput.value = savedRange ? savedRange.low ?? "" : defaultLow;
+  lowInput.value = targetMetric ? "" : savedRange ? savedRange.low ?? "" : defaultLow;
   highInput.value = savedRange ? savedRange.high ?? "" : defaultHigh;
+  lowField.classList.toggle("hidden", targetMetric);
+  lowLabel.textContent = "Reference lower limit";
+  highLabel.textContent = targetMetric ? "Target" : "Reference upper limit";
   lowInput.disabled = Boolean(savedRange) && !isEditing;
   highInput.disabled = Boolean(savedRange) && !isEditing;
   rangeEditButton.classList.toggle("hidden", !savedRange);
-  rangeEditButton.textContent = isEditing ? "Lock range" : "Edit range";
-  rangeHint.textContent = savedRange
-    ? isEditing
-      ? "Editing the saved range for this person and metric."
-      : "Saved range is locked for repeat entry."
-    : "First entry can set the saved range for this person and metric.";
+  rangeEditButton.textContent = isEditing
+    ? targetMetric
+      ? "Lock target"
+      : "Lock range"
+    : targetMetric
+      ? "Edit target"
+      : "Edit range";
+  rangeHint.textContent = "";
+  rangeHint.classList.add("hidden");
+}
+
+function isTargetMetric(metricName) {
+  return targetMetricNames.has(metricName);
 }
 
 function visibleResults(results = state.results) {
@@ -1139,6 +1165,7 @@ function render() {
   dueSoonResults.textContent = dueCount;
   latestDate.textContent = latest ? formatDate(latest.sample_date) : "-";
 
+  renderQuickMetrics();
   renderOnboarding(scopedResults, flaggedCount, dueCount);
   renderProfiles();
   renderSchedule();
@@ -1152,14 +1179,14 @@ function render() {
     .map((result) => {
       const statusClass = getStatusClass(result.status_vs_range);
       const due = getDueStatus(getProfile(result.profile_id), getMetric(result.metric));
-      const range = `${result.reference_lower_limit ?? "null"} - ${result.reference_upper_limit ?? "null"}`;
+      const range = formatRangeOrTarget(result);
       const notes = result.notes ? `<span class="notes">${escapeHtml(result.notes)}</span>` : "";
 
       return `
         <tr>
           <td>${escapeHtml(result.person_name)}</td>
           <td>${formatDate(result.sample_date)}</td>
-          <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span><span class="source-badge">${escapeHtml(result.source_confidence)} · ${escapeHtml(result.source_type)}</span>${notes}</td>
+          <td><strong>${escapeHtml(result.metric)}</strong><span class="notes">${escapeHtml(result.group)} · ${escapeHtml(result.cadence)}</span>${notes}</td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
           <td>${range}</td>
           <td><span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span></td>
@@ -1192,6 +1219,17 @@ function renderOnboarding(scopedResults, flaggedCount, dueCount) {
   }
   onboardingTitle.textContent = `${profileName}: ${scopedResults.length} measurements`;
   onboardingText.textContent = `${flaggedCount} warnings · ${dueCount} due or overdue`;
+}
+
+function formatRangeOrTarget(result) {
+  const low = result.reference_lower_limit;
+  const high = result.reference_upper_limit;
+  const unit = result.unit ? ` ${result.unit}` : "";
+  if (isTargetMetric(result.metric)) return high === null ? "-" : `${formatAxisValue(high)}${unit}`;
+  if (low === null && high === null) return "-";
+  if (low === null) return `<= ${formatAxisValue(high)}${unit}`;
+  if (high === null) return `>= ${formatAxisValue(low)}${unit}`;
+  return `${formatAxisValue(low)} - ${formatAxisValue(high)}${unit}`;
 }
 
 function saveRangeForResult(result) {
@@ -1238,7 +1276,8 @@ function renderTrends() {
   const low = numericResults.length ? minBy(numericResults, (result) => Number(result.result_value)) : null;
   const changeClass = getTrendClass(latest.trend_direction);
   const chart = numericResults.length >= 2 ? createSparkline(numericResults, latest) : "";
-  const rangeText = `${latest.reference_lower_limit ?? "null"} - ${latest.reference_upper_limit ?? "null"}${latest.unit ? ` ${latest.unit}` : ""}`;
+  const rangeText = formatRangeOrTarget(latest);
+  const rangeLabel = isTargetMetric(latest.metric) ? "Target" : "Reference";
   const timeline = scopedResults
     .slice(-8)
     .map((result) => `
@@ -1262,7 +1301,7 @@ function renderTrends() {
       <em>${previous ? `Since ${formatDate(previous.sample_date)}` : "First result"}</em>
     </article>
     <article class="trend-card">
-      <strong>Reference</strong>
+      <strong>${rangeLabel}</strong>
       <span>${escapeHtml(rangeText)}</span>
       <em>${escapeHtml(latest.cadence)}</em>
     </article>
@@ -1885,7 +1924,7 @@ function renderImportReview(review) {
           <td>${escapeHtml(result.metric)}</td>
           <td>${escapeHtml(formatValue(result.result_value, result.unit))}</td>
           <td>${formatDate(result.sample_date)}</td>
-          <td>${escapeHtml(`${result.reference_lower_limit ?? "null"} - ${result.reference_upper_limit ?? "null"}`)}</td>
+          <td>${escapeHtml(formatRangeOrTarget(result))}</td>
           <td>${escapeHtml(result.source_confidence)} · ${escapeHtml(result.source_type)}</td>
         </tr>
       `,
@@ -1992,7 +2031,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.20").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.21").catch(() => {});
   });
 }
 
@@ -2091,14 +2130,16 @@ window.addEventListener("offline", () => {
 importReviewModal.addEventListener("click", (event) => {
   if (event.target === importReviewModal) closeImportReview();
 });
-resetButton.addEventListener("click", () => {
-  if (!assertCanEdit()) return;
-  if (!state.results.length) return;
-  if (!window.confirm("Clear all saved health measurements from this browser?")) return;
-  state.results = [];
-  saveResults();
-  render();
-});
+if (resetButton) {
+  resetButton.addEventListener("click", () => {
+    if (!assertCanEdit()) return;
+    if (!state.results.length) return;
+    if (!window.confirm("Clear all saved health measurements from this browser?")) return;
+    state.results = [];
+    saveResults();
+    render();
+  });
+}
 
 profileCards.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-edit-profile]");

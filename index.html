@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.20" />
-    <link rel="icon" href="app-icon.svg?v=0.20" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.20" />
-    <link rel="stylesheet" href="styles.css?v=0.20" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.21" />
+    <link rel="icon" href="app-icon.svg?v=0.21" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.21" />
+    <link rel="stylesheet" href="styles.css?v=0.21" />
   </head>
   <body>
     <main class="app-shell">
@@ -27,7 +27,6 @@
             <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
             <button class="ghost-button" id="exportReviewPackButton" type="button">Review pack</button>
             <button class="ghost-button" id="exportCsvButton" type="button">Export CSV</button>
-            <button class="ghost-button danger" id="resetButton" type="button">Clear data</button>
           </div>
         </header>
 
@@ -141,7 +140,6 @@
           <form class="entry-panel" id="resultForm">
             <div class="panel-heading">
               <h2>Add measurement</h2>
-              <span class="privacy-note">Saved in your private account</span>
             </div>
 
             <label class="person-field" id="personField">
@@ -155,10 +153,7 @@
             </label>
             <input id="sampleDateInput" type="hidden" />
 
-            <label>
-              Find metric
-              <input id="metricSearchInput" type="search" autocomplete="off" placeholder="Type to narrow the metric list" />
-            </label>
+            <input class="hidden" id="metricSearchInput" type="hidden" value="" />
 
             <div class="quick-metrics" id="quickMetricPanel" aria-label="Common metrics"></div>
 
@@ -179,17 +174,17 @@
             </div>
 
             <div class="inline-fields">
-              <label>
-                Reference lower limit
+              <label id="lowField">
+                <span id="lowLabel">Reference lower limit</span>
                 <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" />
               </label>
-              <label>
-                Reference upper limit
+              <label id="highField">
+                <span id="highLabel">Reference upper limit</span>
                 <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
               </label>
             </div>
             <div class="range-tools">
-              <span id="rangeHint">First entry can set the saved range for this person and metric.</span>
+              <span class="hidden" id="rangeHint"></span>
               <button class="mini-button hidden" id="rangeEditButton" type="button">Edit range</button>
             </div>
 
@@ -198,38 +193,22 @@
               <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
             </label>
 
-            <div class="source-grid">
-              <label>
-                Source
-                <select id="sourceTypeInput">
-                  <option value="Lab Report / PDF">Lab report / PDF</option>
-                  <option value="Clinician Report">Clinician report</option>
-                  <option value="Manual Measurement">Manual measurement</option>
-                  <option value="Wearable Estimate">Wearable estimate</option>
-                  <option value="Calculated Value">Calculated value</option>
-                  <option value="User Note">User note</option>
-                </select>
-              </label>
-              <label>
-                Confidence
-                <select id="sourceConfidenceInput">
-                  <option value="High">High</option>
-                  <option value="Medium to High">Medium to high</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Subjective">Subjective</option>
-                </select>
-              </label>
-            </div>
-
-            <label>
-              Source note
-              <input id="sourceNotesInput" type="text" placeholder="e.g. fasting lab report, home BP cuff, Apple Watch" />
-            </label>
-
-            <label>
-              Source document
-              <input id="sourceDocumentInput" type="text" placeholder="Report name or link, if available" />
-            </label>
+            <select class="hidden" id="sourceTypeInput">
+              <option value="Lab Report / PDF">Lab report / PDF</option>
+              <option value="Clinician Report">Clinician report</option>
+              <option value="Manual Measurement">Manual measurement</option>
+              <option value="Wearable Estimate">Wearable estimate</option>
+              <option value="Calculated Value">Calculated value</option>
+              <option value="User Note">User note</option>
+            </select>
+            <select class="hidden" id="sourceConfidenceInput">
+              <option value="High">High</option>
+              <option value="Medium to High">Medium to high</option>
+              <option value="Medium">Medium</option>
+              <option value="Subjective">Subjective</option>
+            </select>
+            <input class="hidden" id="sourceNotesInput" type="hidden" value="" />
+            <input class="hidden" id="sourceDocumentInput" type="hidden" value="" />
 
             <button class="primary-button" type="submit">Add to tracker</button>
           </form>
@@ -267,7 +246,7 @@
                     <th>Date</th>
                     <th>Metric</th>
                     <th>Value</th>
-                    <th>Range</th>
+                    <th>Range / target</th>
                     <th>Status</th>
                     <th>Due</th>
                     <th>Previous</th>
@@ -283,16 +262,10 @@
           </section>
         </section>
 
-        <section class="notes-band hidden" data-private aria-hidden="true">
-          <p>
-            Designed for long-term prevention and trend analysis. Lab tracking remains blood and urine only; STI and immunoserology tests are intentionally excluded.
-          </p>
-        </section>
-
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.20</span>
+          <span class="version-chip" id="appVersion">v0.21</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
@@ -315,9 +288,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.20"></script>
+    <script src="supabase-config.js?v=0.21"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.20"></script>
-    <script src="privacy-guard.js?v=0.20"></script>
+    <script src="app.js?v=0.21"></script>
+    <script src="privacy-guard.js?v=0.21"></script>
   </body>
 </html>
