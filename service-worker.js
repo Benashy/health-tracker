@@ -1,16 +1,16 @@
-const CACHE_NAME = "health-dashboard-v0.25";
+const CACHE_NAME = "health-dashboard-v0.26";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=0.25",
-  "./app.js?v=0.25",
-  "./supabase-config.js?v=0.25",
-  "./privacy-guard.js?v=0.25",
-  "./manifest.webmanifest?v=0.25",
-  "./app-icon.svg?v=0.25",
-  "./app-icon-180.png?v=0.25",
-  "./app-icon-192.png?v=0.25",
-  "./app-icon-512.png?v=0.25",
+  "./styles.css?v=0.26",
+  "./app.js?v=0.26",
+  "./supabase-config.js?v=0.26",
+  "./privacy-guard.js?v=0.26",
+  "./manifest.webmanifest?v=0.26",
+  "./app-icon.svg?v=0.26",
+  "./app-icon-180.png?v=0.26",
+  "./app-icon-192.png?v=0.26",
+  "./app-icon-512.png?v=0.26",
 ];
 
 self.addEventListener("install", (event) => {

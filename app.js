@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.25";
+const APP_VERSION = "v0.26";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -912,7 +912,8 @@ function getStatus(result) {
   const high = result.reference_upper_limit;
   if (isTargetMetric(result.metric)) {
     if (high === null) return "Recorded";
-    return value <= high ? "On target" : "Above target";
+    if (value > high) return "Above target";
+    return value >= high - getTargetTolerance(result.metric) ? "On target" : "Below target";
   }
   if (low !== null && value < low) return "Outside range";
   if (high !== null && value > high) return "Outside range";
@@ -930,6 +931,10 @@ function isNearLimit(value, low, high) {
   if (high !== null) return value >= high * 0.9;
   if (low !== null) return value <= low * 1.1;
   return false;
+}
+
+function getTargetTolerance() {
+  return 1;
 }
 
 function getPreviousResult(result, allResults) {
@@ -2049,7 +2054,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.25").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.26").catch(() => {});
   });
 }
 

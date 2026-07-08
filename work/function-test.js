@@ -226,14 +226,14 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.25"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.25"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.26"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.26"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.25"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.25"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.26"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.26"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -249,12 +249,12 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.25"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.25"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.25"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.25"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.25"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.25", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.26"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.26"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.26"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.26"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.26"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.26", "footer should show app version");
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 
@@ -325,12 +325,19 @@ assert(!document.elements.resultsBody.innerHTML.includes("Core body metrics"), "
 
 context.selectMetric("Weight");
 document.elements.dateInput.value = "2026-07-02";
-document.elements.valueInput.value = "82.5";
+document.elements.valueInput.value = "83.5";
 document.elements.highInput.value = "84";
 context.addResult({ preventDefault() {} });
 results = JSON.parse(store["blood-results-tracker:v3"]);
 const firstWeight = results.find((result) => result.metric === "Weight" && result.sample_date === "2026-07-02");
-assert(firstWeight.status_vs_range === "On target", "weight at or below target should be on target");
+assert(firstWeight.status_vs_range === "On target", "weight within one unit below target should be on target");
+assert(context.getStatus({
+  metric: "Weight",
+  metric_type: "numeric",
+  result_value: "77.8",
+  reference_lower_limit: null,
+  reference_upper_limit: 79,
+}) === "Below target", "weight more than one unit below target should be below target");
 context.selectMetric("Weight");
 assert(document.elements.highInput.disabled === true, "saved target should lock on repeat entry");
 context.toggleRangeEditing();
