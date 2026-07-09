@@ -66,31 +66,37 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Include current priorities, overdue items, reassuring results, recent changes, and latest key metrics.
    - Keep it preventative, not diagnostic.
 
-8. Improve mobile and tablet UI.
+8. Add metric medical context notes.
+   - Start with concise, calm explanations for flagged or borderline results.
+   - Eosinophils and monocytes are the first proof of concept.
+   - Later, add an expandable explanation for every tracked metric.
+   - Keep explanations short, evidence-based, and non-diagnostic.
+
+9. Improve mobile and tablet UI.
    - Make iPhone and iPad layouts first-class.
    - Reduce table heaviness on small screens.
    - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
 
-9. Add health events and notes.
+10. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
 ## Later
 
-10. Add document upload/storage.
+11. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-11. Add reminders and review scheduling.
+12. Add reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
 
-12. Add backup scheduling.
+13. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-13. Consider structured database tables later.
+14. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
 

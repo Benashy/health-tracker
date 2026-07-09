@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.30";
+const APP_VERSION = "v0.31";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -200,7 +200,7 @@ const tableWrap = document.querySelector(".results-table-wrap");
 const totalResults = document.querySelector("#totalResults");
 const flaggedResults = document.querySelector("#flaggedResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
-const latestDate = document.querySelector("#latestDate");
+const nextDueDate = document.querySelector("#nextDueDate");
 const markerSummary = document.querySelector("#markerSummary");
 const schedulePanel = document.querySelector("#schedulePanel");
 const statusStrip = document.querySelector(".status-strip");
@@ -1263,13 +1263,12 @@ function render() {
   const flaggedCount = scopedResults.filter((result) =>
     ["Outside range", "Near limit"].includes(result.status_vs_range),
   ).length;
-  const latest = [...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date))[0];
   const dueCount = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state)).length;
 
   totalResults.textContent = scopedResults.length;
   flaggedResults.textContent = flaggedCount;
   dueSoonResults.textContent = dueCount;
-  latestDate.textContent = latest ? formatDate(latest.sample_date) : "-";
+  nextDueDate.textContent = getNextDueDisplay();
 
   renderQuickMetrics();
   renderOnboarding(scopedResults, flaggedCount, dueCount);
@@ -1478,7 +1477,7 @@ function renderTrends() {
   const rangeText = formatRangeOrTarget(latest);
   const rangeLabel = isTargetMetric(latest.metric) ? "Target" : "Reference";
   const timeline = scopedResults
-    .slice(-8)
+    .slice(-4)
     .map((result) => `
       <li>
         <span>${formatDate(result.sample_date)}</span>
@@ -1679,6 +1678,16 @@ function renderSummarySelection() {
   });
 }
 
+function getNextDueDisplay() {
+  const scheduleItems = getScheduleItems();
+  if (scheduleItems.some((item) => ["due", "overdue"].includes(item.due.state))) return "Now";
+  const next = scheduleItems
+    .map((item) => item.due.nextDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b)[0];
+  return next ? formatDate(toDateString(next)) : "-";
+}
+
 function focusMetricEntry(profileId, metricName) {
   const profile = getProfile(profileId);
   const selectedMetric = getMetric(metricName);
@@ -1710,7 +1719,22 @@ function explainWarning(resultId) {
     message.push(`Previous: ${formatValue(result.previous_result, result.unit)}`);
     message.push(`Change: ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)})`);
   }
+  const medicalNote = getMetricMedicalNote(result.metric);
+  if (medicalNote) {
+    message.push("");
+    message.push(medicalNote);
+  }
   window.alert(message.join("\n"));
+}
+
+function getMetricMedicalNote(metricName) {
+  if (metricName === "Eosinophils") {
+    return "Medical context: eosinophils are white blood cells involved in allergic and inflammatory responses. A borderline high percentage can be seen with common allergic conditions such as hay fever, asthma or eczema, but it should be interpreted alongside the absolute eosinophil count, total white cell count, symptoms, and whether the pattern persists.";
+  }
+  if (metricName === "Monocytes") {
+    return "Medical context: monocytes are white blood cells involved in clearing infection and supporting immune response. A mild isolated increase can occur with recent infection, inflammation or stress, but the significance depends on the absolute monocyte count, total white cell count, symptoms, and repeat results over time.";
+  }
+  return "";
 }
 
 function getStatusClass(status) {
@@ -2340,7 +2364,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.30").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.31").catch(() => {});
   });
 }
 
