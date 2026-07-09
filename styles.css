@@ -185,7 +185,8 @@ h2 {
 }
 
 .status-strip article:hover,
-.status-strip article:focus-visible {
+.status-strip article:focus-visible,
+.status-strip article.active {
   border-color: var(--accent);
   background: var(--surface-soft);
 }
@@ -734,6 +735,33 @@ td {
   font-size: 0.8rem;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.trend-controls {
+  gap: 10px;
+}
+
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segmented-control button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  border-color: var(--accent);
+  background: var(--surface-soft);
+  color: var(--accent-dark);
 }
 
 .value-cell strong {

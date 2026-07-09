@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.29";
+const APP_VERSION = "v0.30";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -37,15 +37,16 @@ const starterMetricNames = [
   "Waist circumference",
   "Blood pressure systolic",
   "Blood pressure diastolic",
-  "LDL",
-  "HDL",
-  "Triglycerides",
-  "HbA1c IFCC",
-  "Vitamin D",
-  "Ferritin",
+  "Resting heart rate",
 ];
-const quickMetricLimit = 8;
 const targetMetricNames = new Set(["Weight", "Waist circumference"]);
+const relaxedNearLimitMetrics = new Set([
+  "Blood pressure systolic",
+  "Blood pressure diastolic",
+  "Urine specific gravity",
+  "Urine pH",
+  "CRP",
+]);
 
 const metrics = [
   metric("Weight", "Core body metrics", "kg", null, null, "numeric", "highest", 14, "context"),
@@ -133,9 +134,11 @@ const state = {
   scheduleState: loadScheduleState(),
   filter: "latest",
   activeProfileId: null,
+  activeSummaryFilter: "measurements",
   editingProfiles: !profilesAreComplete(initialProfiles),
   editingRangeKey: null,
   activeTrendKey: "",
+  trendRange: "all",
   pendingImport: null,
 };
 
@@ -766,19 +769,7 @@ function renderQuickMetrics() {
 }
 
 function getQuickMetricNames() {
-  const stats = new Map();
-  visibleResults().forEach((result) => {
-    const existing = stats.get(result.metric) ?? { count: 0, latest: "" };
-    existing.count += 1;
-    if (result.sample_date > existing.latest) existing.latest = result.sample_date;
-    stats.set(result.metric, existing);
-  });
-  const frequent = [...stats.entries()]
-    .filter(([name]) => getMetric(name))
-    .sort((a, b) => b[1].count - a[1].count || b[1].latest.localeCompare(a[1].latest) || a[0].localeCompare(b[0]))
-    .map(([name]) => name);
-  const combined = [...frequent, ...starterMetricNames.filter((name) => getMetric(name))];
-  return [...new Set(combined)].slice(0, quickMetricLimit);
+  return starterMetricNames.filter((name) => getMetric(name));
 }
 
 function selectMetric(name) {
@@ -940,15 +931,17 @@ function getStatus(result) {
   }
   if (low !== null && value < low) return "Outside range";
   if (high !== null && value > high) return "Outside range";
-  if (isNearLimit(value, low, high)) return "Near limit";
+  if (isNearLimit(result.metric, value, low, high)) return "Near limit";
   return low === null && high === null ? "Recorded" : "In range";
 }
 
-function isNearLimit(value, low, high) {
+function isNearLimit(metricName, value, low, high) {
+  if (relaxedNearLimitMetrics.has(metricName)) return false;
   if (low === null && high === null) return false;
   if (low !== null && high !== null) {
     const range = high - low;
     if (range <= 0) return false;
+    if (range < 2) return false;
     return value <= low + range * 0.1 || value >= high - range * 0.1;
   }
   if (high !== null) return value >= high * 0.9;
@@ -1235,7 +1228,7 @@ function filteredResults() {
   });
 
   if (state.filter === "flagged") {
-    return sorted.filter((result) => ["Outside range", "Near limit"].includes(result.status_vs_range));
+    return getLatestByMetric(sorted).filter((result) => ["Outside range", "Near limit", "Above target", "Below target"].includes(result.status_vs_range));
   }
 
   if (state.filter === "due") {
@@ -1244,19 +1237,23 @@ function filteredResults() {
         .filter((item) => ["due", "soon", "overdue"].includes(item.due.state))
         .map((item) => `${item.profile.id}:${item.metric.name}`),
     );
-    return sorted.filter((result) => dueMetricNames.has(`${result.profile_id}:${result.metric}`));
+    return getLatestByMetric(sorted).filter((result) => dueMetricNames.has(`${result.profile_id}:${result.metric}`));
   }
 
   if (state.filter === "latest") {
-    const latestByMetric = new Map();
-    sorted.forEach((result) => {
-      const key = `${result.profile_id}:${result.metric}`;
-      if (!latestByMetric.has(key)) latestByMetric.set(key, result);
-    });
-    return [...latestByMetric.values()];
+    return getLatestByMetric(sorted);
   }
 
   return sorted;
+}
+
+function getLatestByMetric(results) {
+  const latestByMetric = new Map();
+  results.forEach((result) => {
+    const key = `${result.profile_id}:${result.metric}`;
+    if (!latestByMetric.has(key)) latestByMetric.set(key, result);
+  });
+  return [...latestByMetric.values()];
 }
 
 function render() {
@@ -1281,6 +1278,8 @@ function render() {
   renderSummary();
   renderTrends();
 
+  renderEmptyState(results.length, dueCount);
+  renderSummarySelection();
   emptyState.classList.toggle("hidden", results.length > 0);
   tableWrap.classList.toggle("hidden", results.length === 0);
 
@@ -1289,7 +1288,7 @@ function render() {
 
 function renderResultRows(results) {
   const sorted = [...results].sort((a, b) => {
-    const groupSort = getDisplayGroupForMetric(a.metric).localeCompare(getDisplayGroupForMetric(b.metric));
+    const groupSort = getDisplayGroupOrder(a.metric) - getDisplayGroupOrder(b.metric);
     if (groupSort) return groupSort;
     return a.metric.localeCompare(b.metric) || b.sample_date.localeCompare(a.sample_date);
   });
@@ -1352,6 +1351,42 @@ function getDisplayGroupForMetric(metricName) {
   if (group === "Urinalysis") return "Urinalysis";
   if (group === "One-off and infrequent") return "Infrequent checks";
   return group || "Other";
+}
+
+function getDisplayGroupOrder(metricName) {
+  const order = [
+    "Body composition",
+    "Vitals and fitness",
+    "Cardiovascular",
+    "Metabolic",
+    "Full blood count",
+    "Kidney and proteins",
+    "Liver and bilirubin",
+    "Electrolytes",
+    "Vitamins and iron",
+    "Thyroid and endocrine",
+    "Hormones",
+    "Urinalysis",
+    "Infrequent checks",
+    "Other",
+  ];
+  const index = order.indexOf(getDisplayGroupForMetric(metricName));
+  return index === -1 ? order.length : index;
+}
+
+function renderEmptyState(resultCount, dueCount) {
+  if (resultCount > 0) return;
+  if (state.filter === "due") {
+    emptyState.innerHTML = dueCount
+      ? "<strong>No due results recorded yet</strong><span>Click a due item above to add its next measurement.</span>"
+      : "<strong>Nothing due</strong><span>No tests are currently due or overdue.</span>";
+    return;
+  }
+  if (state.filter === "flagged") {
+    emptyState.innerHTML = "<strong>No range warnings</strong><span>Current measurements have no active range or target warnings.</span>";
+    return;
+  }
+  emptyState.innerHTML = "<strong>No results yet</strong><span>Add your first measurement to start tracking long-term trends.</span>";
 }
 
 function renderOnboarding(scopedResults, flaggedCount, dueCount) {
@@ -1418,11 +1453,12 @@ function toggleRangeEditing() {
 
 function renderTrends() {
   const selectedMetricName = state.activeTrendKey || trendMetricInput.value;
-  const scopedResults = visibleResults()
+  const allScopedResults = visibleResults()
     .filter((result) => result.metric === selectedMetricName)
     .sort((a, b) => a.sample_date.localeCompare(b.sample_date));
+  const scopedResults = filterTrendResultsByRange(allScopedResults);
 
-  if (!scopedResults.length) {
+  if (!allScopedResults.length) {
     trendPanel.innerHTML = `
       <article class="trend-card">
         <strong>No trend data yet</strong>
@@ -1453,6 +1489,15 @@ function renderTrends() {
     .join("");
 
   trendPanel.innerHTML = `
+    <article class="trend-card trend-controls">
+      <strong>Range</strong>
+      <div class="segmented-control" role="group" aria-label="Trend range">
+        ${renderTrendRangeButton("6m", "6 months")}
+        ${renderTrendRangeButton("1y", "1 year")}
+        ${renderTrendRangeButton("all", "All time")}
+      </div>
+      <em>${scopedResults.length} of ${allScopedResults.length} results shown</em>
+    </article>
     <article class="trend-card">
       <strong>Latest</strong>
       <span>${escapeHtml(latest.person_name)} · ${escapeHtml(formatValue(latest.result_value, latest.unit))}</span>
@@ -1487,6 +1532,19 @@ function renderTrends() {
       <ul>${timeline}</ul>
     </article>
   `;
+}
+
+function renderTrendRangeButton(range, label) {
+  return `<button class="${state.trendRange === range ? "active" : ""}" type="button" data-trend-range="${range}">${label}</button>`;
+}
+
+function filterTrendResultsByRange(results) {
+  if (state.trendRange === "all" || !results.length) return results;
+  const latest = results[results.length - 1];
+  const end = new Date(`${latest.sample_date}T00:00:00`);
+  const start = new Date(end);
+  start.setMonth(start.getMonth() - (state.trendRange === "6m" ? 6 : 12));
+  return results.filter((result) => new Date(`${result.sample_date}T00:00:00`) >= start);
 }
 
 function createSparkline(results, latest) {
@@ -1605,12 +1663,20 @@ function renderSummary() {
     .join("");
 }
 
-function setFilter(filter) {
+function setFilter(filter, summaryKey = filter) {
   state.filter = filter;
+  state.activeSummaryFilter = summaryKey;
   document.querySelectorAll(".filter-button").forEach((item) => {
     item.classList.toggle("active", item.dataset.filter === filter);
   });
+  renderSummarySelection();
   render();
+}
+
+function renderSummarySelection() {
+  document.querySelectorAll("[data-summary-filter]").forEach((item) => {
+    item.classList.toggle("active", (item.dataset.summaryKey ?? item.dataset.summaryFilter) === state.activeSummaryFilter);
+  });
 }
 
 function focusMetricEntry(profileId, metricName) {
@@ -2274,7 +2340,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.29").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.30").catch(() => {});
   });
 }
 
@@ -2410,7 +2476,7 @@ document.querySelector(".filters").addEventListener("click", (event) => {
 statusStrip.addEventListener("click", (event) => {
   const card = event.target.closest("[data-summary-filter]");
   if (!card) return;
-  setFilter(card.dataset.summaryFilter);
+  setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
 });
 
 statusStrip.addEventListener("keydown", (event) => {
@@ -2418,7 +2484,7 @@ statusStrip.addEventListener("keydown", (event) => {
   const card = event.target.closest("[data-summary-filter]");
   if (!card) return;
   event.preventDefault();
-  setFilter(card.dataset.summaryFilter);
+  setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
 });
 
 markerSummary.addEventListener("click", (event) => {
@@ -2438,6 +2504,13 @@ markerSummary.addEventListener("keydown", (event) => {
   state.activeTrendKey = card.dataset.summaryMetric;
   trendMetricInput.value = card.dataset.summaryMetric;
   setFilter("latest");
+  renderTrends();
+});
+
+trendPanel.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-trend-range]");
+  if (!button) return;
+  state.trendRange = button.dataset.trendRange;
   renderTrends();
 });
 

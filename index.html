@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.29" />
-    <link rel="icon" href="app-icon.svg?v=0.29" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.29" />
-    <link rel="stylesheet" href="styles.css?v=0.29" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.30" />
+    <link rel="icon" href="app-icon.svg?v=0.30" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.30" />
+    <link rel="stylesheet" href="styles.css?v=0.30" />
   </head>
   <body>
     <main class="app-shell">
@@ -66,7 +66,7 @@
         </section>
 
         <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
-          <article role="button" tabindex="0" data-summary-filter="all">
+          <article class="active" role="button" tabindex="0" data-summary-filter="latest" data-summary-key="measurements">
             <span class="metric" id="totalResults">0</span>
             <span class="label">tracked measurements</span>
           </article>
@@ -78,7 +78,7 @@
             <span class="metric attention" id="dueSoonResults">0</span>
             <span class="label">due or overdue</span>
           </article>
-          <article role="button" tabindex="0" data-summary-filter="latest">
+          <article role="button" tabindex="0" data-summary-filter="latest" data-summary-key="latest">
             <span class="metric" id="latestDate">-</span>
             <span class="label">latest measurement</span>
           </article>
@@ -131,7 +131,6 @@
         <section class="schedule-section hidden" data-private aria-hidden="true" aria-label="Due measurements">
           <div class="panel-heading">
             <h2>Due soon</h2>
-            <span class="privacy-note">Amber means due soon, red means overdue</span>
           </div>
           <div class="schedule-grid" id="schedulePanel"></div>
         </section>
@@ -265,7 +264,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.29</span>
+          <span class="version-chip" id="appVersion">v0.30</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
@@ -288,9 +287,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.29"></script>
+    <script src="supabase-config.js?v=0.30"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.29"></script>
-    <script src="privacy-guard.js?v=0.29"></script>
+    <script src="app.js?v=0.30"></script>
+    <script src="privacy-guard.js?v=0.30"></script>
   </body>
 </html>
