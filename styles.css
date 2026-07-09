@@ -184,11 +184,39 @@ h2 {
   cursor: pointer;
 }
 
+.status-strip article.summary-static {
+  cursor: default;
+}
+
 .status-strip article:hover,
 .status-strip article:focus-visible,
 .status-strip article.active {
   border-color: var(--accent);
   background: var(--surface-soft);
+}
+
+.status-strip article.summary-static:hover,
+.status-strip article.summary-static:focus-visible {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.status-strip article.due-now {
+  border-color: #e3b437;
+  background: var(--amber-bg);
+}
+
+.status-strip article.overdue {
+  border-color: #dc6a59;
+  background: var(--bad-bg);
+}
+
+.status-strip article.overdue .metric {
+  color: var(--bad);
+}
+
+.status-strip article.due-now .metric {
+  color: var(--amber);
 }
 
 .auth-panel {

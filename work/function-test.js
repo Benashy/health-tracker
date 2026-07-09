@@ -113,6 +113,7 @@ function createDocument() {
     "totalResults",
     "flaggedResults",
     "dueSoonResults",
+    "nextDueCard",
     "nextDueDate",
     "markerSummary",
     "schedulePanel",
@@ -227,14 +228,14 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.31"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.31"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.32"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.32"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.31"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.31"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.32"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.32"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -250,17 +251,24 @@ assert(indexHtml.includes("Current</button>"), "results should default to a curr
 assert(indexHtml.includes("Archive</button>"), "results should keep a separate archive view");
 assert(indexHtml.includes("next due"), "summary strip should show next due instead of latest measurement");
 assert(!indexHtml.includes("latest measurement"), "summary strip should not show redundant latest measurement tile");
+assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.31"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.31"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.31"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.31"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.31"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.31", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.32"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.32"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.32"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.32"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.32"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.32", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
+assert(
+  document.elements.nextDueCard.classList.contains("due-now") ||
+    document.elements.nextDueCard.classList.contains("overdue") ||
+    document.elements.nextDueDate.textContent !== "Now",
+  "next due card should be colour-coded when due now or overdue",
+);
 assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
 assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
 assert(context.getWarningDays(14) === 2, "14-day checks should only warn close to due date");

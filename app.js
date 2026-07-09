@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.31";
+const APP_VERSION = "v0.32";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -201,6 +201,7 @@ const totalResults = document.querySelector("#totalResults");
 const flaggedResults = document.querySelector("#flaggedResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
 const nextDueDate = document.querySelector("#nextDueDate");
+const nextDueCard = document.querySelector("#nextDueCard");
 const markerSummary = document.querySelector("#markerSummary");
 const schedulePanel = document.querySelector("#schedulePanel");
 const statusStrip = document.querySelector(".status-strip");
@@ -1268,7 +1269,10 @@ function render() {
   totalResults.textContent = scopedResults.length;
   flaggedResults.textContent = flaggedCount;
   dueSoonResults.textContent = dueCount;
-  nextDueDate.textContent = getNextDueDisplay();
+  const nextDueSummary = getNextDueSummary();
+  nextDueDate.textContent = nextDueSummary.label;
+  nextDueCard.classList.toggle("due-now", nextDueSummary.state === "due");
+  nextDueCard.classList.toggle("overdue", nextDueSummary.state === "overdue");
 
   renderQuickMetrics();
   renderOnboarding(scopedResults, flaggedCount, dueCount);
@@ -1678,14 +1682,15 @@ function renderSummarySelection() {
   });
 }
 
-function getNextDueDisplay() {
+function getNextDueSummary() {
   const scheduleItems = getScheduleItems();
-  if (scheduleItems.some((item) => ["due", "overdue"].includes(item.due.state))) return "Now";
+  if (scheduleItems.some((item) => item.due.state === "overdue")) return { label: "Now", state: "overdue" };
+  if (scheduleItems.some((item) => item.due.state === "due")) return { label: "Now", state: "due" };
   const next = scheduleItems
     .map((item) => item.due.nextDate)
     .filter(Boolean)
     .sort((a, b) => a - b)[0];
-  return next ? formatDate(toDateString(next)) : "-";
+  return next ? { label: formatDate(toDateString(next)), state: "future" } : { label: "-", state: "none" };
 }
 
 function focusMetricEntry(profileId, metricName) {
@@ -2364,7 +2369,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.31").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.32").catch(() => {});
   });
 }
 
