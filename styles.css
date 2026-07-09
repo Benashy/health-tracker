@@ -181,6 +181,13 @@ h2 {
 .status-strip article {
   min-height: 92px;
   padding: 18px;
+  cursor: pointer;
+}
+
+.status-strip article:hover,
+.status-strip article:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-soft);
 }
 
 .auth-panel {
@@ -350,6 +357,19 @@ legend {
 .schedule-card em {
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.schedule-card {
+  cursor: pointer;
+}
+
+.schedule-card:hover,
+.schedule-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.schedule-card .snooze-button {
+  margin-top: 10px;
 }
 
 .schedule-section {
@@ -704,6 +724,18 @@ td {
   font-size: 0.92rem;
 }
 
+.result-group-row th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-bottom: 0;
+  background: #eef6f0;
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .value-cell strong {
   display: block;
   font-size: 1rem;
@@ -719,10 +751,21 @@ td {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
+  border: 0;
   border-radius: 999px;
   padding: 0 10px;
   font-size: 0.78rem;
   font-weight: 800;
+  font-family: inherit;
+}
+
+button.status-pill {
+  cursor: pointer;
+}
+
+button.status-pill:hover,
+button.status-pill:focus-visible {
+  box-shadow: 0 0 0 2px rgba(12, 90, 69, 0.14);
 }
 
 .status-pill.ok {

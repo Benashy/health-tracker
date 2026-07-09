@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.28" />
-    <link rel="icon" href="app-icon.svg?v=0.28" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.28" />
-    <link rel="stylesheet" href="styles.css?v=0.28" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.29" />
+    <link rel="icon" href="app-icon.svg?v=0.29" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.29" />
+    <link rel="stylesheet" href="styles.css?v=0.29" />
   </head>
   <body>
     <main class="app-shell">
@@ -66,19 +66,19 @@
         </section>
 
         <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
-          <article>
+          <article role="button" tabindex="0" data-summary-filter="all">
             <span class="metric" id="totalResults">0</span>
             <span class="label">tracked measurements</span>
           </article>
-          <article>
+          <article role="button" tabindex="0" data-summary-filter="flagged">
             <span class="metric attention" id="flaggedResults">0</span>
             <span class="label">range warnings</span>
           </article>
-          <article>
+          <article role="button" tabindex="0" data-summary-filter="due">
             <span class="metric attention" id="dueSoonResults">0</span>
             <span class="label">due or overdue</span>
           </article>
-          <article>
+          <article role="button" tabindex="0" data-summary-filter="latest">
             <span class="metric" id="latestDate">-</span>
             <span class="label">latest measurement</span>
           </article>
@@ -226,10 +226,10 @@
             <div class="panel-heading">
               <h2>Results</h2>
               <div class="filters" role="group" aria-label="Filter results">
-                <button class="filter-button active" data-filter="all" type="button">All</button>
+                <button class="filter-button active" data-filter="latest" type="button">Current</button>
                 <button class="filter-button" data-filter="flagged" type="button">Flagged</button>
                 <button class="filter-button" data-filter="due" type="button">Due</button>
-                <button class="filter-button" data-filter="latest" type="button">Latest</button>
+                <button class="filter-button" data-filter="all" type="button">Archive</button>
               </div>
             </div>
 
@@ -265,7 +265,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.28</span>
+          <span class="version-chip" id="appVersion">v0.29</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
@@ -288,9 +288,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.28"></script>
+    <script src="supabase-config.js?v=0.29"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.28"></script>
-    <script src="privacy-guard.js?v=0.28"></script>
+    <script src="app.js?v=0.29"></script>
+    <script src="privacy-guard.js?v=0.29"></script>
   </body>
 </html>

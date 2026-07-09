@@ -1,8 +1,9 @@
-const APP_VERSION = "v0.28";
+const APP_VERSION = "v0.29";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
 const RANGE_STORAGE_KEY = "health-dashboard-reference-ranges:v1";
+const SCHEDULE_STORAGE_KEY = "health-dashboard-schedule-state:v1";
 const LAST_LOCAL_UPDATE_KEY = "health-dashboard-last-local-update:v1";
 const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
@@ -129,7 +130,8 @@ const state = {
   profiles: initialProfiles,
   results: loadResults(initialProfiles),
   metricRanges: loadMetricRanges(),
-  filter: "all",
+  scheduleState: loadScheduleState(),
+  filter: "latest",
   activeProfileId: null,
   editingProfiles: !profilesAreComplete(initialProfiles),
   editingRangeKey: null,
@@ -198,6 +200,7 @@ const dueSoonResults = document.querySelector("#dueSoonResults");
 const latestDate = document.querySelector("#latestDate");
 const markerSummary = document.querySelector("#markerSummary");
 const schedulePanel = document.querySelector("#schedulePanel");
+const statusStrip = document.querySelector(".status-strip");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const exportChatGptButton = document.querySelector("#exportChatGptButton");
 const exportReviewPackButton = document.querySelector("#exportReviewPackButton");
@@ -296,6 +299,22 @@ function saveMetricRanges() {
   markLocalUpdated();
 }
 
+function loadScheduleState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SCHEDULE_STORAGE_KEY));
+    return {
+      snoozes: saved?.snoozes ?? {},
+    };
+  } catch {
+    return { snoozes: {} };
+  }
+}
+
+function saveScheduleState() {
+  localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(state.scheduleState));
+  markLocalUpdated();
+}
+
 function loadResults(profiles = state.profiles) {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
@@ -389,6 +408,7 @@ function createFreshCloudData(profileId = cloudState.profileId ?? "ben") {
     profiles: [getDefaultProfile(profileId)],
     measurements: [],
     reference_ranges: {},
+    schedule_state: { snoozes: {} },
     imports: [],
     settings: {},
     exported_at: new Date().toISOString(),
@@ -402,6 +422,7 @@ function serializeDashboardData() {
     profiles: state.profiles,
     measurements: recalculateDerivedFields(state.results),
     reference_ranges: state.metricRanges,
+    schedule_state: state.scheduleState,
     imports: [],
     settings: {
       active_profile_id: state.activeProfileId,
@@ -417,11 +438,13 @@ function applyDashboardData(data) {
   state.profiles = normaliseProfiles(profiles, false, profileId);
   state.results = recalculateDerivedFields((data?.measurements ?? data?.results ?? []).map((result) => normaliseResult(result, state.profiles)), state.profiles);
   state.metricRanges = data?.reference_ranges ?? data?.metricRanges ?? {};
+  state.scheduleState = data?.schedule_state ?? data?.scheduleState ?? { snoozes: {} };
   state.activeProfileId = profileId;
   state.editingProfiles = !profilesAreComplete(state.profiles);
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(state.profiles));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.results));
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(state.metricRanges));
+  localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(state.scheduleState));
   localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(data ?? createFreshCloudData(profileId)));
 }
 
@@ -1080,14 +1103,85 @@ function getDueStatus(profile, selectedMetric) {
       : { state: "due", label: selectedMetric.cadence, latest: null, nextDate: null };
   }
 
-  if (!latest) return { state: "due", label: "No result yet", latest: null, nextDate: null };
+  const anchorDate = getScheduleAnchorDate(profile.id, selectedMetric);
+  let nextDate = anchorDate ? addDays(anchorDate, selectedMetric.intervalDays) : null;
 
-  const nextDate = addDays(latest.sample_date, selectedMetric.intervalDays);
+  if (!latest && !nextDate) return { state: "due", label: "No result yet", latest: null, nextDate: null };
+
+  const snoozedDate = getSnoozedDueDate(profile.id, selectedMetric.name);
+  if (snoozedDate && (!nextDate || new Date(`${snoozedDate}T00:00:00`) > nextDate)) {
+    nextDate = new Date(`${snoozedDate}T00:00:00`);
+  }
+
   const daysRemaining = daysBetween(new Date(), nextDate);
   const warningDays = getWarningDays(selectedMetric.intervalDays);
   if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, latest, nextDate };
   if (daysRemaining <= warningDays) return { state: "soon", label: `Due in ${daysRemaining} days`, latest, nextDate };
   return { state: "ok", label: `Due ${formatDate(toDateString(nextDate))}`, latest, nextDate };
+}
+
+function getScheduleAnchorDate(profileId, selectedMetric) {
+  const group = getScheduleGroup(selectedMetric);
+  const matchingMetrics = metrics
+    .filter((item) => getScheduleGroup(item).key === group.key && item.intervalDays === selectedMetric.intervalDays)
+    .map((item) => item.name);
+  const matchingResults = state.results
+    .filter((result) => result.profile_id === profileId && matchingMetrics.includes(result.metric))
+    .sort((a, b) => b.sample_date.localeCompare(a.sample_date));
+  return matchingResults[0]?.sample_date ?? null;
+}
+
+function getScheduleGroup(selectedMetric) {
+  if (targetMetricNames.has(selectedMetric.name)) return { key: "body", label: "Body composition" };
+  if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
+  if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
+    return { key: "six-month-bloods", label: "Six-month bloods" };
+  }
+  if (selectedMetric.group === "One-off and infrequent") return { key: "infrequent", label: "Infrequent checks" };
+  if (selectedMetric.intervalDays >= 365) return { key: "annual-bloods", label: "Annual bloods" };
+  return { key: selectedMetric.group.toLowerCase().replaceAll(" ", "-"), label: selectedMetric.group };
+}
+
+function getSnoozeKey(profileId, metricName) {
+  return `${profileId}:${metricName}`;
+}
+
+function getSnoozedDueDate(profileId, metricName) {
+  return state.scheduleState.snoozes?.[getSnoozeKey(profileId, metricName)]?.due_date ?? null;
+}
+
+function snoozeScheduleItem(profileId, metricName) {
+  if (!assertCanEdit()) return;
+  const selectedMetric = getMetric(metricName);
+  if (!selectedMetric?.intervalDays) return;
+  const nextDate = getNextSnoozeDate(profileId, selectedMetric);
+  state.scheduleState.snoozes[getSnoozeKey(profileId, metricName)] = {
+    due_date: toDateString(nextDate),
+    updated_at: new Date().toISOString(),
+  };
+  saveScheduleState();
+  render();
+}
+
+function getNextSnoozeDate(profileId, selectedMetric) {
+  const group = getScheduleGroup(selectedMetric);
+  const today = new Date();
+  const peerDates = metrics
+    .filter((item) =>
+      item.name !== selectedMetric.name &&
+      item.intervalDays === selectedMetric.intervalDays &&
+      getScheduleGroup(item).key === group.key
+    )
+    .map((item) => getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], item).nextDate)
+    .filter((date) => date && daysBetween(today, date) >= 0)
+    .sort((a, b) => a - b);
+
+  if (peerDates.length) return peerDates[0];
+
+  const fallback = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  fallback.setDate(fallback.getDate() + selectedMetric.intervalDays);
+  if (selectedMetric.intervalDays >= 180) return new Date(fallback.getFullYear(), fallback.getMonth(), 1);
+  return fallback;
 }
 
 function getWarningDays(intervalDays) {
@@ -1190,20 +1284,35 @@ function render() {
   emptyState.classList.toggle("hidden", results.length > 0);
   tableWrap.classList.toggle("hidden", results.length === 0);
 
-  resultsBody.innerHTML = results
+  resultsBody.innerHTML = renderResultRows(results);
+}
+
+function renderResultRows(results) {
+  const sorted = [...results].sort((a, b) => {
+    const groupSort = getDisplayGroupForMetric(a.metric).localeCompare(getDisplayGroupForMetric(b.metric));
+    if (groupSort) return groupSort;
+    return a.metric.localeCompare(b.metric) || b.sample_date.localeCompare(a.sample_date);
+  });
+  let currentGroup = "";
+  return sorted
     .map((result) => {
+      const group = getDisplayGroupForMetric(result.metric);
+      const heading = group === currentGroup ? "" : `<tr class="result-group-row"><th colspan="12">${escapeHtml(group)}</th></tr>`;
+      currentGroup = group;
       const statusClass = getStatusClass(result.status_vs_range);
       const due = getDueStatus(getProfile(result.profile_id), getMetric(result.metric));
       const range = formatRangeOrTarget(result);
+      const status = renderStatusPill(result, statusClass);
 
       return `
+        ${heading}
         <tr>
           <td>${escapeHtml(result.person_name)}</td>
           <td>${formatDate(result.sample_date)}</td>
           <td><strong>${escapeHtml(result.metric)}</strong></td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
           <td>${range}</td>
-          <td><span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span></td>
+          <td>${status}</td>
           <td><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></td>
           <td>${formatValue(result.previous_result, result.unit)}</td>
           <td>${formatChange(result.absolute_change_since_previous_test, result)}</td>
@@ -1214,6 +1323,35 @@ function render() {
       `;
     })
     .join("");
+}
+
+function renderStatusPill(result, statusClass) {
+  const warningStatuses = new Set(["Outside range", "Near limit", "Above target", "Below target"]);
+  if (!warningStatuses.has(result.status_vs_range)) {
+    return `<span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span>`;
+  }
+  return `<button class="status-pill ${statusClass}" type="button" data-warning-id="${escapeHtml(result.id)}">${escapeHtml(result.status_vs_range)}</button>`;
+}
+
+function getDisplayGroupForMetric(metricName) {
+  const selectedMetric = getMetric(metricName);
+  const group = selectedMetric?.group ?? "";
+  if (targetMetricNames.has(metricName)) return "Body composition";
+  if (["Blood pressure systolic", "Blood pressure diastolic", "Resting heart rate", "VO2 Max"].includes(metricName)) {
+    return "Vitals and fitness";
+  }
+  if (["Lipids", "Cardiovascular markers", "Amino acids"].includes(group)) return "Cardiovascular";
+  if (group === "Metabolic") return "Metabolic";
+  if (group === "Full blood count") return "Full blood count";
+  if (["Renal and purines", "Proteins"].includes(group)) return "Kidney and proteins";
+  if (group === "Liver and enzymes") return "Liver and bilirubin";
+  if (group === "Electrolytes") return "Electrolytes";
+  if (group === "Vitamins and iron") return "Vitamins and iron";
+  if (group === "Endocrine") return "Thyroid and endocrine";
+  if (group.startsWith("Hormone panel")) return "Hormones";
+  if (group === "Urinalysis") return "Urinalysis";
+  if (group === "One-off and infrequent") return "Infrequent checks";
+  return group || "Other";
 }
 
 function renderOnboarding(scopedResults, flaggedCount, dueCount) {
@@ -1436,10 +1574,11 @@ function renderSchedule() {
   schedulePanel.innerHTML = items.length
     ? items
         .map((item) => `
-          <article class="schedule-card ${item.due.state}">
+          <article class="schedule-card ${item.due.state}" role="button" tabindex="0" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">
             <strong>${escapeHtml(item.metric.name)}</strong>
-            <span>${escapeHtml(item.profile.name)} · ${escapeHtml(item.metric.cadence)}</span>
+            <span>${escapeHtml(item.profile.name)} · ${escapeHtml(getScheduleGroup(item.metric).label)} · ${escapeHtml(item.metric.cadence)}</span>
             <em>${escapeHtml(item.due.label)}</em>
+            <button class="mini-button snooze-button" type="button" data-snooze-profile="${escapeHtml(item.profile.id)}" data-snooze-metric="${escapeHtml(item.metric.name)}">Snooze</button>
           </article>
         `)
         .join("")
@@ -1458,12 +1597,54 @@ function renderSummary() {
   markerSummary.innerHTML = [...latestByMetric.values()]
     .slice(0, 4)
     .map((result) => `
-      <article class="summary-card">
+      <article class="summary-card" role="button" tabindex="0" data-summary-metric="${escapeHtml(result.metric)}">
         <strong>${escapeHtml(result.person_name)} · ${escapeHtml(result.metric)}</strong>
         <span>${escapeHtml(formatValue(result.result_value, result.unit))} · ${escapeHtml(result.status_vs_range)}</span>
       </article>
     `)
     .join("");
+}
+
+function setFilter(filter) {
+  state.filter = filter;
+  document.querySelectorAll(".filter-button").forEach((item) => {
+    item.classList.toggle("active", item.dataset.filter === filter);
+  });
+  render();
+}
+
+function focusMetricEntry(profileId, metricName) {
+  const profile = getProfile(profileId);
+  const selectedMetric = getMetric(metricName);
+  if (!profile || !selectedMetric) return;
+
+  state.activeProfileId = profile.id;
+  populatePeople();
+  personInput.value = profile.id;
+  metricInput.value = selectedMetric.name;
+  setTodayDefaults();
+  syncMetricDefaults();
+  syncRangeDefaults();
+  syncSourceDefaults();
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  valueInput.focus();
+}
+
+function explainWarning(resultId) {
+  const result = state.results.find((item) => item.id === resultId);
+  if (!result) return;
+  const label = isTargetMetric(result.metric) ? "Target" : "Reference";
+  const message = [
+    `${result.metric}: ${formatValue(result.result_value, result.unit)}`,
+    `Status: ${result.status_vs_range}`,
+    `${label}: ${formatRangeOrTarget(result)}`,
+    `Date: ${formatDate(result.sample_date)}`,
+  ];
+  if (result.previous_result !== null && result.previous_result !== undefined) {
+    message.push(`Previous: ${formatValue(result.previous_result, result.unit)}`);
+    message.push(`Change: ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)})`);
+  }
+  window.alert(message.join("\n"));
 }
 
 function getStatusClass(status) {
@@ -1525,7 +1706,9 @@ function addResult(event) {
   };
 
   state.results.push(result);
+  delete state.scheduleState.snoozes[getSnoozeKey(profile.id, selectedMetric.name)];
   saveRangeForResult(result);
+  saveScheduleState();
   saveResults();
   form.reset();
   setTodayDefaults();
@@ -2091,7 +2274,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.28").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.29").catch(() => {});
   });
 }
 
@@ -2221,14 +2404,71 @@ document.querySelector(".filters").addEventListener("click", (event) => {
   const button = event.target.closest("[data-filter]");
   if (!button) return;
 
-  state.filter = button.dataset.filter;
-  document.querySelectorAll(".filter-button").forEach((item) => {
-    item.classList.toggle("active", item === button);
-  });
-  render();
+  setFilter(button.dataset.filter);
+});
+
+statusStrip.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-summary-filter]");
+  if (!card) return;
+  setFilter(card.dataset.summaryFilter);
+});
+
+statusStrip.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const card = event.target.closest("[data-summary-filter]");
+  if (!card) return;
+  event.preventDefault();
+  setFilter(card.dataset.summaryFilter);
+});
+
+markerSummary.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-summary-metric]");
+  if (!card) return;
+  state.activeTrendKey = card.dataset.summaryMetric;
+  trendMetricInput.value = card.dataset.summaryMetric;
+  setFilter("latest");
+  renderTrends();
+});
+
+markerSummary.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const card = event.target.closest("[data-summary-metric]");
+  if (!card) return;
+  event.preventDefault();
+  state.activeTrendKey = card.dataset.summaryMetric;
+  trendMetricInput.value = card.dataset.summaryMetric;
+  setFilter("latest");
+  renderTrends();
+});
+
+schedulePanel.addEventListener("click", (event) => {
+  const snoozeButton = event.target.closest("[data-snooze-profile]");
+  if (snoozeButton) {
+    event.stopPropagation();
+    snoozeScheduleItem(snoozeButton.dataset.snoozeProfile, snoozeButton.dataset.snoozeMetric);
+    return;
+  }
+
+  const card = event.target.closest("[data-schedule-profile]");
+  if (!card) return;
+  focusMetricEntry(card.dataset.scheduleProfile, card.dataset.scheduleMetric);
+});
+
+schedulePanel.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const card = event.target.closest("[data-schedule-profile]");
+  if (!card) return;
+  event.preventDefault();
+  focusMetricEntry(card.dataset.scheduleProfile, card.dataset.scheduleMetric);
 });
 
 resultsBody.addEventListener("click", (event) => {
+  const warningButton = event.target.closest("[data-warning-id]");
+  if (warningButton) {
+    explainWarning(warningButton.dataset.warningId);
+    return;
+  }
+
   const button = event.target.closest("[data-id]");
   if (!button) return;
   if (button.dataset.confirming !== "true") {
