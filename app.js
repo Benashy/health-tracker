@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.26";
+const APP_VERSION = "v0.27";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -1609,7 +1609,7 @@ function exportCsv() {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `health-dashboard-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = getExportFilename("data", "csv");
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -1686,7 +1686,7 @@ function exportForChatGpt() {
   ];
 
   downloadText(
-    `health-dashboard-chatgpt-${new Date().toISOString().slice(0, 10)}.md`,
+    getExportFilename("", "md"),
     lines.join("\n"),
     "text/markdown",
   );
@@ -1734,10 +1734,44 @@ function exportReviewPack() {
   ];
 
   downloadText(
-    `health-dashboard-review-pack-${new Date().toISOString().slice(0, 10)}.md`,
+    getExportFilename("review", "md"),
     lines.join("\n"),
     "text/markdown",
   );
+}
+
+function getExportFilename(label, extension, date = new Date()) {
+  const person = getExportFilePersonName();
+  const dateText = formatExportDateForFilename(date);
+  const middle = label ? ` ${label}` : "";
+  return `health dashboard ${person}${middle} ${dateText}.${extension}`;
+}
+
+function getExportFilePersonName() {
+  const profile =
+    (cloudState.profileId && getProfile(cloudState.profileId)) ||
+    (state.activeProfileId && getProfile(state.activeProfileId)) ||
+    (state.profiles.length === 1 ? state.profiles[0] : null);
+  if (!profile && state.profiles.length > 1) return "All";
+  return getCanonicalProfileName(profile);
+}
+
+function getCanonicalProfileName(profile) {
+  if (!profile) return "Health";
+  if (profile.id === "ben") return "Ben";
+  if (profile.id === "angelika" || profile.id === "angelica") return "Angelika";
+  return sanitiseFilenamePart(profile.name || profile.id || "Health");
+}
+
+function formatExportDateForFilename(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function sanitiseFilenamePart(value) {
+  return String(value).trim().replace(/[^a-z0-9]+/gi, " ").replace(/\s+/g, " ").trim() || "Health";
 }
 
 function getExportScopeLabel() {
@@ -2054,7 +2088,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.26").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.27").catch(() => {});
   });
 }
 
