@@ -6,3 +6,4 @@ health-dashboard-backup-secrets*
 supabase-service-role*
 service-role*
 backup-tool/secrets*
+outputs/
