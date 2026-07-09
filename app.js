@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.27";
+const APP_VERSION = "v0.28";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -1091,9 +1091,11 @@ function getDueStatus(profile, selectedMetric) {
 }
 
 function getWarningDays(intervalDays) {
-  if (intervalDays <= 31) return 14;
-  if (intervalDays <= 210) return 30;
-  if (intervalDays <= 400) return 45;
+  if (intervalDays <= 14) return 2;
+  if (intervalDays <= 31) return 3;
+  if (intervalDays <= 90) return 7;
+  if (intervalDays <= 210) return 14;
+  if (intervalDays <= 400) return 30;
   return 90;
 }
 
@@ -1468,6 +1470,7 @@ function getStatusClass(status) {
   if (status === "Outside range") return "bad";
   if (status === "Near limit" || status === "Above target" || status === "Below target") return "near";
   if (status === "In range" || status === "On target") return "ok";
+  if (status === "Recorded") return "recorded";
   return "neutral";
 }
 
@@ -2088,7 +2091,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.27").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.28").catch(() => {});
   });
 }
 

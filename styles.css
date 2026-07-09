@@ -740,6 +740,11 @@ td {
   color: var(--bad);
 }
 
+.status-pill.recorded {
+  background: #e8f2ff;
+  color: #2f6fae;
+}
+
 .status-pill.warn,
 .status-pill.neutral {
   background: var(--warn-bg);
