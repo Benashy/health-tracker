@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -61,42 +61,49 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Show an import confirmation screen before saving.
    - Never import STI or immunoserology results.
 
-7. Improve the Current Health Snapshot.
+7. Add a Prepare AI Review workflow.
+   - Evolve the existing Export for ChatGPT feature into a clearer `Prepare AI Review` or `Prepare GPT Review` action.
+   - Generate a focused review brief containing latest results, active warnings, due or overdue items, meaningful trends, recent changes, and the app's prevention-first/non-diagnostic context.
+   - Keep this as a safe hybrid workflow first: prepare the review pack inside the app, then continue the conversation in ChatGPT.
+   - Do not add a true in-app AI assistant until privacy, backend, API-key handling, costs, and auditability are deliberately designed.
+
+8. Improve the Current Health Snapshot.
    - Add a first-page summary after login.
    - Include current priorities, overdue items, reassuring results, recent changes, and latest key metrics.
    - Keep it preventative, not diagnostic.
 
-8. Add metric medical context notes.
+9. Add metric medical context notes.
    - Start with concise, calm explanations for flagged or borderline results.
    - Eosinophils and monocytes are the first proof of concept.
+   - Use `METRIC_CONTEXT_NOTES.md` as the first-pass source-backed content library.
    - Later, add an expandable explanation for every tracked metric.
    - Keep explanations short, evidence-based, and non-diagnostic.
 
-9. Improve mobile and tablet UI.
+10. Improve mobile and tablet UI.
    - Make iPhone and iPad layouts first-class.
    - Reduce table heaviness on small screens.
    - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
 
-10. Add health events and notes.
+11. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
 ## Later
 
-11. Add document upload/storage.
+12. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-12. Add reminders and review scheduling.
+13. Add reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
 
-13. Add backup scheduling.
+14. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-14. Consider structured database tables later.
+15. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
 
