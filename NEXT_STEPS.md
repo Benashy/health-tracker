@@ -10,9 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.34`.
-- The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, and metric context notes.
+- The app is now on `v0.35`.
+- The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.35
+
+- Reworked the current snapshot into an actionable focus panel for waist circumference, weight, total cholesterol, and LDL.
+- Kept Lipoprotein(a) visible as inherited cardiovascular risk context instead of counting it as an active range warning.
+- Added noise-aware trend rules so small in-range blood pressure changes and small lipid variations are not over-labelled as worsening.
+- Updated AI exports to separate active warnings from risk-context markers.
 
 ## Completed In v0.34
 

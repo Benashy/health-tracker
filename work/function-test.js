@@ -239,8 +239,8 @@ const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
-assert(indexHtml.includes("app.js?v=0.34"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.34"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.35"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.35"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -249,8 +249,8 @@ assert(indexHtml.includes("Prepare AI Review"), "AI review action should be clea
 assert(indexHtml.includes("Current snapshot"), "current health snapshot section should exist");
 assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
 assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
-assert(indexHtml.includes("privacy-guard.js?v=0.34"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.34"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.35"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.35"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -271,15 +271,15 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.34"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.34"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.34"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.34"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.34"), "service worker should cache PNG app icons");
+assert(indexHtml.includes("app-icon-180.png?v=0.35"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.35"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.35"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.35"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.35"), "service worker should cache PNG app icons");
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.34", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.35", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -385,6 +385,86 @@ assert(context.getStatus({
   reference_lower_limit: 1.01,
   reference_upper_limit: 1.02,
 }) === "In range", "urine specific gravity should not be amber because of a tiny range");
+assert(context.isActionableWarning({
+  metric: "Lipoprotein(a)",
+  status_vs_range: "Outside range",
+}) === false, "Lp(a) should be risk context rather than an actionable warning");
+assert(context.isActionableWarning({
+  metric: "LDL",
+  status_vs_range: "Outside range",
+}) === true, "LDL outside range should remain actionable");
+assert(context.getTrendDirection(3, {
+  metric: "Blood pressure systolic",
+  metric_type: "numeric",
+  result_value: 115,
+  reference_lower_limit: null,
+  reference_upper_limit: 120,
+  trend_goal: "lower",
+}, {
+  metric: "Blood pressure systolic",
+  metric_type: "numeric",
+  result_value: 112,
+  reference_lower_limit: null,
+  reference_upper_limit: 120,
+}) === "Stable", "small in-range systolic changes should not be labelled worse");
+assert(context.getTrendDirection(4, {
+  metric: "LDL",
+  metric_type: "numeric",
+  result_value: 104,
+  reference_lower_limit: null,
+  reference_upper_limit: 115,
+  trend_goal: "lower",
+}, {
+  metric: "LDL",
+  metric_type: "numeric",
+  result_value: 100,
+  reference_lower_limit: null,
+  reference_upper_limit: 115,
+}) === "Stable", "small LDL changes should be treated as stable");
+assert(context.getTrendDirection(10, {
+  metric: "LDL",
+  metric_type: "numeric",
+  result_value: 110,
+  reference_lower_limit: null,
+  reference_upper_limit: 115,
+  trend_goal: "lower",
+}, {
+  metric: "LDL",
+  metric_type: "numeric",
+  result_value: 100,
+  reference_lower_limit: null,
+  reference_upper_limit: 115,
+}) === "Worse", "meaningful LDL increases should still be labelled worse");
+assert(context.getMaterialChanges([
+  {
+    id: "bp-old",
+    profile_id: "ben",
+    metric: "Blood pressure systolic",
+    metric_type: "numeric",
+    result_value: 100,
+    reference_lower_limit: null,
+    reference_upper_limit: 120,
+    status_vs_range: "In range",
+    sample_date: "2026-01-01",
+    test_date: "2026-01-01",
+  },
+  {
+    id: "bp-new",
+    profile_id: "ben",
+    metric: "Blood pressure systolic",
+    metric_type: "numeric",
+    result_value: 115,
+    reference_lower_limit: null,
+    reference_upper_limit: 120,
+    status_vs_range: "In range",
+    previous_result: 100,
+    absolute_change_since_previous_test: 15,
+    percentage_change_since_previous_test: 15,
+    trend_direction: "Stable",
+    sample_date: "2026-02-01",
+    test_date: "2026-02-01",
+  },
+]).length === 0, "in-range blood pressure movements should not become material changes just because of percentage");
 
 context.selectMetric("Waist circumference");
 document.elements.dateInput.value = "2026-07-01";
@@ -524,8 +604,11 @@ assert(document.elements.trendPanel.innerHTML.includes("2 years"), "trend contro
 assert(document.elements.trendPanel.innerHTML.includes("Year-on-year"), "trend panel should include year-on-year comparison");
 assert(document.elements.trendPanel.innerHTML.match(/<li>/g).length <= 4, "recent history should be capped at four entries");
 vm.runInContext('cloudState.user = { email: "ben_ashurst@me.com" }; render();', context);
-assert(document.elements.snapshotGrid.innerHTML.includes("Warnings"), "snapshot should render warning summary");
-assert(document.elements.snapshotList.innerHTML, "snapshot should render priority items or calm state");
+assert(document.elements.snapshotGrid.innerHTML.includes("Waist circumference"), "snapshot should focus on waist circumference");
+assert(document.elements.snapshotGrid.innerHTML.includes("Weight"), "snapshot should focus on weight");
+assert(document.elements.snapshotGrid.innerHTML.includes("Total cholesterol"), "snapshot should focus on total cholesterol");
+assert(document.elements.snapshotGrid.innerHTML.includes("LDL"), "snapshot should focus on LDL");
+assert(!document.elements.snapshotGrid.innerHTML.includes("Warnings"), "snapshot should not render a generic warning summary card");
 
 const eosinophilNote = context.getMetricMedicalNote("Eosinophils");
 assert(eosinophilNote.includes("hay fever"), "eosinophil context should mention common allergic context");

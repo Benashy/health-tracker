@@ -247,6 +247,33 @@ h2 {
   cursor: pointer;
 }
 
+.snapshot-card.focus {
+  border-left: 4px solid #9fb6ad;
+}
+
+.snapshot-card.ok {
+  border-color: #9fcbb3;
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.snapshot-card.warning {
+  border-color: #e3b437;
+  border-left-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.snapshot-card.bad {
+  border-color: #dc6a59;
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.snapshot-card.neutral {
+  border-left-color: #6e9fc8;
+  background: #f2f7fc;
+}
+
 .snapshot-card:hover,
 .snapshot-card:focus-visible,
 .snapshot-item:hover,
@@ -308,6 +335,11 @@ h2 {
   border-color: #9fcbb3;
   background: var(--ok-bg);
   cursor: default;
+}
+
+.snapshot-item.context {
+  border-color: #9abedc;
+  background: #eef6fd;
 }
 
 .auth-panel {

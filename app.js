@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.34";
+const APP_VERSION = "v0.35";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -47,6 +47,20 @@ const relaxedNearLimitMetrics = new Set([
   "Urine pH",
   "CRP",
 ]);
+const snapshotFocusMetricNames = ["Waist circumference", "Weight", "Total cholesterol", "LDL"];
+const riskContextMetricNames = new Set(["Lipoprotein(a)"]);
+const inRangeStableTrendMetrics = new Set(["Blood pressure systolic", "Blood pressure diastolic"]);
+const meaningfulChangeRules = {
+  "Weight": { absolute: 0.5 },
+  "Waist circumference": { absolute: 1 },
+  "Blood pressure systolic": { absolute: 5 },
+  "Blood pressure diastolic": { absolute: 5 },
+  "Resting heart rate": { absolute: 5 },
+  "VO2 Max": { absolute: 2 },
+  "LDL": { absolute: 5, percent: 5 },
+  "Total cholesterol": { absolute: 5, percent: 5 },
+  "Triglycerides": { percent: 10 },
+};
 
 const metricContextNotes = {
   "Weight": "Weight is useful for long-term trend tracking, but day-to-day values can shift with hydration, meals, bowel contents, and training. Interpret changes alongside waist circumference, blood pressure, glucose/HbA1c, lipids, and how the measurement was taken.",
@@ -1071,6 +1085,18 @@ function isWarningStatus(status) {
   return ["Outside range", "Near limit", "Above target", "Below target"].includes(status);
 }
 
+function isRiskContextMetric(metricName) {
+  return riskContextMetricNames.has(metricName);
+}
+
+function isRiskContextResult(result) {
+  return result && isRiskContextMetric(result.metric);
+}
+
+function isActionableWarning(result) {
+  return result && isWarningStatus(result.status_vs_range) && !isRiskContextResult(result);
+}
+
 function isNearLimit(metricName, value, low, high) {
   if (relaxedNearLimitMetrics.has(metricName)) return false;
   if (low === null && high === null) return false;
@@ -1140,11 +1166,37 @@ function deriveChange(result, previous) {
 
 function getTrendDirection(change, result, previous) {
   if (change === 0) return "Stable";
+  if (inRangeStableTrendMetrics.has(result.metric) && getStatusForTrend(result) === "In range" && getStatusForTrend(previous) === "In range") {
+    return "Stable";
+  }
+  if (!hasMeaningfulNumericChange(result, previous, change)) return "Stable";
   const goal = result.trend_goal ?? getMetricMeta(result.metric).goal;
   if (goal === "lower") return change < 0 ? "Improved" : "Worse";
   if (goal === "higher") return change > 0 ? "Improved" : "Worse";
   if (goal === "range") return getRangeTrend(result, previous);
   return change > 0 ? "Up" : "Down";
+}
+
+function getStatusForTrend(result) {
+  if (!result) return "";
+  return result.status_vs_range ?? getStatus(result);
+}
+
+function getMeaningfulChangeRule(metricName) {
+  return meaningfulChangeRules[metricName] ?? null;
+}
+
+function hasMeaningfulNumericChange(result, previous, change) {
+  if (!result || result.metric_type === "qualitative") return true;
+  const rule = getMeaningfulChangeRule(result.metric);
+  if (!rule) return true;
+  const absolute = Math.abs(Number(change));
+  const previousValue = Math.abs(Number(previous?.result_value));
+  const percent = previousValue === 0 ? null : (absolute / previousValue) * 100;
+  if (rule.absolute !== undefined && absolute < rule.absolute) return false;
+  if (rule.percent !== undefined && percent !== null && percent < rule.percent) return false;
+  if (rule.percent !== undefined && percent === null && rule.absolute === undefined) return false;
+  return true;
 }
 
 function getRangeTrend(result, previous) {
@@ -1364,7 +1416,7 @@ function filteredResults() {
   });
 
   if (state.filter === "flagged") {
-    return getLatestByMetric(sorted).filter((result) => isWarningStatus(result.status_vs_range));
+    return getLatestByMetric(sorted).filter(isActionableWarning);
   }
 
   if (state.filter === "due") {
@@ -1396,7 +1448,8 @@ function render() {
   state.results = recalculateDerivedFields(state.results);
   const results = filteredResults();
   const scopedResults = visibleResults();
-  const flaggedCount = scopedResults.filter((result) => isWarningStatus(result.status_vs_range)).length;
+  const latestScopedResults = getLatestByMetric([...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date)));
+  const flaggedCount = latestScopedResults.filter(isActionableWarning).length;
   const dueCount = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state)).length;
 
   totalResults.textContent = scopedResults.length;
@@ -1431,52 +1484,106 @@ function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
     .filter(Boolean)
     .sort()
     .at(-1);
-  const materialChanges = getMaterialChanges(scopedResults);
-  const warnings = latestResults.filter((result) => isWarningStatus(result.status_vs_range));
+  const riskContextResults = latestResults.filter(isRiskContextResult);
   const dueItems = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
 
   snapshotSection.classList.toggle("hidden", !cloudState.user || (!scopedResults.length && !dueItems.length));
-  snapshotUpdated.textContent = latestDate ? `Latest entry ${formatDate(latestDate)}` : "No measurements yet";
-  snapshotGrid.innerHTML = [
-    renderSnapshotCard("Warnings", flaggedCount, flaggedCount ? "Review flagged current results" : "No active range or target warnings", "flagged"),
-    renderSnapshotCard("Due", dueCount, dueCount ? "Tests or measurements need attention" : "Nothing currently due", "due"),
-    renderSnapshotCard("Changes", materialChanges.length, materialChanges.length ? "Material changes found" : "No material changes yet", "changes"),
-    renderSnapshotCard("Latest", latestDate ? formatDate(latestDate) : "-", scopedResults.length ? `${scopedResults.length} total measurements` : "Start with one entry", "latest"),
-  ].join("");
+  snapshotUpdated.textContent = latestDate
+    ? `${flaggedCount} active warnings · ${dueCount} due or overdue`
+    : "No measurements yet";
+  snapshotGrid.innerHTML = snapshotFocusMetricNames
+    .map((metricName) => renderSnapshotFocusCard(metricName, latestResults))
+    .join("");
 
-  const priorityItems = [
-    ...warnings.slice(0, 3).map((result) => ({
-      type: "warning",
-      title: `${result.metric}: ${result.status_vs_range}`,
-      text: `${formatValue(result.result_value, result.unit)} · ${formatDate(result.sample_date)}`,
-      metric: result.metric,
-    })),
-    ...dueItems.slice(0, 3).map((item) => ({
-      type: item.due.state,
-      title: `${item.metric.name}: ${item.due.label}`,
-      text: `${item.profile.name} · ${item.metric.cadence}`,
-      metric: item.metric.name,
-      profileId: item.profile.id,
-    })),
-    ...materialChanges.slice(0, 2).map((result) => ({
-      type: "change",
-      title: `${result.metric}: ${result.trend_direction}`,
-      text: `${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}) since previous`,
-      metric: result.metric,
-    })),
-  ].slice(0, 5);
-
-  snapshotList.innerHTML = priorityItems.length
-    ? priorityItems.map(renderSnapshotItem).join("")
-    : `<article class="snapshot-item ok"><strong>No immediate priorities</strong><span>Use the current view below for latest measurements.</span></article>`;
+  snapshotList.innerHTML = riskContextResults.length
+    ? riskContextResults.map(renderRiskContextItem).join("")
+    : "";
 }
 
-function renderSnapshotCard(label, value, detail, filter) {
+function renderSnapshotFocusCard(metricName, latestResults) {
+  const result = getSnapshotResult(metricName, latestResults);
+  if (!result) {
+    return `
+      <article class="snapshot-card focus neutral" role="button" tabindex="0" data-snapshot-metric="${escapeHtml(metricName)}">
+        <strong>-</strong>
+        <span>${escapeHtml(metricName)}</span>
+        <em>No result yet</em>
+      </article>
+    `;
+  }
+
+  const statusClass = getSnapshotStatusClass(result);
+  const profileAttribute = result.profile_id ? ` data-snapshot-profile="${escapeHtml(result.profile_id)}"` : "";
   return `
-    <article class="snapshot-card" role="button" tabindex="0" data-snapshot-filter="${escapeHtml(filter)}">
-      <strong>${escapeHtml(value)}</strong>
-      <span>${escapeHtml(label)}</span>
-      <em>${escapeHtml(detail)}</em>
+    <article class="snapshot-card focus ${statusClass}" role="button" tabindex="0" data-snapshot-metric="${escapeHtml(result.metric)}"${profileAttribute}>
+      <strong>${escapeHtml(formatValue(result.result_value, result.unit))}</strong>
+      <span>${escapeHtml(result.metric)}</span>
+      <em>${escapeHtml(result.status_vs_range)} · ${escapeHtml(getSnapshotTrendLabel(result))} · ${formatDate(result.sample_date)}</em>
+    </article>
+  `;
+}
+
+function getSnapshotResult(metricName, latestResults) {
+  const profileId = state.activeProfileId || cloudState.profileId;
+  return latestResults.find((result) => result.metric === metricName && (!profileId || result.profile_id === profileId)) ??
+    latestResults.find((result) => result.metric === metricName) ??
+    null;
+}
+
+function getSnapshotStatusClass(result) {
+  if (isActionableWarning(result)) {
+    return result.status_vs_range === "Outside range" ? "bad" : "warning";
+  }
+  if (result.status_vs_range === "In range" || result.status_vs_range === "On target") return "ok";
+  return "neutral";
+}
+
+function getSnapshotTrendLabel(result) {
+  const previous = getPreviousResult(result, state.results);
+  if (!previous) return "first result";
+  if (isTargetMetric(result.metric)) return getTargetSnapshotTrend(result, previous);
+  if (["LDL", "Total cholesterol"].includes(result.metric)) return getLowerIsBetterSnapshotTrend(result, previous);
+  return formatSnapshotTrend(result.trend_direction);
+}
+
+function getTargetSnapshotTrend(result, previous) {
+  const target = result.reference_upper_limit;
+  if (target === null || target === undefined) return formatSnapshotTrend(result.trend_direction);
+  const currentValue = Number(result.result_value);
+  const previousValue = Number(previous.result_value);
+  if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) return formatSnapshotTrend(result.trend_direction);
+  const tolerance = getMeaningfulChangeRule(result.metric)?.absolute ?? getTargetTolerance(result.metric);
+  const currentDistance = Math.abs(currentValue - Number(target));
+  const previousDistance = Math.abs(previousValue - Number(target));
+  const distanceChange = previousDistance - currentDistance;
+  if (Math.abs(distanceChange) < tolerance) return "trend static";
+  return distanceChange > 0 ? "trend improving" : "trend worsening";
+}
+
+function getLowerIsBetterSnapshotTrend(result, previous) {
+  const change = Number(result.result_value) - Number(previous.result_value);
+  if (!Number.isFinite(change) || !hasMeaningfulNumericChange(result, previous, change)) return "trend static";
+  if (change < 0) return "trend improving";
+  if (change > 0) return "trend worsening";
+  return "trend static";
+}
+
+function formatSnapshotTrend(trend) {
+  if (trend === "Improved") return "trend improving";
+  if (trend === "Worse") return "trend worsening";
+  if (trend === "Stable") return "trend static";
+  if (trend === "first") return "first result";
+  if (trend === "changed") return "changed";
+  if (trend === "unchanged") return "unchanged";
+  return String(trend || "recorded").toLowerCase();
+}
+
+function renderRiskContextItem(result) {
+  const profileAttribute = result.profile_id ? ` data-snapshot-profile="${escapeHtml(result.profile_id)}"` : "";
+  return `
+    <article class="snapshot-item context" role="button" tabindex="0" data-snapshot-metric="${escapeHtml(result.metric)}"${profileAttribute}>
+      <strong>${escapeHtml(result.metric)}: risk context</strong>
+      <span>${escapeHtml(formatValue(result.result_value, result.unit))} · inherited/stable marker used to guide overall prevention targets.</span>
     </article>
   `;
 }
@@ -2193,9 +2300,10 @@ function exportCsv() {
 function exportForChatGpt() {
   const now = new Date().toISOString();
   const scopedResults = state.results;
-  const warnings = scopedResults.filter((result) => isWarningStatus(result.status_vs_range));
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const latestResults = getLatestResultsForExport(scopedResults);
+  const warnings = latestResults.filter(isActionableWarning);
+  const riskContextResults = latestResults.filter(isRiskContextResult);
   const importSchema = getChatGptImportInstructions();
   const exportScope = getExportScopeLabel();
 
@@ -2242,6 +2350,15 @@ function exportForChatGpt() {
       ? warnings.map(formatResultForExport)
       : ["- No range warnings in the selected data."]),
     "",
+    "## Risk Context",
+    "",
+    ...(riskContextResults.length
+      ? riskContextResults.map(
+          (result) =>
+            `${formatResultForExport(result)}; interpretation note: inherited or relatively stable context marker, not treated as an active dashboard warning.`,
+        )
+      : ["- No inherited or stable risk-context markers recorded."]),
+    "",
     "## Due Or Overdue",
     "",
     ...(dueItems.length
@@ -2270,11 +2387,12 @@ function exportForChatGpt() {
 
 function exportReviewPack() {
   const now = new Date().toISOString();
-  const warnings = state.results.filter((result) => isWarningStatus(result.status_vs_range));
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const materialChanges = getMaterialChanges(state.results);
   const exportScope = getExportScopeLabel();
   const latestResults = getLatestResultsForExport(state.results);
+  const warnings = latestResults.filter(isActionableWarning);
+  const riskContextResults = latestResults.filter(isRiskContextResult);
 
   const lines = [
     "# Prepare AI Review",
@@ -2299,6 +2417,15 @@ function exportReviewPack() {
     "",
     ...(warnings.length ? warnings.map(formatResultForExport) : ["- No current range warnings."]),
     "",
+    "## Risk Context",
+    "",
+    ...(riskContextResults.length
+      ? riskContextResults.map(
+          (result) =>
+            `${formatResultForExport(result)}; interpretation note: inherited or relatively stable context marker, not treated as an active dashboard warning.`,
+        )
+      : ["- No inherited or stable risk-context markers recorded."]),
+    "",
     "## Due Or Overdue Monitoring",
     "",
     ...(dueItems.length
@@ -2318,7 +2445,9 @@ function exportReviewPack() {
     "",
     "## Threshold Used",
     "",
-    "- Numeric results: included when percentage change is at least 10%, trend is Worse, or status is near/outside range or target.",
+    "- Numeric results: included when percentage change is at least 10%, trend is meaningfully worse, or status is an actionable near/outside range or target warning.",
+    "- Lp(a) and similar stable inherited markers are kept as risk context rather than active warnings.",
+    "- Small in-range vital-sign movements are treated cautiously because single readings and wearable estimates can vary.",
     "- Qualitative results: included when changed.",
     "- Metric context notes are available in the app and in METRIC_CONTEXT_NOTES.md; use cautious, non-diagnostic language.",
     "",
@@ -2376,11 +2505,16 @@ function getMaterialChanges(results) {
   return results
     .filter((result) => result.previous_result !== null && result.previous_result !== undefined)
     .filter((result) => {
+      if (isRiskContextResult(result)) return false;
       if (result.metric_type === "qualitative") return result.trend_direction === "changed";
+      const previous = getPreviousResult(result, results);
+      if (inRangeStableTrendMetrics.has(result.metric) && getStatusForTrend(result) === "In range" && getStatusForTrend(previous) === "In range") {
+        return false;
+      }
       const percent = Math.abs(Number(result.percentage_change_since_previous_test));
       return (
         result.trend_direction === "Worse" ||
-        isWarningStatus(result.status_vs_range) ||
+        isActionableWarning(result) ||
         (Number.isFinite(percent) && percent >= 10)
       );
     })
@@ -2705,7 +2839,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.34").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.35").catch(() => {});
   });
 }
 
