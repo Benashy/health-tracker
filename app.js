@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.32";
+const APP_VERSION = "v0.33";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -1706,6 +1706,7 @@ function focusMetricEntry(profileId, metricName) {
   syncMetricDefaults();
   syncRangeDefaults();
   syncSourceDefaults();
+  renderQuickMetrics();
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   valueInput.focus();
 }
@@ -2369,7 +2370,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.32").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.33").catch(() => {});
   });
 }
 
@@ -2423,7 +2424,10 @@ profileForm.addEventListener("submit", saveProfile);
 authForm.addEventListener("submit", signInWithPassword);
 magicLinkButton.addEventListener("click", sendMagicLink);
 personInput.addEventListener("change", syncRangeDefaults);
-metricInput.addEventListener("change", syncMetricDefaults);
+metricInput.addEventListener("change", () => {
+  syncMetricDefaults();
+  renderQuickMetrics();
+});
 metricSearchInput.addEventListener("input", populateMetrics);
 quickMetricPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-metric-name]");

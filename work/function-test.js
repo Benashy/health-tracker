@@ -228,14 +228,14 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.32"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.32"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.33"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.33"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.32"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.32"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.33"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.33"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -256,12 +256,12 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.32"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.32"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.32"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.32"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.32"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.32", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.33"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.33"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.33"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.33"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.33"), "service worker should cache PNG app icons");
+assert(document.elements.appVersion.textContent === "v0.33", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -333,6 +333,16 @@ assert(latestLdl.trend_direction === "Improved", "lower LDL should be improved")
 assert(document.elements.quickMetricPanel.innerHTML.includes("Waist circumference"), "quick metrics should include the fixed frequent body metric");
 assert(document.elements.quickMetricPanel.innerHTML.includes("Resting heart rate"), "quick metrics should include the fixed frequent vital metric");
 assert(!document.elements.quickMetricPanel.innerHTML.includes("LDL"), "quick metrics should leave blood tests in the dropdown");
+context.focusMetricEntry("ben", "Blood pressure systolic");
+assert(document.elements.markerInput.value === "Blood pressure systolic", "due item click should select the requested metric");
+assert(document.elements.quickMetricPanel.innerHTML.includes('quick-metric-button active" data-metric-name="Blood pressure systolic"'), "due item click should highlight matching quick metric");
+context.focusMetricEntry("ben", "LDL");
+assert(document.elements.markerInput.value === "LDL", "due item click should select non-quick metrics too");
+assert(!document.elements.quickMetricPanel.innerHTML.includes("quick-metric-button active"), "non-quick due metric should clear quick metric highlight");
+document.elements.markerInput.value = "Blood pressure diastolic";
+document.elements.markerInput.listeners.change();
+assert(document.elements.quickMetricPanel.innerHTML.includes('quick-metric-button active" data-metric-name="Blood pressure diastolic"'), "dropdown changes should refresh quick metric highlight");
+vm.runInContext('state.activeProfileId = null;', context);
 assert(context.getStatus({
   metric: "Blood pressure systolic",
   metric_type: "numeric",
