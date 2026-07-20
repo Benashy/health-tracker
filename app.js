@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.33";
+const APP_VERSION = "v0.34";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -47,6 +47,83 @@ const relaxedNearLimitMetrics = new Set([
   "Urine pH",
   "CRP",
 ]);
+
+const metricContextNotes = {
+  "Weight": "Weight is useful for long-term trend tracking, but day-to-day values can shift with hydration, meals, bowel contents, and training. Interpret changes alongside waist circumference, blood pressure, glucose/HbA1c, lipids, and how the measurement was taken.",
+  "Waist circumference": "Waist circumference is a practical marker of central body fat and cardiometabolic risk. Small changes can reflect tape position or technique, so measure consistently at the navel and focus on the longer-term direction.",
+  "Blood pressure systolic": "Systolic blood pressure is the pressure when the heart contracts. Home readings are most useful as repeated, rested measurements; persistent elevation matters more than a single reading.",
+  "Blood pressure diastolic": "Diastolic blood pressure is the pressure between beats. Interpret with systolic pressure, home technique, stress, caffeine, sleep, exercise, and whether readings are repeatedly elevated.",
+  "Resting heart rate": "Resting heart rate can reflect fitness, recovery, sleep, stress, illness, medication, caffeine, and hydration. Trends are more useful than isolated wearable or single-day values.",
+  "VO2 Max": "VO2 max estimates cardiorespiratory fitness. Wearable estimates are useful for trend tracking, but they are not equivalent to formal cardiopulmonary exercise testing.",
+  "Haemoglobin": "Haemoglobin carries oxygen in red blood cells. Low values can fit with anaemia, blood loss, iron/B12/folate issues, or chronic illness; high values can reflect dehydration, smoking, altitude, or less commonly blood disorders.",
+  "Erythrocytes": "Erythrocytes are red blood cells. Interpret the count with haemoglobin, haematocrit, MCV, ferritin, B12, folate, hydration status, and recent training or altitude exposure.",
+  "Haematocrit": "Haematocrit is the proportion of blood made up by red blood cells. It can rise with dehydration or increased red cell mass and fall with anaemia or overhydration, so context matters.",
+  "MCV": "MCV reflects average red-cell size. Low MCV often points toward iron deficiency or thalassaemia trait; high MCV can be seen with B12/folate deficiency, alcohol, liver disease, thyroid issues, or some medicines.",
+  "MCH": "MCH estimates the amount of haemoglobin per red blood cell. Low values often travel with iron-deficiency patterns, while interpretation is strongest when paired with MCV, MCHC, RDW, and ferritin.",
+  "MCHC": "MCHC reflects haemoglobin concentration inside red blood cells. Borderline changes are often interpreted with the rest of the red-cell indices rather than alone.",
+  "RDW": "RDW measures variation in red-cell size. A higher RDW can appear with evolving or mixed deficiencies, recovery after blood loss, or mixed red-cell populations; interpret with MCV, ferritin, B12, and folate.",
+  "Leukocytes": "Leukocytes are total white blood cells. High values can occur with infection, inflammation, stress, smoking, or steroid use; low values can occur with viral illness, medicines, autoimmune conditions, or bone marrow issues.",
+  "Neutrophils": "Neutrophils are the main rapid-response white cells for bacterial infection and inflammation. They can rise with infection, stress, steroids, or intense exercise, and fall with some viral illnesses or medicines.",
+  "Eosinophils": "Eosinophils are involved in allergic and inflammatory responses. Borderline high percentages can fit with common allergic conditions such as hay fever, asthma, or eczema, but should be interpreted with the absolute eosinophil count and whether the pattern persists.",
+  "Basophils": "Basophils are a small white-cell subtype involved in allergic and inflammatory signalling. Mild percentage variation is often nonspecific; persistent or marked elevation should be interpreted with the total white cell count and the wider differential.",
+  "Lymphocytes": "Lymphocytes are important immune cells, including B cells and T cells. They can rise with some viral infections and immune activation, and fall with stress, steroids, some infections, or immune suppression.",
+  "Monocytes": "Monocytes help clear infection and support immune response. A mild isolated rise can be seen after recent infection, inflammation, or stress, but significance depends on the absolute monocyte count, symptoms, and repeat results.",
+  "Platelets": "Platelets help blood clot. High values can be reactive after inflammation, infection, bleeding, or iron deficiency; low values can increase bleeding risk and need context from symptoms, repeat testing, and medications.",
+  "B12": "Vitamin B12 is important for red blood cells and nerve function. Low or borderline values are best interpreted with symptoms, MCV, homocysteine, folate, diet, absorption risk, and supplementation history.",
+  "Folate": "Folate supports DNA production and red blood cell formation. Low values can contribute to macrocytosis and raised homocysteine, but should be interpreted alongside B12 so B12 deficiency is not missed.",
+  "Ferritin": "Ferritin reflects iron stores, but it also rises with inflammation, liver disease, infection, and some metabolic conditions. Low ferritin strongly supports iron deficiency; high ferritin is not automatically iron overload.",
+  "Vitamin D": "Vitamin D supports bone, muscle, nerve, and immune function. Levels vary with season, sun exposure, supplements, skin coverage, and absorption; routine testing is not needed for everyone but can be useful when tracking deficiency or replacement.",
+  "Glucose": "Blood glucose is a snapshot of blood sugar at the time of testing. It is affected by meals, fasting status, stress, illness, sleep, and exercise, so trend it with HbA1c and the test context.",
+  "Fasting glucose": "Fasting glucose is more interpretable for metabolic risk than a random glucose value. It should be read with HbA1c, triglycerides, waist circumference, blood pressure, and whether the fast was genuine.",
+  "HbA1c NGSP": "HbA1c estimates average blood glucose over roughly the previous two to three months. It can be affected by anaemia, red-cell turnover, haemoglobin variants, kidney disease, and recent blood loss.",
+  "HbA1c IFCC": "HbA1c IFCC is the mmol/mol version of HbA1c. It gives the same broad long-term glucose picture as HbA1c NGSP, so the trend matters more than the reporting format.",
+  "Total cholesterol": "Total cholesterol is a broad measure combining several cholesterol fractions. It is useful for context but less informative than LDL, HDL, triglycerides, ApoB, Lp(a), blood pressure, glucose, and family history.",
+  "LDL": "LDL is a major atherogenic cholesterol fraction and is central to cardiovascular prevention. Lower LDL is generally favourable, especially when ApoB or Lp(a) is high or family risk is present.",
+  "HDL": "HDL is often described as protective, but it is best used as a risk marker rather than a treatment target by itself. Interpret HDL with triglycerides, LDL/ApoB, exercise, weight, alcohol, and metabolic health.",
+  "Triglycerides": "Triglycerides are circulating fats used for energy. They rise with recent food intake, alcohol, insulin resistance, weight gain, some medicines, and genetic factors; fasting status is important.",
+  "ApoB": "ApoB approximates the number of atherogenic particles that can enter artery walls. It can be a clearer marker of particle burden than LDL alone, especially when triglycerides are high or metabolic risk is present.",
+  "Lipoprotein(a)": "Lp(a) is mostly genetically determined and usually stable across life. High Lp(a) can increase cardiovascular risk even when LDL looks acceptable, so it mainly informs how aggressively to manage overall risk.",
+  "Homocysteine": "Homocysteine is an amino acid influenced by B12, folate, B6, kidney function, genetics, and some medicines. Higher values can be associated with cardiovascular risk, but it should be interpreted as part of a broader risk pattern.",
+  "Albumin": "Albumin is a major blood protein made by the liver. Low values can reflect inflammation, kidney or gut protein loss, liver disease, or nutrition issues; interpret with CRP, liver markers, urine protein, and overall health.",
+  "CRP": "CRP is a nonspecific inflammation marker. It can rise with infection, injury, inflammatory conditions, recent intense exercise, and some chronic cardiometabolic risk patterns; repeat context is important.",
+  "Uric acid": "Uric acid is a breakdown product of purines. Higher values can be associated with gout or kidney stones, but many people with high uric acid do not have gout; interpret with symptoms, kidney function, hydration, alcohol, and diet.",
+  "Urea": "Urea reflects protein metabolism and kidney excretion, and is strongly affected by hydration and protein intake. It is most useful alongside creatinine, eGFR, electrolytes, and clinical context.",
+  "Creatinine": "Creatinine is a muscle-derived waste product used to estimate kidney function. It varies with muscle mass, hydration, recent intense exercise, supplements such as creatine, and kidney filtration.",
+  "eGFR": "eGFR estimates how well the kidneys filter blood, usually using creatinine, age, and sex. Persistent reduction is more meaningful than a single borderline value and should be read with urine protein/blood and blood pressure.",
+  "LDH": "LDH is an enzyme found in many tissues, so it is nonspecific. It can rise with sample haemolysis, muscle injury, liver issues, inflammation, or tissue damage; interpret with AST, ALT, bilirubin, blood count, and symptoms.",
+  "AST": "AST is found in liver, muscle, heart, and other tissues. A rise can reflect liver irritation but also muscle injury or recent hard exercise, so compare with ALT, GGT, bilirubin, CK if available, and recent training.",
+  "ALT": "ALT is more liver-focused than AST and can rise with fatty liver, alcohol, medicines/supplements, viral hepatitis, metabolic risk, or other liver irritation. Trends and the wider liver panel matter.",
+  "GGT": "GGT is a liver and bile-duct enzyme. It can rise with alcohol, fatty liver, bile duct irritation, some medicines, and metabolic risk; interpret with ALT, AST, ALP if available, and bilirubin.",
+  "Bilirubin total": "Total bilirubin reflects bilirubin from red-cell breakdown and liver/bile handling. Mild isolated elevation can be benign in Gilbert syndrome, but context from direct/indirect bilirubin and liver enzymes matters.",
+  "Bilirubin direct": "Direct bilirubin is conjugated bilirubin. Elevation can point more toward liver processing or bile flow issues, especially when paired with abnormal ALT, AST, GGT, ALP, or symptoms such as jaundice.",
+  "Bilirubin indirect": "Indirect bilirubin is unconjugated bilirubin. It can rise with Gilbert syndrome, fasting, illness, or increased red-cell breakdown; interpret with haemoglobin, reticulocytes if available, and liver enzymes.",
+  "Sodium": "Sodium reflects water and salt balance. Meaningful abnormalities can occur with dehydration, overhydration, kidney/adrenal issues, medicines, vomiting/diarrhoea, or illness; significant changes deserve clinician review.",
+  "Potassium": "Potassium is important for heart rhythm, nerves, and muscles. Abnormal results can relate to kidney function, medicines, supplements, sample handling, dehydration, or hormone issues and can be clinically important.",
+  "Chloride": "Chloride helps maintain fluid and acid-base balance. It is usually interpreted with sodium, potassium, bicarbonate/CO2 if available, kidney function, hydration, and gastrointestinal losses.",
+  "TSH": "TSH is the pituitary signal to the thyroid. High TSH often suggests underactive thyroid tendency; low TSH can suggest overactive thyroid or excess replacement, but FT4 and symptoms are needed.",
+  "FT4": "Free T4 is the circulating thyroid hormone available to tissues. Interpret with TSH, symptoms, medication timing, biotin/supplements, and whether the pattern is persistent.",
+  "Cortisol": "Cortisol is a stress and adrenal hormone with strong daily rhythm. Time of day, illness, stress, steroid medication, sleep disruption, and testing method are critical for interpretation.",
+  "Total testosterone": "Total testosterone should be interpreted with symptoms, morning timing, repeat testing, SHBG, free testosterone estimate, illness, sleep, weight, and medications. Low libido or fatigue alone is not enough without objective pattern.",
+  "SHBG": "SHBG binds testosterone and oestradiol and changes how much hormone is available to tissues. It can be influenced by thyroid status, liver function, weight, insulin resistance, age, medications, and sex hormone levels.",
+  "LH": "LH is a pituitary signal to the testes/ovaries. In men, high LH with low testosterone can suggest primary testicular failure; low/inappropriately normal LH with low testosterone can suggest pituitary or functional suppression.",
+  "FSH": "FSH is a pituitary hormone involved in sperm production and ovarian follicle development. In a male hormone workup it is most useful when testosterone or fertility markers are abnormal.",
+  "Prolactin": "Prolactin is a pituitary hormone that can suppress the gonadal axis when elevated. Stress, sleep, exercise, sex, some medicines, pituitary causes, and macroprolactin can affect interpretation.",
+  "Oestradiol": "Oestradiol is an estrogen important for bone, libido, body composition, and reproductive health in both sexes. Interpretation depends heavily on sex, age, symptoms, testosterone/SHBG, medication, and assay quality.",
+  "Urine pH": "Urine pH reflects urine acidity, not blood pH. Diet, hydration, kidney handling, infection with urease-producing bacteria, and stone risk can influence it.",
+  "Urine specific gravity": "Specific gravity estimates urine concentration. It mainly reflects hydration and kidney concentrating ability; small changes near the reference edge are often less meaningful than persistent extremes.",
+  "Urine nitrites": "Nitrites can be positive when certain bacteria convert nitrates in urine, supporting a possible UTI. A negative result does not exclude infection, especially with frequent urination or bacteria that do not produce nitrite.",
+  "Urine protein": "Urine protein can be transient after exercise, fever, dehydration, or illness, but persistent protein can suggest kidney filtering stress. It is important alongside blood pressure, eGFR, and repeat urine testing.",
+  "Urine glucose": "Glucose in urine can occur when blood glucose is high enough to spill into urine, or less commonly with renal tubular handling differences. Interpret with blood glucose and HbA1c.",
+  "Urine ketones": "Ketones can appear with fasting, low-carbohydrate diets, prolonged exercise, vomiting, or diabetes-related insulin deficiency. Context and blood glucose are important.",
+  "Urine urobilinogen": "Urobilinogen reflects bilirubin metabolism through the gut and liver. Abnormal values are interpreted with bilirubin, liver enzymes, haemolysis markers, and sample handling.",
+  "Urine bilirubin": "Bilirubin in urine usually reflects conjugated bilirubin and can suggest liver or bile-flow issues. Interpret with blood bilirubin fractions, ALT/AST/GGT/ALP if available, and symptoms such as jaundice or dark urine.",
+  "Urine haemoglobin": "A positive urine blood/haemoglobin result can reflect red cells, haemoglobin, or myoglobin. Causes include UTI, stones, exercise, contamination, kidney/urological issues, or muscle injury; microscopy helps clarify.",
+  "Urine leukocytes": "Leukocytes or leukocyte esterase suggest white cells in the urine. This can fit UTI or urinary inflammation, but contamination is common, especially if epithelial cells are also present.",
+  "Urine epithelial cells": "Epithelial cells often reflect sample contamination from skin or genital tract, especially when many are present. They are mainly useful for judging urine sample quality.",
+  "Urinary leukocytes": "Microscopic urinary leukocytes can support infection or inflammation when elevated. Interpret with symptoms, nitrites, culture if done, epithelial cells, and whether the sample was clean-catch.",
+  "ECG": "An ECG is a short snapshot of the heart's electrical activity. It can show rhythm, conduction, and signs of previous or current strain/injury, but a normal ECG does not exclude intermittent rhythm problems or all heart disease.",
+  "Coronary artery calcium score": "CAC score measures calcified plaque in the coronary arteries. Higher scores generally mean higher future cardiovascular risk; a score of zero is reassuring but does not exclude non-calcified plaque or future risk.",
+};
 
 const metrics = [
   metric("Weight", "Core body metrics", "kg", null, null, "numeric", "highest", 14, "context"),
@@ -194,6 +271,7 @@ const sourceTypeInput = document.querySelector("#sourceTypeInput");
 const sourceConfidenceInput = document.querySelector("#sourceConfidenceInput");
 const sourceNotesInput = document.querySelector("#sourceNotesInput");
 const sourceDocumentInput = document.querySelector("#sourceDocumentInput");
+const entryAssist = document.querySelector("#entryAssist");
 const resultsBody = document.querySelector("#resultsBody");
 const emptyState = document.querySelector("#emptyState");
 const tableWrap = document.querySelector(".results-table-wrap");
@@ -202,6 +280,10 @@ const flaggedResults = document.querySelector("#flaggedResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
 const nextDueDate = document.querySelector("#nextDueDate");
 const nextDueCard = document.querySelector("#nextDueCard");
+const snapshotSection = document.querySelector("#snapshotSection");
+const snapshotUpdated = document.querySelector("#snapshotUpdated");
+const snapshotGrid = document.querySelector("#snapshotGrid");
+const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
 const schedulePanel = document.querySelector("#schedulePanel");
 const statusStrip = document.querySelector(".status-strip");
@@ -215,6 +297,11 @@ const importReviewContent = document.querySelector("#importReviewContent");
 const cancelImportButton = document.querySelector("#cancelImportButton");
 const discardImportButton = document.querySelector("#discardImportButton");
 const confirmImportButton = document.querySelector("#confirmImportButton");
+const metricContextModal = document.querySelector("#metricContextModal");
+const metricContextTitle = document.querySelector("#metricContextTitle");
+const metricContextSubtitle = document.querySelector("#metricContextSubtitle");
+const metricContextContent = document.querySelector("#metricContextContent");
+const closeContextButton = document.querySelector("#closeContextButton");
 const syncStatus = document.querySelector("#syncStatus");
 const manualRefreshButton = document.querySelector("#manualRefreshButton");
 const appVersion = document.querySelector("#appVersion");
@@ -793,6 +880,7 @@ function syncMetricDefaults() {
     selectedMetric.type === "numeric" ? "Result value" : `e.g. ${selectedMetric.normal ?? "Normal"}`;
   syncRangeDefaults();
   syncSourceDefaults();
+  renderEntryAssist();
 }
 
 function getDefaultSourceType(metricName) {
@@ -815,6 +903,49 @@ function syncSourceDefaults() {
 
 function syncSourceConfidence() {
   sourceConfidenceInput.value = getSourceConfidence(sourceTypeInput.value);
+}
+
+function renderEntryAssist() {
+  if (!entryAssist) return;
+  const selectedMetric = getMetric(metricInput.value);
+  const profile = getSelectedProfile();
+  if (!selectedMetric || !profile) {
+    entryAssist.innerHTML = "";
+    return;
+  }
+
+  const savedRange = getSavedRange(profile.id, selectedMetric.name);
+  const rangeLabel = isTargetMetric(selectedMetric.name) ? "Target" : "Range";
+  const rangeText = savedRange
+    ? formatRangeOrTarget({
+        metric: selectedMetric.name,
+        unit: selectedMetric.unit,
+        reference_lower_limit: savedRange.low,
+        reference_upper_limit: savedRange.high,
+      })
+    : "set on first entry";
+  const followOn = getFollowOnMetric(selectedMetric.name);
+
+  entryAssist.innerHTML = `
+    <div>
+      <strong>${escapeHtml(getDisplayGroupForMetric(selectedMetric.name))}</strong>
+      <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(rangeLabel)} ${escapeHtml(rangeText)}</span>
+    </div>
+    ${
+      followOn
+        ? `<button class="mini-button" type="button" data-entry-metric="${escapeHtml(followOn)}">Next: ${escapeHtml(followOn)}</button>`
+        : ""
+    }
+  `;
+}
+
+function getFollowOnMetric(metricName) {
+  const flow = {
+    "Weight": "Waist circumference",
+    "Blood pressure systolic": "Blood pressure diastolic",
+    "Blood pressure diastolic": "Resting heart rate",
+  };
+  return flow[metricName] ?? null;
 }
 
 function getMetric(name) {
@@ -934,6 +1065,10 @@ function getStatus(result) {
   if (high !== null && value > high) return "Outside range";
   if (isNearLimit(result.metric, value, low, high)) return "Near limit";
   return low === null && high === null ? "Recorded" : "In range";
+}
+
+function isWarningStatus(status) {
+  return ["Outside range", "Near limit", "Above target", "Below target"].includes(status);
 }
 
 function isNearLimit(metricName, value, low, high) {
@@ -1229,7 +1364,7 @@ function filteredResults() {
   });
 
   if (state.filter === "flagged") {
-    return getLatestByMetric(sorted).filter((result) => ["Outside range", "Near limit", "Above target", "Below target"].includes(result.status_vs_range));
+    return getLatestByMetric(sorted).filter((result) => isWarningStatus(result.status_vs_range));
   }
 
   if (state.filter === "due") {
@@ -1261,9 +1396,7 @@ function render() {
   state.results = recalculateDerivedFields(state.results);
   const results = filteredResults();
   const scopedResults = visibleResults();
-  const flaggedCount = scopedResults.filter((result) =>
-    ["Outside range", "Near limit"].includes(result.status_vs_range),
-  ).length;
+  const flaggedCount = scopedResults.filter((result) => isWarningStatus(result.status_vs_range)).length;
   const dueCount = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state)).length;
 
   totalResults.textContent = scopedResults.length;
@@ -1276,6 +1409,7 @@ function render() {
 
   renderQuickMetrics();
   renderOnboarding(scopedResults, flaggedCount, dueCount);
+  renderHealthSnapshot(scopedResults, flaggedCount, dueCount);
   renderProfiles();
   renderSchedule();
   renderSummary();
@@ -1287,6 +1421,96 @@ function render() {
   tableWrap.classList.toggle("hidden", results.length === 0);
 
   resultsBody.innerHTML = renderResultRows(results);
+}
+
+function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
+  if (!snapshotSection || !snapshotGrid || !snapshotList) return;
+  const latestResults = getLatestByMetric([...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date)));
+  const latestDate = scopedResults
+    .map((result) => result.sample_date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  const materialChanges = getMaterialChanges(scopedResults);
+  const warnings = latestResults.filter((result) => isWarningStatus(result.status_vs_range));
+  const dueItems = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
+
+  snapshotSection.classList.toggle("hidden", !cloudState.user || (!scopedResults.length && !dueItems.length));
+  snapshotUpdated.textContent = latestDate ? `Latest entry ${formatDate(latestDate)}` : "No measurements yet";
+  snapshotGrid.innerHTML = [
+    renderSnapshotCard("Warnings", flaggedCount, flaggedCount ? "Review flagged current results" : "No active range or target warnings", "flagged"),
+    renderSnapshotCard("Due", dueCount, dueCount ? "Tests or measurements need attention" : "Nothing currently due", "due"),
+    renderSnapshotCard("Changes", materialChanges.length, materialChanges.length ? "Material changes found" : "No material changes yet", "changes"),
+    renderSnapshotCard("Latest", latestDate ? formatDate(latestDate) : "-", scopedResults.length ? `${scopedResults.length} total measurements` : "Start with one entry", "latest"),
+  ].join("");
+
+  const priorityItems = [
+    ...warnings.slice(0, 3).map((result) => ({
+      type: "warning",
+      title: `${result.metric}: ${result.status_vs_range}`,
+      text: `${formatValue(result.result_value, result.unit)} · ${formatDate(result.sample_date)}`,
+      metric: result.metric,
+    })),
+    ...dueItems.slice(0, 3).map((item) => ({
+      type: item.due.state,
+      title: `${item.metric.name}: ${item.due.label}`,
+      text: `${item.profile.name} · ${item.metric.cadence}`,
+      metric: item.metric.name,
+      profileId: item.profile.id,
+    })),
+    ...materialChanges.slice(0, 2).map((result) => ({
+      type: "change",
+      title: `${result.metric}: ${result.trend_direction}`,
+      text: `${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}) since previous`,
+      metric: result.metric,
+    })),
+  ].slice(0, 5);
+
+  snapshotList.innerHTML = priorityItems.length
+    ? priorityItems.map(renderSnapshotItem).join("")
+    : `<article class="snapshot-item ok"><strong>No immediate priorities</strong><span>Use the current view below for latest measurements.</span></article>`;
+}
+
+function renderSnapshotCard(label, value, detail, filter) {
+  return `
+    <article class="snapshot-card" role="button" tabindex="0" data-snapshot-filter="${escapeHtml(filter)}">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+      <em>${escapeHtml(detail)}</em>
+    </article>
+  `;
+}
+
+function renderSnapshotItem(item) {
+  const profileAttribute = item.profileId ? ` data-snapshot-profile="${escapeHtml(item.profileId)}"` : "";
+  return `
+    <article class="snapshot-item ${escapeHtml(item.type)}" role="button" tabindex="0" data-snapshot-metric="${escapeHtml(item.metric)}"${profileAttribute}>
+      <strong>${escapeHtml(item.title)}</strong>
+      <span>${escapeHtml(item.text)}</span>
+    </article>
+  `;
+}
+
+function handleSnapshotAction(target) {
+  const metricItem = target.closest("[data-snapshot-metric]");
+  if (metricItem) {
+    const profileId = metricItem.dataset.snapshotProfile;
+    if (profileId) focusMetricEntry(profileId, metricItem.dataset.snapshotMetric);
+    state.activeTrendKey = metricItem.dataset.snapshotMetric;
+    trendMetricInput.value = metricItem.dataset.snapshotMetric;
+    renderTrends();
+    return;
+  }
+
+  const card = target.closest("[data-snapshot-filter]");
+  if (!card) return;
+  if (card.dataset.snapshotFilter === "flagged") setFilter("flagged");
+  else if (card.dataset.snapshotFilter === "due") setFilter("due");
+  else if (card.dataset.snapshotFilter === "changes") {
+    state.filter = "all";
+    state.activeSummaryFilter = "changes";
+    render();
+  } else setFilter("latest");
 }
 
 function renderResultRows(results) {
@@ -1311,7 +1535,12 @@ function renderResultRows(results) {
         <tr>
           <td>${escapeHtml(result.person_name)}</td>
           <td>${formatDate(result.sample_date)}</td>
-          <td><strong>${escapeHtml(result.metric)}</strong></td>
+          <td>
+            <div class="metric-cell">
+              <strong>${escapeHtml(result.metric)}</strong>
+              <button class="info-button" type="button" data-context-metric="${escapeHtml(result.metric)}" aria-label="Show context for ${escapeHtml(result.metric)}">Info</button>
+            </div>
+          </td>
           <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
           <td>${range}</td>
           <td>${status}</td>
@@ -1328,8 +1557,7 @@ function renderResultRows(results) {
 }
 
 function renderStatusPill(result, statusClass) {
-  const warningStatuses = new Set(["Outside range", "Near limit", "Above target", "Below target"]);
-  if (!warningStatuses.has(result.status_vs_range)) {
+  if (!isWarningStatus(result.status_vs_range)) {
     return `<span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span>`;
   }
   return `<button class="status-pill ${statusClass}" type="button" data-warning-id="${escapeHtml(result.id)}">${escapeHtml(result.status_vs_range)}</button>`;
@@ -1480,6 +1708,10 @@ function renderTrends() {
   const chart = numericResults.length >= 2 ? createSparkline(numericResults, latest) : "";
   const rangeText = formatRangeOrTarget(latest);
   const rangeLabel = isTargetMetric(latest.metric) ? "Target" : "Reference";
+  const yearComparison = latest.metric_type === "numeric" ? findClosestPriorResult(allScopedResults, latest, 365, 75) : null;
+  const average = numericResults.length
+    ? numericResults.reduce((sum, result) => sum + Number(result.result_value), 0) / numericResults.length
+    : null;
   const timeline = scopedResults
     .slice(-4)
     .map((result) => `
@@ -1497,12 +1729,13 @@ function renderTrends() {
       <div class="segmented-control" role="group" aria-label="Trend range">
         ${renderTrendRangeButton("6m", "6 months")}
         ${renderTrendRangeButton("1y", "1 year")}
+        ${renderTrendRangeButton("2y", "2 years")}
         ${renderTrendRangeButton("all", "All time")}
       </div>
       <em>${scopedResults.length} of ${allScopedResults.length} results shown</em>
     </article>
     <article class="trend-card">
-      <strong>Latest</strong>
+      <strong>Latest <button class="info-button inline-info" type="button" data-context-metric="${escapeHtml(latest.metric)}">Info</button></strong>
       <span>${escapeHtml(latest.person_name)} · ${escapeHtml(formatValue(latest.result_value, latest.unit))}</span>
       <em>${formatDate(latest.sample_date)} · ${escapeHtml(latest.status_vs_range)}</em>
     </article>
@@ -1515,6 +1748,16 @@ function renderTrends() {
       <strong>${rangeLabel}</strong>
       <span>${escapeHtml(rangeText)}</span>
       <em>${escapeHtml(latest.cadence)}</em>
+    </article>
+    <article class="trend-card">
+      <strong>Year-on-year</strong>
+      <span class="${yearComparison ? getTrendClass(compareTrend(latest, yearComparison)) : ""}">${yearComparison ? formatYearComparison(latest, yearComparison) : "-"}</span>
+      <em>${yearComparison ? `Versus ${formatDate(yearComparison.sample_date)}` : "Needs a similar result about 12 months earlier"}</em>
+    </article>
+    <article class="trend-card">
+      <strong>Average</strong>
+      <span>${average === null ? "-" : escapeHtml(formatValue(roundChange(average), latest.unit))}</span>
+      <em>${numericResults.length ? `Across selected range` : "Not numeric"}</em>
     </article>
     <article class="trend-card">
       <strong>Lowest</strong>
@@ -1546,8 +1789,32 @@ function filterTrendResultsByRange(results) {
   const latest = results[results.length - 1];
   const end = new Date(`${latest.sample_date}T00:00:00`);
   const start = new Date(end);
-  start.setMonth(start.getMonth() - (state.trendRange === "6m" ? 6 : 12));
+  const months = state.trendRange === "6m" ? 6 : state.trendRange === "2y" ? 24 : 12;
+  start.setMonth(start.getMonth() - months);
   return results.filter((result) => new Date(`${result.sample_date}T00:00:00`) >= start);
+}
+
+function findClosestPriorResult(results, latest, targetDays, toleranceDays) {
+  const latestDate = new Date(`${latest.sample_date}T00:00:00`);
+  const candidates = results
+    .filter((result) => result.id !== latest.id && result.metric_type === "numeric" && result.sample_date < latest.sample_date)
+    .map((result) => {
+      const days = daysBetween(new Date(`${result.sample_date}T00:00:00`), latestDate);
+      return { result, distance: Math.abs(days - targetDays) };
+    })
+    .filter((item) => item.distance <= toleranceDays)
+    .sort((a, b) => a.distance - b.distance);
+  return candidates[0]?.result ?? null;
+}
+
+function compareTrend(current, previous) {
+  return getTrendDirection(Number(current.result_value) - Number(previous.result_value), current, previous);
+}
+
+function formatYearComparison(current, previous) {
+  const change = roundChange(Number(current.result_value) - Number(previous.result_value));
+  const percentage = Number(previous.result_value) === 0 ? null : roundChange((change / Number(previous.result_value)) * 100);
+  return `${formatChange(change, current)} (${formatPercent(percentage, current)})`;
 }
 
 function createSparkline(results, latest) {
@@ -1734,13 +2001,37 @@ function explainWarning(resultId) {
 }
 
 function getMetricMedicalNote(metricName) {
-  if (metricName === "Eosinophils") {
-    return "Medical context: eosinophils are white blood cells involved in allergic and inflammatory responses. A borderline high percentage can be seen with common allergic conditions such as hay fever, asthma or eczema, but it should be interpreted alongside the absolute eosinophil count, total white cell count, symptoms, and whether the pattern persists.";
-  }
-  if (metricName === "Monocytes") {
-    return "Medical context: monocytes are white blood cells involved in clearing infection and supporting immune response. A mild isolated increase can occur with recent infection, inflammation or stress, but the significance depends on the absolute monocyte count, total white cell count, symptoms, and repeat results over time.";
-  }
-  return "";
+  const note = metricContextNotes[metricName] ?? getFallbackMetricContext(metricName);
+  return note ? `Medical context: ${note}` : "";
+}
+
+function getFallbackMetricContext(metricName) {
+  const selectedMetric = getMetric(metricName);
+  if (!selectedMetric) return "";
+  return `${selectedMetric.name} is tracked in the ${getDisplayGroupForMetric(metricName).toLowerCase()} group. Interpret the result with the lab range, previous results, symptoms, timing, and the wider trend rather than one isolated value.`;
+}
+
+function showMetricContext(metricName) {
+  const selectedMetric = getMetric(metricName);
+  if (!metricContextModal || !selectedMetric) return;
+  const rawNote = metricContextNotes[metricName] ?? getFallbackMetricContext(metricName);
+  metricContextTitle.textContent = selectedMetric.name;
+  metricContextSubtitle.textContent = `${getDisplayGroupForMetric(metricName)} · ${selectedMetric.cadence}`;
+  metricContextContent.innerHTML = `
+    <p>${escapeHtml(rawNote)}</p>
+    <div class="context-meta">
+      <span>${escapeHtml(selectedMetric.type === "qualitative" ? "Qualitative metric" : "Numeric metric")}</span>
+      <span>${escapeHtml(isTargetMetric(metricName) ? "Target based" : "Reference range based")}</span>
+      <span>${escapeHtml(getDefaultSourceType(metricName))}</span>
+    </div>
+    <p class="privacy-note">General prevention context only. Use persistent, marked, symptomatic, or concerning changes as prompts for clinician discussion.</p>
+  `;
+  metricContextModal.classList.remove("hidden");
+}
+
+function closeMetricContext() {
+  if (!metricContextModal) return;
+  metricContextModal.classList.add("hidden");
 }
 
 function getStatusClass(status) {
@@ -1806,11 +2097,14 @@ function addResult(event) {
   saveRangeForResult(result);
   saveScheduleState();
   saveResults();
+  const nextMetricName = getFollowOnMetric(selectedMetric.name) ?? selectedMetric.name;
   form.reset();
   setTodayDefaults();
   populatePeople();
+  metricInput.value = nextMetricName;
   syncMetricDefaults();
   syncSourceDefaults();
+  renderQuickMetrics();
   render();
 }
 
@@ -1899,7 +2193,7 @@ function exportCsv() {
 function exportForChatGpt() {
   const now = new Date().toISOString();
   const scopedResults = state.results;
-  const warnings = scopedResults.filter((result) => ["Outside range", "Near limit"].includes(result.status_vs_range));
+  const warnings = scopedResults.filter((result) => isWarningStatus(result.status_vs_range));
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const latestResults = getLatestResultsForExport(scopedResults);
   const importSchema = getChatGptImportInstructions();
@@ -1976,20 +2270,30 @@ function exportForChatGpt() {
 
 function exportReviewPack() {
   const now = new Date().toISOString();
-  const warnings = state.results.filter((result) => ["Outside range", "Near limit"].includes(result.status_vs_range));
+  const warnings = state.results.filter((result) => isWarningStatus(result.status_vs_range));
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const materialChanges = getMaterialChanges(state.results);
   const exportScope = getExportScopeLabel();
+  const latestResults = getLatestResultsForExport(state.results);
 
   const lines = [
-    "# Preventative Health Review Pack",
+    "# Prepare AI Review",
     "",
     `Exported: ${now}`,
-    `Scope: focused review pack for ${exportScope}`,
+    `Scope: focused AI review brief for ${exportScope}`,
     "",
-    "## Purpose",
+    "## Instructions For ChatGPT",
     "",
-    "This review pack highlights items most worth attention: outside-range values, near-limit values, due or overdue monitoring, and materially changed results. It is a triage summary, not a diagnosis.",
+    "Review this as a long-term preventative health dashboard, not as a diagnostic system. Focus on trends, cardiovascular/metabolic prevention, due monitoring, and changes worth discussing with a clinician if persistent or clinically relevant.",
+    "",
+    "Do not suggest excessive testing. Prefer practical next steps, questions to clarify context, and year-on-year interpretation. STI and immunoserology tests are intentionally excluded from this project.",
+    "",
+    "## Current Snapshot",
+    "",
+    `- Active warnings: ${warnings.length}`,
+    `- Due or overdue items: ${dueItems.length}`,
+    `- Material changes: ${materialChanges.length}`,
+    `- Latest measurements tracked: ${latestResults.length}`,
     "",
     "## Range Warnings",
     "",
@@ -2008,15 +2312,20 @@ function exportReviewPack() {
     "",
     ...(materialChanges.length ? materialChanges.map(formatResultForExport) : ["- No material changes detected using the current threshold."]),
     "",
+    "## Latest Results",
+    "",
+    ...(latestResults.length ? latestResults.map(formatResultForExport) : ["- No measurements recorded."]),
+    "",
     "## Threshold Used",
     "",
-    "- Numeric results: included when percentage change is at least 10%, trend is Worse, or status is near/outside range.",
+    "- Numeric results: included when percentage change is at least 10%, trend is Worse, or status is near/outside range or target.",
     "- Qualitative results: included when changed.",
+    "- Metric context notes are available in the app and in METRIC_CONTEXT_NOTES.md; use cautious, non-diagnostic language.",
     "",
   ];
 
   downloadText(
-    getExportFilename("review", "md"),
+    getExportFilename("AI review", "md"),
     lines.join("\n"),
     "text/markdown",
   );
@@ -2071,7 +2380,7 @@ function getMaterialChanges(results) {
       const percent = Math.abs(Number(result.percentage_change_since_previous_test));
       return (
         result.trend_direction === "Worse" ||
-        ["Outside range", "Near limit"].includes(result.status_vs_range) ||
+        isWarningStatus(result.status_vs_range) ||
         (Number.isFinite(percent) && percent >= 10)
       );
     })
@@ -2254,6 +2563,7 @@ function commitPreparedImport(prepared) {
 function renderImportReview(review) {
   if (!assertCanEdit()) return;
   state.pendingImport = review;
+  confirmImportButton.disabled = !review.measurements.length && !review.ranges.length;
   const measurementRows = review.measurements
     .slice(0, 12)
     .map(
@@ -2270,9 +2580,10 @@ function renderImportReview(review) {
     )
     .join("");
   const skippedRows = review.skipped
-    .slice(0, 6)
-    .map((item) => `<li>${escapeHtml(item.reason)}</li>`)
+    .slice(0, 8)
+    .map((item) => `<li><strong>${escapeHtml(item.reason)}</strong><span>${escapeHtml(formatSkippedImportItem(item.item))}</span></li>`)
     .join("");
+  const skippedBreakdown = countSkippedReasons(review.skipped);
 
   importReviewContent.innerHTML = `
     <div class="import-summary">
@@ -2280,6 +2591,13 @@ function renderImportReview(review) {
       <article><strong>${review.ranges.length}</strong><span>ranges ready</span></article>
       <article><strong>${review.skipped.length}</strong><span>skipped</span></article>
     </div>
+    ${
+      review.skipped.length
+        ? `<div class="import-breakdown">${Object.entries(skippedBreakdown)
+            .map(([reason, count]) => `<span>${escapeHtml(reason)}: ${count}</span>`)
+            .join("")}</div>`
+        : ""
+    }
     ${
       review.measurements.length
         ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Date</th><th>Range</th><th>Source</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
@@ -2291,9 +2609,26 @@ function renderImportReview(review) {
   importReviewModal.classList.remove("hidden");
 }
 
+function countSkippedReasons(skippedItems) {
+  return skippedItems.reduce((counts, item) => {
+    counts[item.reason] = (counts[item.reason] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function formatSkippedImportItem(item) {
+  if (!item || typeof item !== "object") return "No item details available";
+  const person = item.profile_id || item.person_name || item.person || "unknown person";
+  const metricName = item.metric || "unknown metric";
+  const date = item.date || item.sample_date || item.result_date || item.test_date || "no date";
+  const value = item.result_value ?? item.value ?? "no value";
+  return `${person} · ${metricName} · ${value} · ${date}`;
+}
+
 function closeImportReview() {
   state.pendingImport = null;
   importReviewContent.innerHTML = "";
+  confirmImportButton.disabled = false;
   importReviewModal.classList.add("hidden");
 }
 
@@ -2370,7 +2705,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.33").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.34").catch(() => {});
   });
 }
 
@@ -2423,7 +2758,7 @@ async function signOut() {
 profileForm.addEventListener("submit", saveProfile);
 authForm.addEventListener("submit", signInWithPassword);
 magicLinkButton.addEventListener("click", sendMagicLink);
-personInput.addEventListener("change", syncRangeDefaults);
+personInput.addEventListener("change", syncMetricDefaults);
 metricInput.addEventListener("change", () => {
   syncMetricDefaults();
   renderQuickMetrics();
@@ -2433,6 +2768,12 @@ quickMetricPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-metric-name]");
   if (!button) return;
   selectMetric(button.dataset.metricName);
+  valueInput.focus();
+});
+entryAssist.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-entry-metric]");
+  if (!button) return;
+  selectMetric(button.dataset.entryMetric);
   valueInput.focus();
 });
 sourceTypeInput.addEventListener("change", syncSourceConfidence);
@@ -2472,6 +2813,10 @@ window.addEventListener("offline", () => {
 importReviewModal.addEventListener("click", (event) => {
   if (event.target === importReviewModal) closeImportReview();
 });
+metricContextModal.addEventListener("click", (event) => {
+  if (event.target === metricContextModal) closeMetricContext();
+});
+closeContextButton.addEventListener("click", closeMetricContext);
 if (resetButton) {
   resetButton.addEventListener("click", () => {
     if (!assertCanEdit()) return;
@@ -2520,6 +2865,16 @@ statusStrip.addEventListener("keydown", (event) => {
   setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
 });
 
+snapshotSection.addEventListener("click", (event) => {
+  handleSnapshotAction(event.target);
+});
+
+snapshotSection.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  handleSnapshotAction(event.target);
+});
+
 markerSummary.addEventListener("click", (event) => {
   const card = event.target.closest("[data-summary-metric]");
   if (!card) return;
@@ -2541,6 +2896,12 @@ markerSummary.addEventListener("keydown", (event) => {
 });
 
 trendPanel.addEventListener("click", (event) => {
+  const contextButton = event.target.closest("[data-context-metric]");
+  if (contextButton) {
+    showMetricContext(contextButton.dataset.contextMetric);
+    return;
+  }
+
   const button = event.target.closest("[data-trend-range]");
   if (!button) return;
   state.trendRange = button.dataset.trendRange;
@@ -2569,6 +2930,12 @@ schedulePanel.addEventListener("keydown", (event) => {
 });
 
 resultsBody.addEventListener("click", (event) => {
+  const contextButton = event.target.closest("[data-context-metric]");
+  if (contextButton) {
+    showMetricContext(contextButton.dataset.contextMetric);
+    return;
+  }
+
   const warningButton = event.target.closest("[data-warning-id]");
   if (warningButton) {
     explainWarning(warningButton.dataset.warningId);

@@ -219,6 +219,97 @@ h2 {
   color: var(--amber);
 }
 
+.snapshot-section {
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.snapshot-card,
+.snapshot-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
+}
+
+.snapshot-card {
+  cursor: pointer;
+}
+
+.snapshot-card:hover,
+.snapshot-card:focus-visible,
+.snapshot-item:hover,
+.snapshot-item:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-soft);
+}
+
+.snapshot-card strong,
+.snapshot-card span,
+.snapshot-card em,
+.snapshot-item strong,
+.snapshot-item span {
+  display: block;
+}
+
+.snapshot-card strong {
+  margin-bottom: 5px;
+  font-size: 1.45rem;
+}
+
+.snapshot-card span,
+.snapshot-item strong {
+  font-weight: 850;
+}
+
+.snapshot-card em,
+.snapshot-item span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+}
+
+.snapshot-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.snapshot-item {
+  cursor: pointer;
+}
+
+.snapshot-item.warning,
+.snapshot-item.soon,
+.snapshot-item.change {
+  border-color: #e3b437;
+  background: var(--amber-bg);
+}
+
+.snapshot-item.overdue,
+.snapshot-item.due {
+  border-color: #dc6a59;
+  background: var(--bad-bg);
+}
+
+.snapshot-item.ok {
+  border-color: #9fcbb3;
+  background: var(--ok-bg);
+  cursor: default;
+}
+
 .auth-panel {
   margin-bottom: 16px;
   padding: 18px;
@@ -492,6 +583,33 @@ legend {
   color: var(--accent-dark);
 }
 
+.entry-assist {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -4px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 10px;
+}
+
+.entry-assist strong,
+.entry-assist span {
+  display: block;
+}
+
+.entry-assist strong {
+  margin-bottom: 3px;
+  font-size: 0.86rem;
+}
+
+.entry-assist span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .compact-select {
   display: flex;
   align-items: center;
@@ -763,6 +881,35 @@ td {
   font-size: 0.8rem;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.metric-cell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.info-button {
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.info-button:hover,
+.info-button:focus-visible {
+  border-color: rgba(35, 111, 98, 0.42);
+  color: var(--accent-dark);
+}
+
+.inline-info {
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .trend-controls {
@@ -1051,9 +1198,65 @@ button.status-pill:focus-visible {
   padding: 12px;
 }
 
+.import-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 14px;
+}
+
+.import-breakdown span {
+  border: 1px solid #e3b437;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: var(--amber);
+  padding: 5px 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .import-skipped ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+
+.import-skipped li {
+  margin-bottom: 7px;
+}
+
+.import-skipped li strong,
+.import-skipped li span {
+  display: block;
+}
+
+.import-skipped li span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.context-panel {
+  width: min(720px, 100%);
+}
+
+.context-content p {
+  line-height: 1.55;
+}
+
+.context-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.context-meta span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfcfb;
+  color: var(--muted);
+  padding: 6px 9px;
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 @media (max-width: 940px) {
@@ -1085,6 +1288,8 @@ button.status-pill:focus-visible {
 
   .marker-summary,
   .trend-grid,
+  .snapshot-grid,
+  .snapshot-list,
   .schedule-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1109,8 +1314,15 @@ button.status-pill:focus-visible {
   .profile-grid,
   .trend-grid,
   .import-summary,
+  .snapshot-grid,
+  .snapshot-list,
   .schedule-grid {
     grid-template-columns: 1fr;
+  }
+
+  .entry-assist {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .modal-actions {

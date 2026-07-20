@@ -89,6 +89,7 @@ function createDocument() {
     "markerInput",
     "metricSearchInput",
     "quickMetricPanel",
+    "entryAssist",
     "trendMetricInput",
     "trendPanel",
     "unitInput",
@@ -115,6 +116,10 @@ function createDocument() {
     "dueSoonResults",
     "nextDueCard",
     "nextDueDate",
+    "snapshotSection",
+    "snapshotUpdated",
+    "snapshotGrid",
+    "snapshotList",
     "markerSummary",
     "schedulePanel",
     "exportCsvButton",
@@ -127,6 +132,11 @@ function createDocument() {
     "cancelImportButton",
     "discardImportButton",
     "confirmImportButton",
+    "metricContextModal",
+    "metricContextTitle",
+    "metricContextSubtitle",
+    "metricContextContent",
+    "closeContextButton",
     "syncStatus",
     "manualRefreshButton",
     "appVersion",
@@ -228,14 +238,19 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
-assert(indexHtml.includes("app.js?v=0.33"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.33"), "Supabase config should be loaded before the app");
+const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
+assert(indexHtml.includes("app.js?v=0.34"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.34"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
-assert(indexHtml.includes("privacy-guard.js?v=0.33"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.33"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("Prepare AI Review"), "AI review action should be clearly named");
+assert(indexHtml.includes("Current snapshot"), "current health snapshot section should exist");
+assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
+assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
+assert(indexHtml.includes("privacy-guard.js?v=0.34"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.34"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -256,12 +271,15 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.33"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.33"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.33"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.33"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.33"), "service worker should cache PNG app icons");
-assert(document.elements.appVersion.textContent === "v0.33", "footer should show app version");
+assert(indexHtml.includes("app-icon-180.png?v=0.34"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.34"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.34"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.34"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.34"), "service worker should cache PNG app icons");
+assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
+assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
+assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
+assert(document.elements.appVersion.textContent === "v0.34", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -290,6 +308,8 @@ assert(String(document.elements.highInput.value) === "115", "LDL upper default s
 assert(document.elements.highInput.disabled === false, "first range entry should be editable");
 assert(document.elements.sourceTypeInput.value === "Lab Report / PDF", "LDL should default to lab source");
 assert(document.elements.sourceConfidenceInput.value === "High", "lab source should be high confidence");
+assert(document.elements.entryAssist.innerHTML.includes("Cardiovascular"), "entry assist should show the selected metric group");
+assert(document.elements.entryAssist.innerHTML.includes("Range set on first entry"), "entry assist should explain first range entry");
 
 context.populateMetrics();
 assert(document.elements.markerInput.innerHTML.includes("Glucose"), "metric dropdown should retain all metrics");
@@ -342,6 +362,7 @@ assert(!document.elements.quickMetricPanel.innerHTML.includes("quick-metric-butt
 document.elements.markerInput.value = "Blood pressure diastolic";
 document.elements.markerInput.listeners.change();
 assert(document.elements.quickMetricPanel.innerHTML.includes('quick-metric-button active" data-metric-name="Blood pressure diastolic"'), "dropdown changes should refresh quick metric highlight");
+assert(document.elements.entryAssist.innerHTML.includes("Next: Resting heart rate"), "entry assist should suggest the next natural vital metric");
 vm.runInContext('state.activeProfileId = null;', context);
 assert(context.getStatus({
   metric: "Blood pressure systolic",
@@ -411,6 +432,7 @@ assert(weightRows[1].reference_upper_limit === 79, "new weight should use update
 assert(weightRows[1].status_vs_range === "Above target", "weight above updated target should not be outside range");
 assert(document.elements.resultsBody.innerHTML.includes("Delete"), "results should expose a delete action");
 assert(document.elements.resultsBody.innerHTML.includes("result-group-row"), "results should include grouped section rows");
+assert(document.elements.resultsBody.innerHTML.includes("data-context-metric"), "result rows should expose metric context buttons");
 
 const imported = context.importChatGptPayload({
   import_type: "health_dashboard_measurements",
@@ -452,6 +474,10 @@ assert(!document.elements.importReviewModal.classList.contains("hidden"), "impor
 assert(document.elements.importReviewContent.innerHTML.includes("measurements ready"), "import review should show summary");
 context.closeImportReview();
 assert(document.elements.importReviewModal.classList.contains("hidden"), "import review modal should close");
+context.renderImportReview({ measurements: [], ranges: [], skipped: [{ reason: "Unknown profile or metric", item: { metric: "Made up", profile_id: "ben" } }] });
+assert(document.elements.confirmImportButton.disabled === true, "empty import review should disable confirmation");
+assert(document.elements.importReviewContent.innerHTML.includes("Unknown profile or metric"), "import review should show skipped reasons");
+context.closeImportReview();
 const duplicate = context.importChatGptPayload({
   import_type: "health_dashboard_measurements",
   version: 1,
@@ -482,22 +508,35 @@ assert(exportText.includes("source Lab Report / PDF"), "ChatGPT export should in
 assert(context.getExportFilename("", "md", new Date("2026-07-09T12:00:00Z")) === "health dashboard All 09-07-2026.md", "multi-profile export filename should use DD-MM-YYYY");
 vm.runInContext('cloudState.profileId = "ben";', context);
 assert(context.getExportFilename("", "md", new Date("2026-07-09T12:00:00Z")) === "health dashboard Ben 09-07-2026.md", "Ben export filename should use canonical user name");
-assert(context.getExportFilename("review", "md", new Date("2026-07-09T12:00:00Z")) === "health dashboard Ben review 09-07-2026.md", "review export filename should include label");
+assert(context.getExportFilename("AI review", "md", new Date("2026-07-09T12:00:00Z")) === "health dashboard Ben AI review 09-07-2026.md", "AI review export filename should include label");
 vm.runInContext('cloudState.profileId = null;', context);
 context.exportReviewPack();
 const reviewPack = context.lastBlob.parts.join("");
-assert(reviewPack.includes("Preventative Health Review Pack"), "review pack should export focused markdown");
-assert(reviewPack.includes("Scope: focused review pack for Ben and Angelika"), "review pack should include the active profile names");
+assert(reviewPack.includes("Prepare AI Review"), "AI review should export focused markdown");
+assert(reviewPack.includes("Scope: focused AI review brief for Ben and Angelika"), "AI review should include the active profile names");
+assert(reviewPack.includes("Do not suggest excessive testing"), "AI review should include prevention-first guardrails");
 
 document.elements.trendMetricInput.value = "LDL";
 vm.runInContext('state.activeTrendKey = "LDL"; renderTrends();', context);
 assert(document.elements.trendPanel.innerHTML.includes("sparkline"), "numeric trend should render chart");
 assert(document.elements.trendPanel.innerHTML.includes("range-band") || document.elements.trendPanel.innerHTML.includes("range-limit"), "chart should show range context");
+assert(document.elements.trendPanel.innerHTML.includes("2 years"), "trend controls should include a two-year range");
+assert(document.elements.trendPanel.innerHTML.includes("Year-on-year"), "trend panel should include year-on-year comparison");
 assert(document.elements.trendPanel.innerHTML.match(/<li>/g).length <= 4, "recent history should be capped at four entries");
+vm.runInContext('cloudState.user = { email: "ben_ashurst@me.com" }; render();', context);
+assert(document.elements.snapshotGrid.innerHTML.includes("Warnings"), "snapshot should render warning summary");
+assert(document.elements.snapshotList.innerHTML, "snapshot should render priority items or calm state");
 
 const eosinophilNote = context.getMetricMedicalNote("Eosinophils");
 assert(eosinophilNote.includes("hay fever"), "eosinophil context should mention common allergic context");
 const monocyteNote = context.getMetricMedicalNote("Monocytes");
 assert(monocyteNote.includes("recent infection"), "monocyte context should mention common mild causes");
+const ldlNote = context.getMetricMedicalNote("LDL");
+assert(ldlNote.includes("atherogenic"), "LDL context should use the full metric context library");
+context.showMetricContext("LDL");
+assert(!document.elements.metricContextModal.classList.contains("hidden"), "metric context modal should open");
+assert(document.elements.metricContextContent.innerHTML.includes("atherogenic"), "metric context modal should show medical context");
+context.closeMetricContext();
+assert(document.elements.metricContextModal.classList.contains("hidden"), "metric context modal should close");
 
 console.log("function test passed");

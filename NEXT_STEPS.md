@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,100 +10,46 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is currently usable for early testing, but the UI and workflows still need polish before heavy real-world use.
+- The app is now on `v0.34`.
+- The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, and metric context notes.
+- A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
 
-## Highest Priority
+## Completed In v0.34
 
-1. Build the navigation polish path.
-   - Add schedule groups so related metrics are treated as batches rather than isolated tasks.
-   - Suggested groups include body tracking, home vitals, six-month bloods, annual bloods, hormone/follow-up tests, and infrequent investigations.
-   - Add due-date anchoring so metrics in the same group do not drift apart over time.
-   - For metrics in the same cadence group that fall within a defined window, choose a shared practical due date, likely the first of the next month or the next group batch date.
-   - Keep short-cycle metrics such as weight and waist aligned where practical, so a Monday/Wednesday entry pattern does not permanently stagger future due dates.
-   - Keep six-monthly and annual blood markers aligned so the app does not suggest isolated one-off blood tests such as fasting glucose alone.
-   - Add a snooze action for due-soon and overdue items.
-   - Snooze should move an item into the next sensible batch rather than dismissing it indefinitely.
-   - Make due/overdue items clickable so clicking a metric pre-fills Add Measurement with today’s date, the selected metric, unit, range/target, and focus on the value field.
-   - Make top summary cards clickable, especially range warnings and due/overdue counts.
-   - Make range warnings clickable and explain why the result is flagged: value, range/target, status, previous result, change, and source document.
-   - Rework Results into a grouped current view plus a separate full archive/audit view.
-   - Group current results by practical health area: body, cardiovascular, metabolic, full blood count, kidney, liver, vitamins/iron, thyroid/endocrine, hormones, urine, and infrequent tests.
-   - Keep all individual historical entries available in the archive/audit view.
+- Small real-use friction cleanup.
+- Metric-entry polish, including entry helper text and next-metric flow for common paired measurements.
+- Trend/chart polish, including two-year range, year-on-year comparison, and average over the selected range.
+- ChatGPT import confirmation polish, including skipped-item detail and disabled confirmation for empty imports.
+- `Prepare AI Review` workflow, replacing the older review-pack wording with clearer AI review instructions and guardrails.
+- Current Health Snapshot after login.
+- Metric medical context UI using the first-pass context note library.
+- Live Supabase security/privacy audit and grant tightening.
 
-2. Test real use with a small number of genuine entries.
-   - Add weight, waist circumference, blood pressure, and a few representative blood markers for Ben and Angelika.
-   - Use this to identify friction in the real workflow before adding lots of data.
+## Current Outstanding Work
 
-3. Polish metric entry.
-   - Make the add-measurement flow calmer and faster.
-   - Keep body metrics, blood/urine results, cardiovascular markers, fitness metrics, and one-off investigations easy to distinguish.
-   - Keep weight and waist as target-based metrics, not clinical reference-range metrics.
-   - Preserve per-person, per-metric reference ranges and targets with explicit edit controls.
-   - Continue to avoid redundant fields that make manual entry feel heavy.
-
-4. Improve trends and charts.
-   - Make previous result, latest change, percentage change, highest, lowest, and trend direction easier to scan.
-   - Add clearer 6-month, 12-month, year-on-year, and all-time comparisons where enough data exists.
-   - Keep trend language calm and non-diagnostic.
-
-5. Review privacy and security.
-   - Re-check Supabase Row Level Security.
-   - Confirm each signed-in user can only see their own health data.
-   - Confirm only Ben and Angelika can use the live app.
-   - Keep private health data out of GitHub and browser-visible code.
-
-## Medium Priority
-
-6. Build the ChatGPT import workflow.
-   - Export all current app context in a ChatGPT-friendly format.
-   - Use that export to instruct ChatGPT how to read an uploaded blood/urine PDF.
-   - Have ChatGPT return structured JSON.
-   - Show an import confirmation screen before saving.
-   - Never import STI or immunoserology results.
-
-7. Add a Prepare AI Review workflow.
-   - Evolve the existing Export for ChatGPT feature into a clearer `Prepare AI Review` or `Prepare GPT Review` action.
-   - Generate a focused review brief containing latest results, active warnings, due or overdue items, meaningful trends, recent changes, and the app's prevention-first/non-diagnostic context.
-   - Keep this as a safe hybrid workflow first: prepare the review pack inside the app, then continue the conversation in ChatGPT.
-   - Do not add a true in-app AI assistant until privacy, backend, API-key handling, costs, and auditability are deliberately designed.
-
-8. Improve the Current Health Snapshot.
-   - Add a first-page summary after login.
-   - Include current priorities, overdue items, reassuring results, recent changes, and latest key metrics.
-   - Keep it preventative, not diagnostic.
-
-9. Add metric medical context notes.
-   - Start with concise, calm explanations for flagged or borderline results.
-   - Eosinophils and monocytes are the first proof of concept.
-   - Use `METRIC_CONTEXT_NOTES.md` as the first-pass source-backed content library.
-   - Later, add an expandable explanation for every tracked metric.
-   - Keep explanations short, evidence-based, and non-diagnostic.
-
-10. Improve mobile and tablet UI.
+9. Continue mobile and tablet UI refinement.
    - Make iPhone and iPad layouts first-class.
    - Reduce table heaviness on small screens.
    - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
 
-11. Add health events and notes.
+10. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
-## Later
-
-12. Add document upload/storage.
+11. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-13. Add reminders and review scheduling.
+12. Add reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
 
-14. Add backup scheduling.
+13. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-15. Consider structured database tables later.
+14. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
 

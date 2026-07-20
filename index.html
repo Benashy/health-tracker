@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.33" />
-    <link rel="icon" href="app-icon.svg?v=0.33" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.33" />
-    <link rel="stylesheet" href="styles.css?v=0.33" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.34" />
+    <link rel="icon" href="app-icon.svg?v=0.34" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.34" />
+    <link rel="stylesheet" href="styles.css?v=0.34" />
   </head>
   <body>
     <main class="app-shell">
@@ -25,7 +25,7 @@
             <button class="ghost-button" id="exportChatGptButton" type="button">Export for ChatGPT</button>
             <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
             <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
-            <button class="ghost-button" id="exportReviewPackButton" type="button">Review pack</button>
+            <button class="ghost-button" id="exportReviewPackButton" type="button">Prepare AI Review</button>
             <button class="ghost-button" id="exportCsvButton" type="button">Export CSV</button>
           </div>
         </header>
@@ -82,6 +82,15 @@
             <span class="metric" id="nextDueDate">-</span>
             <span class="label">next due</span>
           </article>
+        </section>
+
+        <section class="snapshot-section hidden" id="snapshotSection" data-private aria-hidden="true" aria-label="Current health snapshot">
+          <div class="panel-heading">
+            <h2>Current snapshot</h2>
+            <span class="privacy-note" id="snapshotUpdated">No measurements yet</span>
+          </div>
+          <div class="snapshot-grid" id="snapshotGrid"></div>
+          <div class="snapshot-list" id="snapshotList"></div>
         </section>
 
         <section class="profile-section hidden" data-private aria-hidden="true" aria-label="People">
@@ -160,6 +169,8 @@
               Metric
               <select id="markerInput" required></select>
             </label>
+
+            <div class="entry-assist" id="entryAssist"></div>
 
             <div class="inline-fields">
               <label>
@@ -264,7 +275,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.33</span>
+          <span class="version-chip" id="appVersion">v0.34</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
       </section>
@@ -287,9 +298,22 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.33"></script>
+    <section class="modal hidden" id="metricContextModal" role="dialog" aria-modal="true" aria-labelledby="metricContextTitle">
+      <div class="modal-panel context-panel">
+        <div class="panel-heading">
+          <div>
+            <h2 id="metricContextTitle">Metric context</h2>
+            <span class="privacy-note" id="metricContextSubtitle">General prevention context</span>
+          </div>
+          <button class="mini-button" id="closeContextButton" type="button">Close</button>
+        </div>
+        <div class="context-content" id="metricContextContent"></div>
+      </div>
+    </section>
+
+    <script src="supabase-config.js?v=0.34"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.33"></script>
-    <script src="privacy-guard.js?v=0.33"></script>
+    <script src="app.js?v=0.34"></script>
+    <script src="privacy-guard.js?v=0.34"></script>
   </body>
 </html>

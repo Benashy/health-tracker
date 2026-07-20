@@ -74,35 +74,19 @@ Do not start here unless there is a clear reason. The JSONB-first route is simpl
 
 ## Row-Level Security
 
-Enable RLS so each user can only read and write their own single data row.
+Enable RLS so each user can only read and write their own single data row. For this private app, policies should also restrict access to the approved Ben and Angelika login emails.
 
 ```sql
 alter table public.health_dashboard_data enable row level security;
 
+revoke all privileges on table public.health_dashboard_data from anon;
+revoke delete, truncate, references, trigger on table public.health_dashboard_data from authenticated;
+
 grant usage on schema public to authenticated;
 grant select, insert, update on public.health_dashboard_data to authenticated;
-
-create policy "Users can read their own health dashboard data"
-on public.health_dashboard_data
-for select
-to authenticated
-using ((select auth.uid()) = user_id);
-
-create policy "Users can insert their own health dashboard data"
-on public.health_dashboard_data
-for insert
-to authenticated
-with check ((select auth.uid()) = user_id);
-
-create policy "Users can update their own health dashboard data"
-on public.health_dashboard_data
-for update
-to authenticated
-using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
 ```
 
-The deployable SQL lives in `supabase/health_dashboard_data.sql`.
+The deployable SQL lives in `supabase/health_dashboard_data.sql`; that file is the source of truth for the approved-email policies.
 
 ## Sync And Conflict Protection
 
