@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.44";
+const APP_VERSION = "v0.45";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -2405,6 +2405,11 @@ function renderCalmScheduleCard() {
 
 function renderMobileActions(dueCount) {
   if (!mobileActionBar) return;
+  if (!cloudState.user) {
+    mobileActionBar.innerHTML = "";
+    mobileActionBar.classList.remove("has-due");
+    return;
+  }
   const actions = [
     { key: "home", label: "Home", count: dueCount },
     { key: "add", label: "Add", primary: true },
@@ -2437,7 +2442,7 @@ function setMobileOnlyHidden(element, isHidden) {
 function renderMobileLayout() {
   const mobile = isMobileLayout();
   const signedIn = Boolean(cloudState.user);
-  const selectedView = state.mobileView || "home";
+  const selectedView = signedIn ? state.mobileView || "home" : "home";
   const allMobileSections = [
     profileSection,
     onboardingPanel,
@@ -2481,6 +2486,12 @@ function renderMobileLayout() {
 }
 
 function setMobileView(view, options = {}) {
+  if (!cloudState.user) {
+    state.mobileView = "home";
+    renderMobileActions(0);
+    renderMobileLayout();
+    return;
+  }
   const allowedViews = new Set(["home", "add", "trends", "results", "menu"]);
   state.mobileView = allowedViews.has(view) ? view : "home";
   renderMobileActions(getDueCount());
@@ -2586,6 +2597,9 @@ function focusCurrentResults() {
 }
 
 function handleActionShortcut(action) {
+  if (!cloudState.user && ["home", "add", "trends", "results", "menu", "due", "current", "import", "review"].includes(action)) {
+    return;
+  }
   if (action === "add") {
     focusEntryPanel();
     return;
@@ -2612,6 +2626,7 @@ function handleActionShortcut(action) {
 }
 
 function handleMenuAction(action) {
+  if (!cloudState.user) return;
   if (action === "export-gpt") {
     exportForChatGpt();
     return;
@@ -3430,7 +3445,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.44").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.45").catch(() => {});
   });
 }
 

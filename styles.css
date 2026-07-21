@@ -76,6 +76,12 @@ body:not(.signed-in) .topbar {
   margin-bottom: 18px;
 }
 
+body:not(.signed-in) [data-private],
+body:not(.signed-in) .mobile-action-bar,
+body:not(.signed-in) .mobile-menu-panel {
+  display: none !important;
+}
+
 body:not(.signed-in) h1 {
   font-size: clamp(2.3rem, 9vw, 4.2rem);
 }
@@ -449,6 +455,20 @@ h2 {
 
 .auth-actions .primary-button {
   width: auto;
+}
+
+body:not(.signed-in) .auth-form {
+  grid-template-columns: 1fr;
+}
+
+body:not(.signed-in) .auth-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:not(.signed-in) .auth-actions .primary-button,
+body:not(.signed-in) .auth-actions .ghost-button {
+  width: 100%;
 }
 
 .metric {
@@ -1515,6 +1535,10 @@ button.status-pill:focus-visible {
 }
 
 @media (max-width: 560px) {
+  body:not(.signed-in) .auth-actions {
+    grid-template-columns: 1fr;
+  }
+
   .topbar-actions,
   .auth-actions,
   .filters,
@@ -1620,6 +1644,12 @@ button.status-pill:focus-visible {
     justify-content: center;
     width: 100%;
     min-height: 46px;
+  }
+
+  .mobile-menu-panel.hidden,
+  .mobile-action-bar.hidden,
+  [data-private].hidden {
+    display: none !important;
   }
 
   .panel-heading {
