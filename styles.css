@@ -62,6 +62,24 @@ html {
   margin: 0 auto;
 }
 
+body:not(.signed-in) .workspace {
+  width: min(560px, 100%);
+}
+
+body:not(.signed-in) .eyebrow,
+body:not(.signed-in) .topbar-actions {
+  display: none;
+}
+
+body:not(.signed-in) .topbar {
+  display: block;
+  margin-bottom: 18px;
+}
+
+body:not(.signed-in) h1 {
+  font-size: clamp(2.3rem, 9vw, 4.2rem);
+}
+
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -635,10 +653,90 @@ legend {
   flex: 1;
 }
 
+.value-fields {
+  border: 1px solid rgba(35, 111, 98, 0.22);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.value-fields input {
+  border-color: rgba(35, 111, 98, 0.36);
+  background: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.reference-panel {
+  margin-bottom: 14px;
+  border: 1px solid #d7ded8;
+  border-radius: 8px;
+  background: #f2f5f2;
+  padding: 11px;
+}
+
+.reference-panel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.reference-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.reference-options label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 7px 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.reference-options input {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.reference-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.reference-field {
+  margin-bottom: 0 !important;
+}
+
+.reference-field input {
+  border-color: #d4dbd5;
+  background: #edf1ee;
+  color: #47534d;
+  font-size: 0.92rem;
+}
+
 .range-tools {
   align-items: center;
   justify-content: space-between;
-  margin: -4px 0 14px;
+  margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
 }
@@ -1177,6 +1275,12 @@ button.status-pill:focus-visible {
   font-size: 0.84rem;
 }
 
+.account-sync-footer.signed-out-footer {
+  justify-content: flex-start;
+  border-top: 0;
+  padding-top: 0;
+}
+
 .mobile-action-bar {
   display: none;
 }
@@ -1558,6 +1662,15 @@ button.status-pill:focus-visible {
   .quick-metrics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reference-options,
+  .reference-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .reference-options label {
+    min-height: 40px;
   }
 
   .quick-metric-button {

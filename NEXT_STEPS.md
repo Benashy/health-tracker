@@ -10,9 +10,18 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.38`.
+- The app is now on `v0.39`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.39
+
+- Simplified the signed-out page so it only shows the app title, version, and account/sign-in block.
+- Hid sync, refresh, local-draft, export, import, CSV, and AI review affordances until authentication is complete.
+- Made measurement value entry visually more prominent than reference/target setup fields.
+- Added independent lower reference, target, and upper reference field selection per person/metric.
+- Migrated existing weight/waist targets into a dedicated `target_value` field while preserving historical targets.
+- Extended import/export data to include `target_value` and reference-field selections.
 
 ## Completed In v0.38
 

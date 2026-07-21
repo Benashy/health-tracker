@@ -31,10 +31,19 @@ class Element {
     this.textContent = "";
     this.innerHTML = "";
     this.disabled = false;
+    this.checked = false;
     this.files = [];
     this.dataset = {};
     this.listeners = {};
     this.classList = new ClassList();
+  }
+
+  set className(value) {
+    this.classList.items = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
+
+  get className() {
+    return [...this.classList.items].join(" ");
   }
 
   addEventListener(name, handler) {
@@ -94,11 +103,18 @@ function createDocument() {
     "trendPanel",
     "unitInput",
     "lowField",
+    "targetField",
     "highField",
     "lowLabel",
+    "targetLabel",
     "highLabel",
     "lowInput",
+    "targetInput",
     "highInput",
+    "referenceOptions",
+    "referenceLowerEnabled",
+    "targetEnabled",
+    "referenceUpperEnabled",
     "rangeEditButton",
     "rangeHint",
     "dateInput",
@@ -155,6 +171,7 @@ function createDocument() {
   const classes = {
     ".results-table-wrap": new Element("results-table-wrap"),
     ".results-panel": new Element("results-panel"),
+    ".account-sync-footer": new Element("account-sync-footer"),
     ".filters": new Element("filters"),
     ".status-strip": new Element("status-strip"),
   };
@@ -166,6 +183,7 @@ function createDocument() {
   });
 
   return {
+    body: new Element("body"),
     elements,
     createElement() {
       return new Element();
@@ -249,8 +267,8 @@ const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
-assert(indexHtml.includes("app.js?v=0.38"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.38"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.39"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.39"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -262,16 +280,21 @@ assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
 assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
 assert(indexHtml.includes("mobileActionBar"), "mobile bottom action bar should exist");
 assert(indexHtml.includes("entry-submit-button"), "mobile entry submit affordance should exist");
+assert(indexHtml.includes("referenceOptions"), "reference field selectors should exist");
+assert(indexHtml.includes("targetInput"), "target should have a dedicated input");
 assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "account should appear before profile details");
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.38"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.38"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.39"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.39"), "privacy guard should be cached with the app shell");
+assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
+assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
+assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
-assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
-assert(indexHtml.includes("<span id=\"highLabel\">Target</span>"), "default weight form should label the high field as target");
+assert(/<label class="hidden reference-field" id="lowField">/.test(indexHtml), "default weight form should hide lower limit before JavaScript runs");
+assert(indexHtml.includes("<span id=\"targetLabel\">Target</span>"), "target should use its own label");
 assert(!indexHtml.includes("Find metric"), "metric search box should not be visible");
 assert(!indexHtml.includes("Saved in your private account"), "entry panel should avoid redundant private account copy");
 assert(!indexHtml.includes("Source note"), "source note field should not be visible");
@@ -286,15 +309,15 @@ assert(!indexHtml.includes("latest measurement"), "summary strip should not show
 assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.38"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.39"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.38")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.38"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.38"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.38"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.38"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.38"), "service worker should cache PNG app icons");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.39")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.39"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.39"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.39"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.39"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.39"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -304,10 +327,13 @@ assert(styles.includes("env(safe-area-inset-bottom)"), "iPhone safe-area spacing
 assert(styles.includes(".entry-submit-button"), "mobile entry submit should be sticky");
 assert(styles.includes(".empty-actions"), "empty states should include compact action buttons");
 assert(styles.includes("86dvh"), "mobile modals should use a bottom-sheet-friendly height");
+assert(styles.includes("body:not(.signed-in) .workspace"), "signed-out shell should be simplified");
+assert(styles.includes(".reference-panel"), "reference fields should have secondary styling");
+assert(styles.includes(".value-fields input"), "primary value fields should be visually prominent");
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.38", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.39", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -315,8 +341,12 @@ assert(
     document.elements.nextDueDate.textContent !== "Now",
   "next due card should be colour-coded when due now or overdue",
 );
-assert(document.elements.syncStatus.textContent.includes("Local"), "footer should show local sync status");
-assert(document.elements.authPanel.classList.contains("hidden"), "auth panel should hide until Supabase is configured");
+assert(document.elements.syncStatus.classList.contains("hidden"), "signed-out footer should hide sync status");
+assert(document.elements.manualRefreshButton.classList.contains("hidden"), "signed-out footer should hide refresh");
+assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out shell should show the account panel");
+assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
+assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
+assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
 assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="add"'), "mobile action bar should render an Add action");
 assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="due"'), "mobile action bar should render a Due action");
 assert(document.elements.emptyState.innerHTML.includes("empty-actions"), "empty state should offer mobile-friendly next actions");
@@ -340,10 +370,14 @@ document.elements.personInput.value = "ben";
 document.elements.markerInput.value = "LDL";
 context.syncMetricDefaults();
 assert(document.elements.highLabel.textContent === "Reference upper limit", "LDL should use reference range labels");
-assert(!document.elements.lowField.classList.contains("hidden"), "LDL should show lower limit field");
+assert(document.elements.lowField.classList.contains("hidden"), "LDL should hide unused lower limit field by default");
+assert(document.elements.targetField.classList.contains("hidden"), "LDL should hide target field by default");
+assert(!document.elements.highField.classList.contains("hidden"), "LDL should show upper limit field by default");
 assert(document.elements.lowInput.value === "", "LDL lower limit should be blank/null");
 assert(String(document.elements.highInput.value) === "115", "LDL upper default should load");
 assert(document.elements.highInput.disabled === false, "first range entry should be editable");
+assert(document.elements.referenceUpperEnabled.checked === true, "LDL should select upper reference by default");
+assert(document.elements.referenceLowerEnabled.checked === false, "LDL lower reference should be optional");
 assert(document.elements.sourceTypeInput.value === "Lab Report / PDF", "LDL should default to lab source");
 assert(document.elements.sourceConfidenceInput.value === "High", "lab source should be high confidence");
 assert(document.elements.entryAssist.innerHTML.includes("Cardiovascular"), "entry assist should show the selected metric group");
@@ -353,8 +387,10 @@ context.populateMetrics();
 assert(document.elements.markerInput.innerHTML.includes("Glucose"), "metric dropdown should retain all metrics");
 context.selectMetric("Weight");
 assert(document.elements.sourceTypeInput.value === "Manual Measurement", "weight should default to manual source");
-assert(document.elements.highLabel.textContent === "Target", "weight should use target label");
+assert(document.elements.targetLabel.textContent === "Target", "weight should use target label");
 assert(document.elements.lowField.classList.contains("hidden"), "weight should hide lower limit field");
+assert(!document.elements.targetField.classList.contains("hidden"), "weight should show only target field by default");
+assert(document.elements.highField.classList.contains("hidden"), "weight should hide upper reference field by default");
 assert(document.elements.lowInput.disabled === true, "weight lower limit should be disabled");
 context.selectMetric("LDL");
 
@@ -394,6 +430,26 @@ assert(!document.elements.quickMetricPanel.innerHTML.includes("LDL"), "quick met
 context.focusMetricEntry("ben", "Blood pressure systolic");
 assert(document.elements.markerInput.value === "Blood pressure systolic", "due item click should select the requested metric");
 assert(document.elements.quickMetricPanel.innerHTML.includes('quick-metric-button active" data-metric-name="Blood pressure systolic"'), "due item click should highlight matching quick metric");
+assert(!document.elements.referenceOptions.classList.contains("hidden"), "new blood pressure setup should allow reference field selection");
+assert(document.elements.referenceUpperEnabled.checked === true, "blood pressure should default to upper reference");
+document.elements.referenceLowerEnabled.checked = true;
+document.elements.targetEnabled.checked = true;
+document.elements.referenceUpperEnabled.checked = true;
+document.elements.referenceLowerEnabled.listeners.change();
+assert(!document.elements.lowField.classList.contains("hidden"), "selected lower reference should appear");
+assert(!document.elements.targetField.classList.contains("hidden"), "selected target should appear");
+assert(!document.elements.highField.classList.contains("hidden"), "selected upper reference should appear");
+document.elements.dateInput.value = "2026-06-20";
+document.elements.valueInput.value = "118";
+document.elements.lowInput.value = "90";
+document.elements.targetInput.value = "115";
+document.elements.highInput.value = "130";
+context.addResult({ preventDefault() {} });
+let savedRanges = JSON.parse(store["health-dashboard-reference-ranges:v1"]);
+assert(savedRanges["ben:Blood pressure systolic"].low === 90, "blood pressure lower reference should save when selected");
+assert(savedRanges["ben:Blood pressure systolic"].target === 115, "blood pressure target should save when selected");
+assert(savedRanges["ben:Blood pressure systolic"].high === 130, "blood pressure upper reference should save when selected");
+assert(savedRanges["ben:Blood pressure systolic"].fields.lower === true, "blood pressure lower field choice should save");
 context.focusMetricEntry("ben", "LDL");
 assert(document.elements.markerInput.value === "LDL", "due item click should select non-quick metrics too");
 assert(!document.elements.quickMetricPanel.innerHTML.includes("quick-metric-button active"), "non-quick due metric should clear quick metric highlight");
@@ -507,11 +563,12 @@ assert(context.getMaterialChanges([
 context.selectMetric("Waist circumference");
 document.elements.dateInput.value = "2026-07-01";
 document.elements.valueInput.value = "92";
-document.elements.highInput.value = "85";
+document.elements.targetInput.value = "85";
 context.addResult({ preventDefault() {} });
 results = JSON.parse(store["blood-results-tracker:v3"]);
 const waist = results.find((result) => result.metric === "Waist circumference");
-assert(waist.reference_lower_limit === null && waist.reference_upper_limit === 85, "target metrics should save target as upper limit");
+assert(waist.reference_lower_limit === null && waist.target_value === 85 && waist.reference_upper_limit === null, "target metrics should save target separately");
+assert(waist.reference_fields.target === true && waist.reference_fields.upper === false, "target metrics should store selected reference fields");
 assert(waist.status_vs_range === "Above target", "waist above target should use target status, not clinical range status");
 assert(waist.status_vs_range !== "Outside range", "waist target should not be shown as outside a lab range");
 assert(document.elements.resultsBody.innerHTML.includes("85 cm"), "target should render cleanly in results");
@@ -520,7 +577,7 @@ assert(!document.elements.resultsBody.innerHTML.includes("Core body metrics"), "
 context.selectMetric("Weight");
 document.elements.dateInput.value = "2026-07-02";
 document.elements.valueInput.value = "83.5";
-document.elements.highInput.value = "84";
+document.elements.targetInput.value = "84";
 context.addResult({ preventDefault() {} });
 results = JSON.parse(store["blood-results-tracker:v3"]);
 const firstWeight = results.find((result) => result.metric === "Weight" && result.sample_date === "2026-07-02");
@@ -533,20 +590,22 @@ assert(context.getStatus({
   reference_upper_limit: 79,
 }) === "Below target", "weight more than one unit below target should be below target");
 context.selectMetric("Weight");
-assert(document.elements.highInput.disabled === true, "saved target should lock on repeat entry");
+assert(document.elements.targetInput.disabled === true, "saved target should lock on repeat entry");
 context.toggleRangeEditing();
-assert(document.elements.highInput.disabled === false, "edit target should unlock target input");
-document.elements.highInput.value = "79";
+assert(document.elements.targetInput.disabled === false, "edit target should unlock target input");
+assert(!document.elements.referenceOptions.classList.contains("hidden"), "editing target should reveal selectable reference fields");
+document.elements.targetInput.value = "79";
 context.toggleRangeEditing();
-assert(document.elements.highInput.disabled === true, "lock target should relock target input");
-assert(JSON.parse(store["health-dashboard-reference-ranges:v1"])["ben:Weight"].high === 79, "locking target should save the new target");
+assert(document.elements.targetInput.disabled === true, "lock target should relock target input");
+assert(JSON.parse(store["health-dashboard-reference-ranges:v1"])["ben:Weight"].target === 79, "locking target should save the new target");
 document.elements.dateInput.value = "2026-07-16";
 document.elements.valueInput.value = "82";
 context.addResult({ preventDefault() {} });
 results = JSON.parse(store["blood-results-tracker:v3"]);
 const weightRows = results.filter((result) => result.metric === "Weight").sort((a, b) => a.sample_date.localeCompare(b.sample_date));
-assert(weightRows[0].reference_upper_limit === 84, "historical weight should keep old target");
-assert(weightRows[1].reference_upper_limit === 79, "new weight should use updated target");
+assert(weightRows[0].target_value === 84, "historical weight should keep old target");
+assert(weightRows[1].target_value === 79, "new weight should use updated target");
+assert(weightRows[1].reference_upper_limit === null, "new weight should not store target as upper reference");
 assert(weightRows[1].status_vs_range === "Above target", "weight above updated target should not be outside range");
 assert(document.elements.resultsBody.innerHTML.includes("Delete"), "results should expose a delete action");
 assert(document.elements.resultsBody.innerHTML.includes("result-group-row"), "results should include grouped section rows");

@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.38";
+const APP_VERSION = "v0.39";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -9,6 +9,20 @@ const LAST_LOCAL_UPDATE_KEY = "health-dashboard-last-local-update:v1";
 const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
 const DATA_VERSION = 1;
+const APPROVED_EMAILS = new Set([
+  "ben_ashurst@me.com",
+  "angelika_kleczka@hotmail.com",
+]);
+const PRIVATE_STORAGE_KEYS = [
+  STORAGE_KEY,
+  ...LEGACY_STORAGE_KEYS,
+  PROFILE_STORAGE_KEY,
+  RANGE_STORAGE_KEY,
+  SCHEDULE_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+  LAST_LOCAL_UPDATE_KEY,
+  CLOUD_CACHE_KEY,
+];
 
 const defaultProfiles = [
   { id: "ben", name: "Ben", date_of_birth: "", height_cm: "" },
@@ -217,20 +231,22 @@ const metrics = [
   metric("Coronary artery calcium score", "One-off and infrequent", "Agatston", null, null, "numeric", "lower", 3650, "lower", "Around age 45, then infrequent if useful"),
 ];
 
-const initialProfiles = loadProfiles();
+const hasPrivateCloudConfig = Boolean(getSupabaseConfig());
+const initialProfiles = hasPrivateCloudConfig ? defaultProfiles : loadProfiles();
 
 const state = {
   profiles: initialProfiles,
-  results: loadResults(initialProfiles),
-  metricRanges: loadMetricRanges(),
-  scheduleState: loadScheduleState(),
-  settings: loadSettings(),
+  results: hasPrivateCloudConfig ? [] : loadResults(initialProfiles),
+  metricRanges: hasPrivateCloudConfig ? {} : loadMetricRanges(),
+  scheduleState: hasPrivateCloudConfig ? { snoozes: {} } : loadScheduleState(),
+  settings: hasPrivateCloudConfig ? normaliseSettings({}) : loadSettings(),
   filter: "latest",
   activeProfileId: null,
   activeSummaryFilter: "measurements",
   editingProfiles: !profilesAreComplete(initialProfiles),
   editingSnapshot: false,
   editingRangeKey: null,
+  referenceDraftKey: null,
   activeTrendKey: "",
   trendRange: "all",
   pendingImport: null,
@@ -275,10 +291,18 @@ const trendMetricInput = document.querySelector("#trendMetricInput");
 const trendPanel = document.querySelector("#trendPanel");
 const unitInput = document.querySelector("#unitInput");
 const lowField = document.querySelector("#lowField");
+const targetField = document.querySelector("#targetField");
+const highField = document.querySelector("#highField");
 const lowLabel = document.querySelector("#lowLabel");
+const targetLabel = document.querySelector("#targetLabel");
 const highLabel = document.querySelector("#highLabel");
 const lowInput = document.querySelector("#lowInput");
+const targetInput = document.querySelector("#targetInput");
 const highInput = document.querySelector("#highInput");
+const referenceOptions = document.querySelector("#referenceOptions");
+const referenceLowerEnabled = document.querySelector("#referenceLowerEnabled");
+const targetEnabled = document.querySelector("#targetEnabled");
+const referenceUpperEnabled = document.querySelector("#referenceUpperEnabled");
 const rangeEditButton = document.querySelector("#rangeEditButton");
 const rangeHint = document.querySelector("#rangeHint");
 const testDateInput = document.querySelector("#dateInput");
@@ -408,13 +432,14 @@ function saveProfiles() {
 
 function loadMetricRanges() {
   try {
-    return JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY)) ?? {};
+    return normaliseMetricRanges(JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY)) ?? {});
   } catch {
     return {};
   }
 }
 
 function saveMetricRanges() {
+  state.metricRanges = normaliseMetricRanges(state.metricRanges);
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(state.metricRanges));
   markLocalUpdated();
 }
@@ -505,6 +530,7 @@ function getSupabaseConfig() {
 function initSupabase() {
   const config = getSupabaseConfig();
   if (!config || !window.supabase?.createClient) {
+    setPrivateVisibility(false);
     renderAuthPanel();
     renderSyncFooter();
     return;
@@ -530,18 +556,34 @@ function initSupabase() {
 }
 
 async function handleSession(session) {
-  cloudState.session = session;
-  cloudState.user = session?.user ?? null;
+  const sessionUser = session?.user ?? null;
+  const approvedUser = sessionUser && isApprovedUser(sessionUser);
+  cloudState.session = approvedUser ? session : null;
+  cloudState.user = approvedUser ? sessionUser : null;
   cloudState.profileId = cloudState.user ? getProfileIdForUser(cloudState.user) : null;
   cloudState.conflict = false;
   cloudState.lastError = "";
 
+  if (sessionUser && !approvedUser) {
+    resetPrivateStateForSignedOut();
+    clearPrivateLocalData();
+    renderAuthPanel();
+    authStatus.textContent = "This signed-in account is not authorised for this private health dashboard.";
+    renderSyncFooter();
+    setEditingAvailability();
+    render();
+    await cloudState.client.auth.signOut();
+    return;
+  }
+
   if (!cloudState.user) {
     cloudState.cloudUpdatedAt = null;
     cloudState.loadedAt = null;
+    resetPrivateStateForSignedOut();
     renderAuthPanel();
     renderSyncFooter();
     setEditingAvailability();
+    render();
     return;
   }
 
@@ -553,6 +595,36 @@ function getProfileIdForUser(user) {
   const email = String(user.email ?? "").toLowerCase();
   if (email.includes("angelika") || email.includes("kleczka")) return "angelika";
   return "ben";
+}
+
+function isApprovedUser(user) {
+  return APPROVED_EMAILS.has(String(user?.email ?? "").toLowerCase());
+}
+
+function clearPrivateLocalData() {
+  PRIVATE_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+}
+
+function resetPrivateStateForSignedOut() {
+  if (!hasPrivateCloudConfig) return;
+  state.profiles = normaliseProfiles(defaultProfiles);
+  state.results = [];
+  state.metricRanges = {};
+  state.scheduleState = { snoozes: {} };
+  state.settings = normaliseSettings({});
+  state.activeProfileId = null;
+  state.activeSummaryFilter = "measurements";
+  state.filter = "latest";
+  state.editingProfiles = false;
+  state.editingSnapshot = false;
+  state.editingRangeKey = null;
+  state.referenceDraftKey = null;
+  state.pendingImport = null;
+  hydrateProfileForm();
+  populatePeople();
+  populateMetrics();
+  populateTrendMetrics();
+  setPrivateVisibility(false);
 }
 
 function getDefaultProfile(profileId) {
@@ -596,7 +668,7 @@ function applyDashboardData(data) {
   const profiles = Array.isArray(data?.profiles) && data.profiles.length ? data.profiles : fallback;
   state.profiles = normaliseProfiles(profiles, false, profileId);
   state.results = recalculateDerivedFields((data?.measurements ?? data?.results ?? []).map((result) => normaliseResult(result, state.profiles)), state.profiles);
-  state.metricRanges = data?.reference_ranges ?? data?.metricRanges ?? {};
+  state.metricRanges = normaliseMetricRanges(data?.reference_ranges ?? data?.metricRanges ?? {});
   state.scheduleState = data?.schedule_state ?? data?.scheduleState ?? { snoozes: {} };
   state.settings = normaliseSettings(data?.settings ?? {});
   state.activeProfileId = profileId;
@@ -639,6 +711,7 @@ async function loadCloudData() {
     populatePeople();
     populateMetrics();
     populateTrendMetrics();
+    setPrivateVisibility(true);
     render();
   } catch (error) {
     cloudState.lastError = error.message;
@@ -666,7 +739,14 @@ async function createCloudRow() {
 function loadCachedCloudData() {
   try {
     const cached = JSON.parse(localStorage.getItem(CLOUD_CACHE_KEY));
-    if (cached) applyDashboardData(cached);
+    if (!cached) return;
+    applyDashboardData(cached);
+    hydrateProfileForm();
+    populatePeople();
+    populateMetrics();
+    populateTrendMetrics();
+    setPrivateVisibility(true);
+    render();
   } catch {
     return;
   }
@@ -758,14 +838,19 @@ function setEditingAvailability() {
 }
 
 function renderAuthPanel() {
-  authPanel.classList.toggle("hidden", !cloudState.enabled);
-  if (!cloudState.enabled) return;
-
   const signedIn = Boolean(cloudState.user);
+  document.body.classList.toggle("signed-in", signedIn);
+  authPanel.classList.toggle("hidden", signedIn);
+  authForm.classList.toggle("hidden", signedIn || !cloudState.enabled);
+  if (!cloudState.enabled) {
+    authStatus.textContent = "Private sign-in is not configured in this local copy.";
+    return;
+  }
+
   authForm.classList.toggle("hidden", signedIn);
   authStatus.textContent = signedIn
     ? `Signed in as ${cloudState.user.email}.`
-    : "Sign in to use private cloud sync.";
+    : "Sign in to access your private dashboard.";
 }
 
 function renderProfileScope() {
@@ -773,6 +858,14 @@ function renderProfileScope() {
   document.querySelectorAll("[data-profile-fieldset]").forEach((fieldset) => {
     fieldset.classList.toggle("hidden", Boolean(profileId) && fieldset.dataset.profileFieldset !== profileId);
   });
+}
+
+function setPrivateVisibility(isVisible) {
+  document.querySelectorAll("[data-private]").forEach((section) => {
+    section.classList.toggle("hidden", !isVisible);
+    section.setAttribute("aria-hidden", isVisible ? "false" : "true");
+  });
+  document.body.classList.toggle("signed-in", isVisible);
 }
 
 function renderSyncFooter() {
@@ -788,24 +881,24 @@ function renderSyncFooter() {
     const modeText = navigator.onLine ? "Cloud sync" : "Offline: viewing saved data";
     syncStatus.textContent = `${label} · ${modeText}`;
     syncStatus.className = `sync-status ${cloudState.lastError || cloudState.conflict ? "error" : navigator.onLine ? "ok" : "warn"}`;
+    syncStatus.classList.remove("hidden");
+    manualRefreshButton.classList.remove("hidden");
+    manualRefreshButton.disabled = false;
+    document.querySelector(".account-sync-footer")?.classList.remove("signed-out-footer");
     signOutButton.classList.remove("hidden");
     signOutButton.disabled = false;
     signOutButton.title = "Sign out of this private account.";
     return;
   }
 
-  const lastUpdate = localStorage.getItem(LAST_LOCAL_UPDATE_KEY);
-  const updateText = lastUpdate ? `Local draft updated ${formatRelativeTime(lastUpdate)}` : "Local draft only";
-  const modeText = cloudState.enabled
-    ? "Sign in to sync"
-    : navigator.onLine
-      ? "Cloud sync not connected"
-      : "Offline local view";
-  syncStatus.textContent = `${updateText} · ${modeText}`;
-  syncStatus.className = `sync-status ${navigator.onLine ? "neutral" : "warn"}`;
+  syncStatus.textContent = "";
+  syncStatus.className = "sync-status hidden";
+  manualRefreshButton.classList.add("hidden");
+  manualRefreshButton.disabled = true;
+  document.querySelector(".account-sync-footer")?.classList.add("signed-out-footer");
   signOutButton.classList.add("hidden");
   signOutButton.disabled = true;
-  signOutButton.title = cloudState.enabled ? "Sign in before signing out." : "Sign out will be enabled after Supabase login is configured.";
+  signOutButton.title = "";
 }
 
 function formatRelativeTime(isoDate) {
@@ -824,12 +917,22 @@ function formatRelativeTime(isoDate) {
 function normaliseResult(result, profiles = state.profiles) {
   const profileId = result.profile_id === "angelica" ? "angelika" : result.profile_id;
   const profile = profiles.find((item) => item.id === profileId) ?? profiles[0];
+  const selectedMetric = getMetric(result.metric);
   const metricMeta = getMetricMeta(result.metric);
   const sourceType = result.source_type ?? getDefaultSourceType(result.metric);
+  const migratedTarget = isTargetMetric(result.metric) && result.target_value === undefined;
+  const low = parseLimit(result.reference_lower_limit);
+  const target = parseLimit(result.target_value ?? (migratedTarget ? result.reference_upper_limit : null));
+  const high = parseLimit(migratedTarget ? null : result.reference_upper_limit);
+  const referenceFields = normaliseReferenceFields(result.reference_fields, selectedMetric, { low, target, high });
   return {
     ...result,
     profile_id: profile.id,
     person_name: profile.name,
+    reference_lower_limit: referenceFields.lower ? low : null,
+    target_value: referenceFields.target ? target : null,
+    reference_upper_limit: referenceFields.upper ? high : null,
+    reference_fields: referenceFields,
     priority: result.priority ?? metricMeta.priority,
     cadence: result.cadence ?? metricMeta.cadence,
     interval_days: result.interval_days ?? metricMeta.intervalDays,
@@ -990,12 +1093,14 @@ function renderEntryAssist() {
   }
 
   const savedRange = getSavedRange(profile.id, selectedMetric.name);
-  const rangeLabel = isTargetMetric(selectedMetric.name) ? "Target" : "Range";
+  const fields = savedRange?.fields ?? getDefaultReferenceFields(selectedMetric);
+  const rangeLabel = getReferenceSetupLabel(fields);
   const rangeText = savedRange
     ? formatRangeOrTarget({
         metric: selectedMetric.name,
         unit: selectedMetric.unit,
         reference_lower_limit: savedRange.low,
+        target_value: savedRange.target,
         reference_upper_limit: savedRange.high,
       })
     : "set on first entry";
@@ -1025,7 +1130,73 @@ function getRangeKey(profileId, metricName) {
 }
 
 function getSavedRange(profileId, metricName) {
-  return state.metricRanges[getRangeKey(profileId, metricName)];
+  const saved = state.metricRanges[getRangeKey(profileId, metricName)];
+  return saved ? normaliseSavedRange(saved, metricName) : null;
+}
+
+function normaliseMetricRanges(ranges = {}) {
+  return Object.fromEntries(
+    Object.entries(ranges ?? {}).map(([key, range]) => {
+      const metricName = key.split(":").slice(1).join(":");
+      return [key, normaliseSavedRange(range, metricName)];
+    }),
+  );
+}
+
+function normaliseSavedRange(range = {}, metricName = "") {
+  const selectedMetric = getMetric(metricName);
+  const migratedTarget = isTargetMetric(metricName) && range.target === undefined && range.target_value === undefined;
+  const low = parseLimit(range.low ?? range.reference_lower_limit);
+  const target = parseLimit(range.target ?? range.target_value ?? (migratedTarget ? range.high ?? range.reference_upper_limit : null));
+  const high = parseLimit(migratedTarget ? null : range.high ?? range.reference_upper_limit);
+  const fields = normaliseReferenceFields(range.fields ?? range.reference_fields, selectedMetric, { low, target, high });
+
+  return {
+    low: fields.lower ? low : null,
+    target: fields.target ? target : null,
+    high: fields.upper ? high : null,
+    fields,
+    updated_at: range.updated_at ?? new Date().toISOString(),
+  };
+}
+
+function getDefaultReferenceFields(selectedMetric, values = {}) {
+  if (!selectedMetric) return { lower: false, target: false, upper: false };
+  return {
+    lower: values.low !== null && values.low !== undefined ? true : !isTargetMetric(selectedMetric.name) && selectedMetric.low !== null,
+    target: values.target !== null && values.target !== undefined ? true : isTargetMetric(selectedMetric.name),
+    upper: values.high !== null && values.high !== undefined ? true : !isTargetMetric(selectedMetric.name) && selectedMetric.high !== null,
+  };
+}
+
+function normaliseReferenceFields(fields = {}, selectedMetric, values = {}) {
+  const defaults = getDefaultReferenceFields(selectedMetric, values);
+  return {
+    lower: fields.lower !== undefined ? Boolean(fields.lower) : fields.low !== undefined ? Boolean(fields.low) : defaults.lower,
+    target: fields.target !== undefined ? Boolean(fields.target) : defaults.target,
+    upper: fields.upper !== undefined ? Boolean(fields.upper) : fields.high !== undefined ? Boolean(fields.high) : defaults.upper,
+  };
+}
+
+function setReferenceOptionValues(fields) {
+  referenceLowerEnabled.checked = Boolean(fields.lower);
+  targetEnabled.checked = Boolean(fields.target);
+  referenceUpperEnabled.checked = Boolean(fields.upper);
+}
+
+function getReferenceOptionValues() {
+  return {
+    lower: Boolean(referenceLowerEnabled.checked),
+    target: Boolean(targetEnabled.checked),
+    upper: Boolean(referenceUpperEnabled.checked),
+  };
+}
+
+function getReferenceSetupLabel(fields) {
+  if (fields.target && (fields.lower || fields.upper)) return "Reference/target";
+  if (fields.target) return "Target";
+  if (fields.lower || fields.upper) return "Range";
+  return "Recorded only";
 }
 
 function syncRangeDefaults() {
@@ -1036,25 +1207,46 @@ function syncRangeDefaults() {
   const key = getRangeKey(profile.id, selectedMetric.name);
   const savedRange = getSavedRange(profile.id, selectedMetric.name);
   const isEditing = state.editingRangeKey === key;
-  const targetMetric = isTargetMetric(selectedMetric.name);
-  const defaultLow = selectedMetric.low ?? "";
-  const defaultHigh = selectedMetric.high ?? "";
+  const isConfiguring = isEditing || !savedRange;
+  const defaultRange = {
+    low: selectedMetric.low,
+    target: null,
+    high: isTargetMetric(selectedMetric.name) ? null : selectedMetric.high,
+  };
+  const range = savedRange ?? {
+    ...defaultRange,
+    fields: getDefaultReferenceFields(selectedMetric, defaultRange),
+  };
 
-  lowInput.value = targetMetric ? "" : savedRange ? savedRange.low ?? "" : defaultLow;
-  highInput.value = savedRange ? savedRange.high ?? "" : defaultHigh;
-  lowField.classList.toggle("hidden", targetMetric);
+  if (state.referenceDraftKey !== key || (!isConfiguring && state.referenceDraftKey === key)) {
+    setReferenceOptionValues(range.fields);
+    state.referenceDraftKey = key;
+  }
+
+  const fields = isConfiguring ? getReferenceOptionValues() : range.fields;
+  const locked = Boolean(savedRange) && !isEditing;
+  const lowValue = savedRange ? savedRange.low : defaultRange.low;
+  const targetValue = savedRange ? savedRange.target : defaultRange.target;
+  const highValue = savedRange ? savedRange.high : defaultRange.high;
+
+  lowInput.value = fields.lower ? lowValue ?? "" : "";
+  targetInput.value = fields.target ? targetValue ?? "" : "";
+  highInput.value = fields.upper ? highValue ?? "" : "";
+  lowField.classList.toggle("hidden", !fields.lower);
+  targetField.classList.toggle("hidden", !fields.target);
+  highField.classList.toggle("hidden", !fields.upper);
+  referenceOptions.classList.toggle("hidden", !isConfiguring);
   lowLabel.textContent = "Reference lower limit";
-  highLabel.textContent = targetMetric ? "Target" : "Reference upper limit";
-  lowInput.disabled = targetMetric || (Boolean(savedRange) && !isEditing);
-  highInput.disabled = Boolean(savedRange) && !isEditing;
+  targetLabel.textContent = "Target";
+  highLabel.textContent = "Reference upper limit";
+  lowInput.disabled = locked || !fields.lower;
+  targetInput.disabled = locked || !fields.target;
+  highInput.disabled = locked || !fields.upper;
+  referenceLowerEnabled.disabled = !isConfiguring;
+  targetEnabled.disabled = !isConfiguring;
+  referenceUpperEnabled.disabled = !isConfiguring;
   rangeEditButton.classList.toggle("hidden", !savedRange);
-  rangeEditButton.textContent = isEditing
-    ? targetMetric
-      ? "Lock target"
-      : "Lock range"
-    : targetMetric
-      ? "Edit target"
-      : "Edit range";
+  rangeEditButton.textContent = isEditing ? "Lock fields" : "Edit fields";
   rangeHint.textContent = "";
   rangeHint.classList.add("hidden");
 }
@@ -1114,17 +1306,38 @@ function getStatus(result) {
   }
 
   const value = Number(result.result_value);
-  const low = result.reference_lower_limit;
-  const high = result.reference_upper_limit;
-  if (isTargetMetric(result.metric)) {
-    if (high === null) return "Recorded";
-    if (value > high) return "Above target";
-    return value >= high - getTargetTolerance(result.metric) ? "On target" : "Below target";
-  }
+  const low = getResultReferenceLower(result);
+  const target = getResultTarget(result);
+  const high = getResultReferenceUpper(result);
   if (low !== null && value < low) return "Outside range";
   if (high !== null && value > high) return "Outside range";
+  if (target !== null) return getTargetStatus(result, value, target);
   if (isNearLimit(result.metric, value, low, high)) return "Near limit";
   return low === null && high === null ? "Recorded" : "In range";
+}
+
+function getResultReferenceLower(result) {
+  return parseLimit(result.reference_lower_limit);
+}
+
+function getResultTarget(result) {
+  return parseLimit(result.target_value ?? (isTargetMetric(result.metric) ? result.reference_upper_limit : null));
+}
+
+function getResultReferenceUpper(result) {
+  if (result.target_value === undefined && isTargetMetric(result.metric)) return null;
+  return parseLimit(result.reference_upper_limit);
+}
+
+function getTargetStatus(result, value, target) {
+  if (isTargetMetric(result.metric)) {
+    if (value > target) return "Above target";
+    return value >= target - getTargetTolerance(result.metric) ? "On target" : "Below target";
+  }
+
+  const goal = result.trend_goal ?? getMetricMeta(result.metric).goal;
+  if (goal === "higher") return value >= target ? "On target" : "Below target";
+  return value <= target ? "On target" : "Above target";
 }
 
 function isWarningStatus(status) {
@@ -1246,8 +1459,8 @@ function hasMeaningfulNumericChange(result, previous, change) {
 }
 
 function getRangeTrend(result, previous) {
-  const lower = result.reference_lower_limit;
-  const upper = result.reference_upper_limit;
+  const lower = getResultReferenceLower(result);
+  const upper = getResultReferenceUpper(result);
   if (lower === null && upper === null) return "Changed";
   if (lower !== null && upper !== null) {
     const midpoint = (lower + upper) / 2;
@@ -1845,21 +2058,30 @@ function renderOnboarding(scopedResults, flaggedCount, dueCount) {
 }
 
 function formatRangeOrTarget(result) {
-  const low = result.reference_lower_limit;
-  const high = result.reference_upper_limit;
+  const low = getResultReferenceLower(result);
+  const target = getResultTarget(result);
+  const high = getResultReferenceUpper(result);
   const unit = result.unit ? ` ${result.unit}` : "";
-  if (isTargetMetric(result.metric)) return high === null ? "-" : `${formatAxisValue(high)}${unit}`;
-  if (low === null && high === null) return "-";
-  if (low === null) return `<= ${formatAxisValue(high)}${unit}`;
-  if (high === null) return `>= ${formatAxisValue(low)}${unit}`;
-  return `${formatAxisValue(low)} - ${formatAxisValue(high)}${unit}`;
+  const parts = [];
+  if (target !== null) parts.push(`Target ${formatAxisValue(target)}${unit}`);
+  if (low !== null && high !== null) parts.push(`${formatAxisValue(low)} - ${formatAxisValue(high)}${unit}`);
+  else if (low === null && high !== null) parts.push(`<= ${formatAxisValue(high)}${unit}`);
+  else if (low !== null && high === null) parts.push(`>= ${formatAxisValue(low)}${unit}`);
+  return parts.length ? parts.join("; ") : "-";
 }
 
 function saveRangeForResult(result) {
   const key = getRangeKey(result.profile_id, result.metric);
-  state.metricRanges[key] = {
+  const fields = normaliseReferenceFields(result.reference_fields, getMetric(result.metric), {
     low: result.reference_lower_limit,
+    target: result.target_value,
     high: result.reference_upper_limit,
+  });
+  state.metricRanges[key] = {
+    low: fields.lower ? result.reference_lower_limit : null,
+    target: fields.target ? result.target_value : null,
+    high: fields.upper ? result.reference_upper_limit : null,
+    fields,
     updated_at: new Date().toISOString(),
   };
   saveMetricRanges();
@@ -1873,14 +2095,26 @@ function toggleRangeEditing() {
 
   const key = getRangeKey(profile.id, selectedMetric.name);
   if (state.editingRangeKey === key) {
+    const fields = getReferenceOptionValues();
     state.metricRanges[key] = {
-      low: isTargetMetric(selectedMetric.name) ? null : parseLimit(lowInput.value),
-      high: parseLimit(highInput.value),
+      low: fields.lower ? parseLimit(lowInput.value) : null,
+      target: fields.target ? parseLimit(targetInput.value) : null,
+      high: fields.upper ? parseLimit(highInput.value) : null,
+      fields,
       updated_at: new Date().toISOString(),
     };
     state.editingRangeKey = null;
     saveMetricRanges();
   } else {
+    const savedRange = getSavedRange(profile.id, selectedMetric.name);
+    const defaultRange = {
+      low: selectedMetric.low,
+      target: null,
+      high: isTargetMetric(selectedMetric.name) ? null : selectedMetric.high,
+    };
+    const fields = savedRange?.fields ?? getDefaultReferenceFields(selectedMetric, defaultRange);
+    setReferenceOptionValues(fields);
+    state.referenceDraftKey = key;
     state.editingRangeKey = key;
   }
   syncRangeDefaults();
@@ -2027,7 +2261,7 @@ function createSparkline(results, latest) {
   const height = 220;
   const padding = { top: 24, right: 28, bottom: 42, left: 62 };
   const values = results.map((result) => Number(result.result_value));
-  const rangeValues = [latest.reference_lower_limit, latest.reference_upper_limit].filter((value) => value !== null);
+  const rangeValues = [getResultReferenceLower(latest), getResultTarget(latest), getResultReferenceUpper(latest)].filter((value) => value !== null);
   const min = Math.min(...values, ...rangeValues);
   const max = Math.max(...values, ...rangeValues);
   const spread = max - min || 1;
@@ -2064,9 +2298,10 @@ function createSparkline(results, latest) {
 }
 
 function createRangeBand(latest, padding, width, chartWidth, yForValue) {
-  const low = latest.reference_lower_limit;
-  const high = latest.reference_upper_limit;
-  if (low === null && high === null) return "";
+  const low = getResultReferenceLower(latest);
+  const target = getResultTarget(latest);
+  const high = getResultReferenceUpper(latest);
+  if (low === null && high === null && target === null) return "";
 
   if (low !== null && high !== null) {
     const yTop = yForValue(high);
@@ -2074,7 +2309,7 @@ function createRangeBand(latest, padding, width, chartWidth, yForValue) {
     return `<rect class="range-band" x="${padding.left}" y="${roundChange(yTop)}" width="${chartWidth}" height="${roundChange(yBottom - yTop)}"></rect>`;
   }
 
-  const y = yForValue(low ?? high);
+  const y = yForValue(target ?? low ?? high);
   return `<line class="range-limit" x1="${padding.left}" y1="${roundChange(y)}" x2="${width - padding.right}" y2="${roundChange(y)}"></line>`;
 }
 
@@ -2247,7 +2482,11 @@ function handleActionShortcut(action) {
 function explainWarning(resultId) {
   const result = state.results.find((item) => item.id === resultId);
   if (!result) return;
-  const label = isTargetMetric(result.metric) ? "Target" : "Reference";
+  const label = getResultTarget(result) !== null && (getResultReferenceLower(result) !== null || getResultReferenceUpper(result) !== null)
+    ? "Reference/target"
+    : getResultTarget(result) !== null
+      ? "Target"
+      : "Reference";
   const message = [
     `${result.metric}: ${formatValue(result.result_value, result.unit)}`,
     `Status: ${result.status_vs_range}`,
@@ -2329,6 +2568,7 @@ function addResult(event) {
   if (resultValue === null || resultValue === "") return;
 
   const measurementDate = testDateInput.value;
+  const referenceFields = getReferenceOptionValues();
   const result = {
     id: getId(),
     profile_id: profile.id,
@@ -2340,8 +2580,10 @@ function addResult(event) {
     metric_type: selectedMetric.type,
     result_value: resultValue,
     unit: unitInput.value.trim(),
-    reference_lower_limit: parseLimit(lowInput.value),
-    reference_upper_limit: parseLimit(highInput.value),
+    reference_lower_limit: referenceFields.lower ? parseLimit(lowInput.value) : null,
+    target_value: referenceFields.target ? parseLimit(targetInput.value) : null,
+    reference_upper_limit: referenceFields.upper ? parseLimit(highInput.value) : null,
+    reference_fields: referenceFields,
     priority: selectedMetric.priority,
     cadence: selectedMetric.cadence,
     interval_days: selectedMetric.intervalDays,
@@ -2423,7 +2665,9 @@ function exportCsv() {
     "result_value",
     "unit",
     "reference_lower_limit",
+    "target_value",
     "reference_upper_limit",
+    "reference_fields",
     "priority",
     "cadence",
     "interval_days",
@@ -2441,7 +2685,7 @@ function exportCsv() {
   ];
   const rows = state.results
     .sort((a, b) => a.sample_date.localeCompare(b.sample_date) || a.metric.localeCompare(b.metric))
-    .map((result) => header.map((key) => result[key] ?? ""));
+    .map((result) => header.map((key) => (key === "reference_fields" ? JSON.stringify(result.reference_fields ?? {}) : result[key] ?? "")));
 
   const csv = [header, ...rows]
     .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
@@ -2684,7 +2928,7 @@ function getChatGptImportInstructions() {
     {
       import_type: "health_dashboard_measurements",
       version: 1,
-      notes: "Use the profile_id values already present in the export. Prefer date for the measurement date. result_date and sample_date are also accepted for compatibility. Use null for missing lower or upper reference limits. Include source_type, source_confidence, source_notes, and linked_source_document where available. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
+      notes: "Use the profile_id values already present in the export. Prefer date for the measurement date. result_date and sample_date are also accepted for compatibility. Use null for missing lower, target, or upper reference fields. Include reference_fields to say which reference fields apply. Include source_type, source_confidence, source_notes, and linked_source_document where available. Keep qualitative urine values as text such as Negative or Rare. Exclude STI and immunoserology tests.",
       measurements: [
         {
           profile_id: "ben",
@@ -2693,7 +2937,13 @@ function getChatGptImportInstructions() {
           result_value: 123,
           unit: "mg/dL",
           reference_lower_limit: null,
+          target_value: null,
           reference_upper_limit: 115,
+          reference_fields: {
+            lower: false,
+            target: false,
+            upper: true,
+          },
           source_type: "Lab Report / PDF",
           source_confidence: "High",
           source_notes: "Optional source/context note",
@@ -2706,7 +2956,13 @@ function getChatGptImportInstructions() {
           profile_id: "ben",
           metric: "LDL",
           reference_lower_limit: null,
+          target_value: null,
           reference_upper_limit: 115,
+          reference_fields: {
+            lower: false,
+            target: false,
+            upper: true,
+          },
         },
       ],
     },
@@ -2753,12 +3009,20 @@ function prepareChatGptImport(payload) {
       prepared.skipped.push({ reason: "Unknown profile or metric", item: range });
       return;
     }
+    const importedRangeTarget = parseLimit(range.target_value ?? (isTargetMetric(selectedMetric.name) ? range.reference_upper_limit : null));
+    const importedRangeHigh = parseLimit(isTargetMetric(selectedMetric.name) && range.target_value === undefined ? null : range.reference_upper_limit);
     prepared.ranges.push({
       profile_id: profile.id,
       person_name: profile.name,
       metric: selectedMetric.name,
       low: parseLimit(range.reference_lower_limit),
-      high: parseLimit(range.reference_upper_limit),
+      target: importedRangeTarget,
+      high: importedRangeHigh,
+      fields: normaliseReferenceFields(range.reference_fields, selectedMetric, {
+        low: parseLimit(range.reference_lower_limit),
+        target: importedRangeTarget,
+        high: importedRangeHigh,
+      }),
     });
   });
 
@@ -2776,6 +3040,8 @@ function prepareChatGptImport(payload) {
       return;
     }
     const sourceType = item.source_type || getDefaultSourceType(selectedMetric.name);
+    const importedTarget = parseLimit(item.target_value ?? (isTargetMetric(selectedMetric.name) ? item.reference_upper_limit : null));
+    const importedHigh = parseLimit(isTargetMetric(selectedMetric.name) && item.target_value === undefined ? null : item.reference_upper_limit);
 
     const result = {
       id: getId(),
@@ -2789,7 +3055,13 @@ function prepareChatGptImport(payload) {
       result_value: resultValue,
       unit: item.unit ?? selectedMetric.unit,
       reference_lower_limit: parseLimit(item.reference_lower_limit),
-      reference_upper_limit: parseLimit(item.reference_upper_limit),
+      target_value: importedTarget,
+      reference_upper_limit: importedHigh,
+      reference_fields: normaliseReferenceFields(item.reference_fields, selectedMetric, {
+        low: parseLimit(item.reference_lower_limit),
+        target: importedTarget,
+        high: importedHigh,
+      }),
       priority: selectedMetric.priority,
       cadence: selectedMetric.cadence,
       interval_days: selectedMetric.intervalDays,
@@ -2830,7 +3102,9 @@ function commitPreparedImport(prepared) {
   prepared.ranges.forEach((range) => {
     state.metricRanges[getRangeKey(range.profile_id, range.metric)] = {
       low: range.low,
+      target: range.target,
       high: range.high,
+      fields: range.fields,
       updated_at: new Date().toISOString(),
     };
   });
@@ -2966,7 +3240,7 @@ function getLatestResultsForExport(results) {
 }
 
 function formatResultForExport(result) {
-  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}; status ${result.status_vs_range}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}; source ${result.source_type ?? "not set"} (${result.source_confidence ?? "not set"})${result.linked_source_document ? `; document: ${result.linked_source_document}` : ""}${result.source_notes ? `; source notes: ${result.source_notes}` : ""}${result.notes ? `; notes: ${result.notes}` : ""}`;
+  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}; status ${result.status_vs_range}; reference/target ${formatRangeOrTarget(result)}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}; source ${result.source_type ?? "not set"} (${result.source_confidence ?? "not set"})${result.linked_source_document ? `; document: ${result.linked_source_document}` : ""}${result.source_notes ? `; source notes: ${result.source_notes}` : ""}${result.notes ? `; notes: ${result.notes}` : ""}`;
 }
 
 function downloadText(filename, content, type) {
@@ -2997,7 +3271,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.38").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.39").catch(() => {});
   });
 }
 
@@ -3072,6 +3346,9 @@ trendMetricInput.addEventListener("change", () => {
   renderTrends();
 });
 rangeEditButton.addEventListener("click", toggleRangeEditing);
+[referenceLowerEnabled, targetEnabled, referenceUpperEnabled].forEach((checkbox) => {
+  checkbox.addEventListener("change", syncRangeDefaults);
+});
 form.addEventListener("submit", addResult);
 exportCsvButton.addEventListener("click", exportCsv);
 exportChatGptButton.addEventListener("click", exportForChatGpt);

@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.38" />
-    <link rel="icon" href="app-icon.svg?v=0.38" type="image/svg+xml" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.38" />
-    <link rel="stylesheet" href="styles.css?v=0.38" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.39" />
+    <link rel="icon" href="app-icon.svg?v=0.39" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.39" />
+    <link rel="stylesheet" href="styles.css?v=0.39" />
   </head>
   <body>
     <main class="app-shell">
@@ -34,7 +34,7 @@
           <div class="panel-heading">
             <div>
               <h2>Account</h2>
-              <span class="privacy-note" id="authStatus">Sign in to use private cloud sync.</span>
+              <span class="privacy-note" id="authStatus">Sign in to access your private dashboard.</span>
             </div>
           </div>
           <form class="auth-form" id="authForm">
@@ -197,7 +197,7 @@
 
             <div class="entry-assist" id="entryAssist"></div>
 
-            <div class="inline-fields">
+            <div class="inline-fields value-fields">
               <label>
                 Value
                 <input id="valueInput" type="text" required />
@@ -208,19 +208,42 @@
               </label>
             </div>
 
-            <div class="inline-fields">
-              <label class="hidden" id="lowField">
-                <span id="lowLabel">Reference lower limit</span>
-                <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" disabled />
-              </label>
-              <label id="highField">
-                <span id="highLabel">Target</span>
-                <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
-              </label>
-            </div>
-            <div class="range-tools">
-              <span class="hidden" id="rangeHint"></span>
-              <button class="mini-button hidden" id="rangeEditButton" type="button">Edit range</button>
+            <div class="reference-panel" id="referencePanel">
+              <div class="reference-panel-top">
+                <span>Reference setup</span>
+                <button class="mini-button hidden" id="rangeEditButton" type="button">Edit fields</button>
+              </div>
+              <div class="reference-options hidden" id="referenceOptions" aria-label="Reference fields to use">
+                <label>
+                  <input id="referenceLowerEnabled" type="checkbox" />
+                  Reference lower limit
+                </label>
+                <label>
+                  <input id="targetEnabled" type="checkbox" />
+                  Target
+                </label>
+                <label>
+                  <input id="referenceUpperEnabled" type="checkbox" />
+                  Reference upper limit
+                </label>
+              </div>
+              <div class="inline-fields reference-fields">
+                <label class="hidden reference-field" id="lowField">
+                  <span id="lowLabel">Reference lower limit</span>
+                  <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" disabled />
+                </label>
+                <label class="hidden reference-field" id="targetField">
+                  <span id="targetLabel">Target</span>
+                  <input id="targetInput" type="number" inputmode="decimal" step="0.01" min="0" />
+                </label>
+                <label class="hidden reference-field" id="highField">
+                  <span id="highLabel">Reference upper limit</span>
+                  <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
+                </label>
+              </div>
+              <div class="range-tools">
+                <span class="hidden" id="rangeHint"></span>
+              </div>
             </div>
 
             <label>
@@ -300,7 +323,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.38</span>
+          <span class="version-chip" id="appVersion">v0.39</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -343,9 +366,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.38"></script>
+    <script src="supabase-config.js?v=0.39"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.38"></script>
-    <script src="privacy-guard.js?v=0.38"></script>
+    <script src="app.js?v=0.39"></script>
+    <script src="privacy-guard.js?v=0.39"></script>
   </body>
 </html>

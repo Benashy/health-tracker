@@ -9,6 +9,8 @@
     "blood-results-tracker:v2",
     "health-dashboard-profiles:v1",
     "health-dashboard-reference-ranges:v1",
+    "health-dashboard-schedule-state:v1",
+    "health-dashboard-settings:v1",
     "health-dashboard-last-local-update:v1",
     "health-dashboard-cloud-cache:v1",
   ];
