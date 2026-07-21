@@ -267,8 +267,9 @@ const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
-assert(indexHtml.includes("app.js?v=0.39"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.39"), "Supabase config should be loaded before the app");
+const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
+assert(indexHtml.includes("app.js?v=0.40"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.40"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -286,8 +287,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.39"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.39"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.40"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.40"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
@@ -309,15 +310,18 @@ assert(!indexHtml.includes("latest measurement"), "summary strip should not show
 assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.39"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.40"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.39")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.39"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.39"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.39"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.39"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.39"), "service worker should cache PNG app icons");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.40")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.40"), "iOS touch icon should use PNG");
+assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
+assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
+assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
+assert(serviceWorker.includes("health-dashboard-v0.40"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.40"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.40"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.40"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -333,7 +337,7 @@ assert(styles.includes(".value-fields input"), "primary value fields should be v
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.39", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.40", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||

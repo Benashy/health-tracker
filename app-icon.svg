@@ -1,6 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Health Dashboard">
-  <rect width="512" height="512" rx="104" fill="#236f62" />
-  <path d="M116 262h70l34-82 72 156 42-74h62" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
-  <circle cx="354" cy="158" r="42" fill="#fff7dc" />
-  <path d="M354 134v48M330 158h48" stroke="#236f62" stroke-width="18" stroke-linecap="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Health Dashboard</title>
+  <rect width="512" height="512" fill="#236f62" />
+  <path
+    fill="#ffffff"
+    d="M224 120h64c11 0 20 9 20 20v84h84c11 0 20 9 20 20v64c0 11-9 20-20 20h-84v84c0 11-9 20-20 20h-64c-11 0-20-9-20-20v-84h-84c-11 0-20-9-20-20v-64c0-11 9-20 20-20h84v-84c0-11 9-20 20-20Z"
+  />
 </svg>
