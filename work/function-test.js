@@ -118,6 +118,13 @@ function createDocument() {
     "nextDueDate",
     "snapshotSection",
     "snapshotUpdated",
+    "snapshotEditButton",
+    "snapshotEditor",
+    "snapshotCancelButton",
+    "snapshotMetric1",
+    "snapshotMetric2",
+    "snapshotMetric3",
+    "snapshotMetric4",
     "snapshotGrid",
     "snapshotList",
     "markerSummary",
@@ -239,18 +246,23 @@ const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
-assert(indexHtml.includes("app.js?v=0.35"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.35"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.36"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.36"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
 assert(indexHtml.includes("Prepare AI Review"), "AI review action should be clearly named");
 assert(indexHtml.includes("Current snapshot"), "current health snapshot section should exist");
+assert(indexHtml.includes("snapshotEditor"), "snapshot editor should exist");
 assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
 assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
-assert(indexHtml.includes("privacy-guard.js?v=0.35"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.35"), "privacy guard should be cached with the app shell");
+assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "account should appear before profile details");
+assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
+assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
+assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
+assert(indexHtml.includes("privacy-guard.js?v=0.36"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.36"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -271,15 +283,15 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.35"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.35"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.35"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.35"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.35"), "service worker should cache PNG app icons");
+assert(indexHtml.includes("app-icon-180.png?v=0.36"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.36"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.36"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.36"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.36"), "service worker should cache PNG app icons");
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.35", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.36", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -362,7 +374,7 @@ assert(!document.elements.quickMetricPanel.innerHTML.includes("quick-metric-butt
 document.elements.markerInput.value = "Blood pressure diastolic";
 document.elements.markerInput.listeners.change();
 assert(document.elements.quickMetricPanel.innerHTML.includes('quick-metric-button active" data-metric-name="Blood pressure diastolic"'), "dropdown changes should refresh quick metric highlight");
-assert(document.elements.entryAssist.innerHTML.includes("Next: Resting heart rate"), "entry assist should suggest the next natural vital metric");
+assert(!document.elements.entryAssist.innerHTML.includes("Next:"), "entry assist should not show follow-on metric prompts");
 vm.runInContext('state.activeProfileId = null;', context);
 assert(context.getStatus({
   metric: "Blood pressure systolic",
@@ -604,11 +616,33 @@ assert(document.elements.trendPanel.innerHTML.includes("2 years"), "trend contro
 assert(document.elements.trendPanel.innerHTML.includes("Year-on-year"), "trend panel should include year-on-year comparison");
 assert(document.elements.trendPanel.innerHTML.match(/<li>/g).length <= 4, "recent history should be capped at four entries");
 vm.runInContext('cloudState.user = { email: "ben_ashurst@me.com" }; render();', context);
-assert(document.elements.snapshotGrid.innerHTML.includes("Waist circumference"), "snapshot should focus on waist circumference");
-assert(document.elements.snapshotGrid.innerHTML.includes("Weight"), "snapshot should focus on weight");
-assert(document.elements.snapshotGrid.innerHTML.includes("Total cholesterol"), "snapshot should focus on total cholesterol");
-assert(document.elements.snapshotGrid.innerHTML.includes("LDL"), "snapshot should focus on LDL");
+const snapshotHtml = document.elements.snapshotGrid.innerHTML;
+assert(snapshotHtml.includes("Weight"), "snapshot should focus on weight");
+assert(snapshotHtml.includes("Waist circumference"), "snapshot should focus on waist circumference");
+assert(snapshotHtml.includes("LDL"), "snapshot should focus on LDL");
+assert(snapshotHtml.includes("Total cholesterol"), "snapshot should focus on total cholesterol");
+assert(
+  snapshotHtml.indexOf("<span>Weight</span>") <
+    snapshotHtml.indexOf("<span>Waist circumference</span>") &&
+    snapshotHtml.indexOf("<span>Waist circumference</span>") <
+      snapshotHtml.indexOf("<span>LDL</span>") &&
+    snapshotHtml.indexOf("<span>LDL</span>") <
+      snapshotHtml.indexOf("<span>Total cholesterol</span>"),
+  "snapshot should default to weight, waist, LDL, then total cholesterol",
+);
 assert(!document.elements.snapshotGrid.innerHTML.includes("Warnings"), "snapshot should not render a generic warning summary card");
+vm.runInContext('state.editingSnapshot = true; render();', context);
+assert(!document.elements.snapshotEditor.classList.contains("hidden"), "snapshot editor should open");
+document.elements.snapshotMetric1.value = "Resting heart rate";
+document.elements.snapshotMetric2.value = "VO2 Max";
+document.elements.snapshotMetric3.value = "HDL";
+document.elements.snapshotMetric4.value = "ApoB";
+context.saveSnapshotMetrics({ preventDefault() {} });
+const savedSettings = JSON.parse(store["health-dashboard-settings:v1"]);
+assert(savedSettings.snapshot_metrics_by_profile.ben[0] === "Resting heart rate", "snapshot choices should save per profile");
+assert(document.elements.snapshotEditor.classList.contains("hidden"), "snapshot editor should close after save");
+assert(document.elements.snapshotGrid.innerHTML.includes("Resting heart rate"), "custom snapshot should render saved first metric");
+assert(document.elements.snapshotGrid.innerHTML.includes("ApoB"), "custom snapshot should render saved fourth metric");
 
 const eosinophilNote = context.getMetricMedicalNote("Eosinophils");
 assert(eosinophilNote.includes("hay fever"), "eosinophil context should mention common allergic context");

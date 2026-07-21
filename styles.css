@@ -337,9 +337,47 @@ h2 {
   cursor: default;
 }
 
-.snapshot-item.context {
-  border-color: #9abedc;
-  background: #eef6fd;
+.snapshot-editor {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
+}
+
+.snapshot-editor label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.snapshot-editor select {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 8px;
+}
+
+.snapshot-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.snapshot-editor-actions .primary-button {
+  width: auto;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 0.78rem;
 }
 
 .auth-panel {
@@ -421,6 +459,10 @@ h2 {
   gap: 16px;
   align-items: stretch;
   margin-bottom: 16px;
+}
+
+.profile-section.details-only {
+  grid-template-columns: 1fr;
 }
 
 .profile-panel,

@@ -1,9 +1,10 @@
-const APP_VERSION = "v0.35";
+const APP_VERSION = "v0.36";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
 const RANGE_STORAGE_KEY = "health-dashboard-reference-ranges:v1";
 const SCHEDULE_STORAGE_KEY = "health-dashboard-schedule-state:v1";
+const SETTINGS_STORAGE_KEY = "health-dashboard-settings:v1";
 const LAST_LOCAL_UPDATE_KEY = "health-dashboard-last-local-update:v1";
 const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
@@ -47,7 +48,7 @@ const relaxedNearLimitMetrics = new Set([
   "Urine pH",
   "CRP",
 ]);
-const snapshotFocusMetricNames = ["Waist circumference", "Weight", "Total cholesterol", "LDL"];
+const defaultSnapshotMetricNames = ["Weight", "Waist circumference", "LDL", "Total cholesterol"];
 const riskContextMetricNames = new Set(["Lipoprotein(a)"]);
 const inRangeStableTrendMetrics = new Set(["Blood pressure systolic", "Blood pressure diastolic"]);
 const meaningfulChangeRules = {
@@ -223,10 +224,12 @@ const state = {
   results: loadResults(initialProfiles),
   metricRanges: loadMetricRanges(),
   scheduleState: loadScheduleState(),
+  settings: loadSettings(),
   filter: "latest",
   activeProfileId: null,
   activeSummaryFilter: "measurements",
   editingProfiles: !profilesAreComplete(initialProfiles),
+  editingSnapshot: false,
   editingRangeKey: null,
   activeTrendKey: "",
   trendRange: "all",
@@ -259,6 +262,7 @@ const onboardingTitle = document.querySelector("#onboardingTitle");
 const onboardingText = document.querySelector("#onboardingText");
 const focusEntryButton = document.querySelector("#focusEntryButton");
 const focusImportButton = document.querySelector("#focusImportButton");
+const profileSection = document.querySelector(".profile-section");
 const profileForm = document.querySelector("#profileForm");
 const profileCards = document.querySelector("#profileCards");
 const personField = document.querySelector("#personField");
@@ -296,6 +300,15 @@ const nextDueDate = document.querySelector("#nextDueDate");
 const nextDueCard = document.querySelector("#nextDueCard");
 const snapshotSection = document.querySelector("#snapshotSection");
 const snapshotUpdated = document.querySelector("#snapshotUpdated");
+const snapshotEditButton = document.querySelector("#snapshotEditButton");
+const snapshotEditor = document.querySelector("#snapshotEditor");
+const snapshotCancelButton = document.querySelector("#snapshotCancelButton");
+const snapshotMetricInputs = [
+  document.querySelector("#snapshotMetric1"),
+  document.querySelector("#snapshotMetric2"),
+  document.querySelector("#snapshotMetric3"),
+  document.querySelector("#snapshotMetric4"),
+];
 const snapshotGrid = document.querySelector("#snapshotGrid");
 const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
@@ -420,6 +433,44 @@ function saveScheduleState() {
   markLocalUpdated();
 }
 
+function loadSettings() {
+  try {
+    return normaliseSettings(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY)));
+  } catch {
+    return normaliseSettings({});
+  }
+}
+
+function normaliseSettings(settings = {}) {
+  const snapshotMetricsByProfile = settings?.snapshot_metrics_by_profile ?? settings?.snapshotMetricsByProfile ?? {};
+  const normalisedSnapshotMetrics = {};
+  const profileIds = new Set([...defaultProfiles.map((profile) => profile.id), ...Object.keys(snapshotMetricsByProfile)]);
+  profileIds.forEach((profileId) => {
+    normalisedSnapshotMetrics[profileId] = normaliseSnapshotMetricNames(snapshotMetricsByProfile[profileId]);
+  });
+  return {
+    ...settings,
+    snapshot_metrics_by_profile: normalisedSnapshotMetrics,
+  };
+}
+
+function normaliseSnapshotMetricNames(metricNames) {
+  const requested = Array.isArray(metricNames) ? metricNames : [];
+  const validNames = new Set(metrics.map((item) => item.name));
+  const selected = [];
+  [...requested, ...defaultSnapshotMetricNames].forEach((name) => {
+    if (!validNames.has(name) || selected.includes(name)) return;
+    selected.push(name);
+  });
+  return selected.slice(0, 4);
+}
+
+function saveSettings() {
+  state.settings = normaliseSettings(state.settings);
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
+  markLocalUpdated();
+}
+
 function loadResults(profiles = state.profiles) {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
@@ -515,7 +566,7 @@ function createFreshCloudData(profileId = cloudState.profileId ?? "ben") {
     reference_ranges: {},
     schedule_state: { snoozes: {} },
     imports: [],
-    settings: {},
+    settings: normaliseSettings({}),
     exported_at: new Date().toISOString(),
   };
 }
@@ -530,6 +581,7 @@ function serializeDashboardData() {
     schedule_state: state.scheduleState,
     imports: [],
     settings: {
+      ...state.settings,
       active_profile_id: state.activeProfileId,
     },
     exported_at: new Date().toISOString(),
@@ -544,12 +596,14 @@ function applyDashboardData(data) {
   state.results = recalculateDerivedFields((data?.measurements ?? data?.results ?? []).map((result) => normaliseResult(result, state.profiles)), state.profiles);
   state.metricRanges = data?.reference_ranges ?? data?.metricRanges ?? {};
   state.scheduleState = data?.schedule_state ?? data?.scheduleState ?? { snoozes: {} };
+  state.settings = normaliseSettings(data?.settings ?? {});
   state.activeProfileId = profileId;
   state.editingProfiles = !profilesAreComplete(state.profiles);
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(state.profiles));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.results));
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(state.metricRanges));
   localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(state.scheduleState));
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
   localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(data ?? createFreshCloudData(profileId)));
 }
 
@@ -683,14 +737,17 @@ function setEditingAvailability() {
     exportCsvButton,
     exportChatGptButton,
     exportReviewPackButton,
+    snapshotEditor,
+    snapshotEditButton,
     resetButton,
   ].forEach((element) => {
     if (element) element.classList.toggle("read-only", disabled);
   });
-  document.querySelectorAll("#profileForm input, #profileForm button, #resultForm input, #resultForm select, #resultForm textarea, #resultForm button").forEach((element) => {
+  document.querySelectorAll("#profileForm input, #profileForm button, #resultForm input, #resultForm select, #resultForm textarea, #resultForm button, #snapshotEditor select, #snapshotEditor button").forEach((element) => {
     element.disabled = disabled;
   });
   importChatGptButton.disabled = disabled;
+  if (snapshotEditButton) snapshotEditButton.disabled = disabled;
   if (resetButton) resetButton.disabled = disabled;
   if (!disabled && metricInput.value) {
     syncRangeDefaults();
@@ -705,7 +762,7 @@ function renderAuthPanel() {
   const signedIn = Boolean(cloudState.user);
   authForm.classList.toggle("hidden", signedIn);
   authStatus.textContent = signedIn
-    ? `Signed in as ${cloudState.user.email}. Private cloud sync is active.`
+    ? `Signed in as ${cloudState.user.email}.`
     : "Sign in to use private cloud sync.";
 }
 
@@ -811,7 +868,9 @@ function hydrateProfileForm() {
 }
 
 function renderProfiles() {
-  profileForm.classList.toggle("hidden", !state.editingProfiles && profilesAreComplete(state.profiles));
+  const profileFormHidden = !state.editingProfiles && profilesAreComplete(state.profiles);
+  profileForm.classList.toggle("hidden", profileFormHidden);
+  if (profileSection) profileSection.classList.toggle("details-only", profileFormHidden);
   renderProfileScope();
   const allPeopleCard = cloudState.user
     ? ""
@@ -938,28 +997,13 @@ function renderEntryAssist() {
         reference_upper_limit: savedRange.high,
       })
     : "set on first entry";
-  const followOn = getFollowOnMetric(selectedMetric.name);
 
   entryAssist.innerHTML = `
     <div>
       <strong>${escapeHtml(getDisplayGroupForMetric(selectedMetric.name))}</strong>
       <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(rangeLabel)} ${escapeHtml(rangeText)}</span>
     </div>
-    ${
-      followOn
-        ? `<button class="mini-button" type="button" data-entry-metric="${escapeHtml(followOn)}">Next: ${escapeHtml(followOn)}</button>`
-        : ""
-    }
   `;
-}
-
-function getFollowOnMetric(metricName) {
-  const flow = {
-    "Weight": "Waist circumference",
-    "Blood pressure systolic": "Blood pressure diastolic",
-    "Blood pressure diastolic": "Resting heart rate",
-  };
-  return flow[metricName] ?? null;
 }
 
 function getMetric(name) {
@@ -1484,20 +1528,55 @@ function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
     .filter(Boolean)
     .sort()
     .at(-1);
-  const riskContextResults = latestResults.filter(isRiskContextResult);
   const dueItems = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
+  const snapshotMetricNames = getSnapshotMetricNames();
 
   snapshotSection.classList.toggle("hidden", !cloudState.user || (!scopedResults.length && !dueItems.length));
   snapshotUpdated.textContent = latestDate
     ? `${flaggedCount} active warnings · ${dueCount} due or overdue`
     : "No measurements yet";
-  snapshotGrid.innerHTML = snapshotFocusMetricNames
+  snapshotGrid.innerHTML = snapshotMetricNames
     .map((metricName) => renderSnapshotFocusCard(metricName, latestResults))
     .join("");
+  snapshotList.innerHTML = "";
+  renderSnapshotEditor(snapshotMetricNames);
+}
 
-  snapshotList.innerHTML = riskContextResults.length
-    ? riskContextResults.map(renderRiskContextItem).join("")
-    : "";
+function getSnapshotProfileId() {
+  return state.activeProfileId || cloudState.profileId || state.profiles[0]?.id || "ben";
+}
+
+function getSnapshotMetricNames(profileId = getSnapshotProfileId()) {
+  const configured = state.settings?.snapshot_metrics_by_profile?.[profileId];
+  return normaliseSnapshotMetricNames(configured);
+}
+
+function renderSnapshotEditor(metricNames = getSnapshotMetricNames()) {
+  if (!snapshotEditor) return;
+  snapshotEditor.classList.toggle("hidden", !state.editingSnapshot);
+  snapshotEditButton.textContent = state.editingSnapshot ? "Editing snapshot" : "Edit snapshot";
+  const options = metrics.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("");
+  snapshotMetricInputs.forEach((input, index) => {
+    if (!input) return;
+    input.innerHTML = options;
+    input.value = metricNames[index] ?? defaultSnapshotMetricNames[index] ?? metrics[index]?.name ?? "";
+  });
+}
+
+function saveSnapshotMetrics(event) {
+  event.preventDefault();
+  if (!assertCanEdit()) return;
+  const selected = snapshotMetricInputs.map((input) => input?.value).filter(Boolean);
+  if (new Set(selected).size !== selected.length) {
+    window.alert("Choose four different snapshot metrics.");
+    return;
+  }
+  const profileId = getSnapshotProfileId();
+  state.settings.snapshot_metrics_by_profile ??= {};
+  state.settings.snapshot_metrics_by_profile[profileId] = normaliseSnapshotMetricNames(selected);
+  state.editingSnapshot = false;
+  saveSettings();
+  render();
 }
 
 function renderSnapshotFocusCard(metricName, latestResults) {
@@ -1576,16 +1655,6 @@ function formatSnapshotTrend(trend) {
   if (trend === "changed") return "changed";
   if (trend === "unchanged") return "unchanged";
   return String(trend || "recorded").toLowerCase();
-}
-
-function renderRiskContextItem(result) {
-  const profileAttribute = result.profile_id ? ` data-snapshot-profile="${escapeHtml(result.profile_id)}"` : "";
-  return `
-    <article class="snapshot-item context" role="button" tabindex="0" data-snapshot-metric="${escapeHtml(result.metric)}"${profileAttribute}>
-      <strong>${escapeHtml(result.metric)}: risk context</strong>
-      <span>${escapeHtml(formatValue(result.result_value, result.unit))} · inherited/stable marker used to guide overall prevention targets.</span>
-    </article>
-  `;
 }
 
 function renderSnapshotItem(item) {
@@ -2204,11 +2273,10 @@ function addResult(event) {
   saveRangeForResult(result);
   saveScheduleState();
   saveResults();
-  const nextMetricName = getFollowOnMetric(selectedMetric.name) ?? selectedMetric.name;
   form.reset();
   setTodayDefaults();
   populatePeople();
-  metricInput.value = nextMetricName;
+  metricInput.value = selectedMetric.name;
   syncMetricDefaults();
   syncSourceDefaults();
   renderQuickMetrics();
@@ -2839,7 +2907,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.35").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.36").catch(() => {});
   });
 }
 
@@ -2902,12 +2970,6 @@ quickMetricPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-metric-name]");
   if (!button) return;
   selectMetric(button.dataset.metricName);
-  valueInput.focus();
-});
-entryAssist.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-entry-metric]");
-  if (!button) return;
-  selectMetric(button.dataset.entryMetric);
   valueInput.focus();
 });
 sourceTypeInput.addEventListener("change", syncSourceConfidence);
@@ -3008,6 +3070,19 @@ snapshotSection.addEventListener("keydown", (event) => {
   event.preventDefault();
   handleSnapshotAction(event.target);
 });
+
+snapshotEditButton.addEventListener("click", () => {
+  if (!assertCanEdit()) return;
+  state.editingSnapshot = !state.editingSnapshot;
+  render();
+});
+
+snapshotCancelButton.addEventListener("click", () => {
+  state.editingSnapshot = false;
+  render();
+});
+
+snapshotEditor.addEventListener("submit", saveSnapshotMetrics);
 
 markerSummary.addEventListener("click", (event) => {
   const card = event.target.closest("[data-summary-metric]");

@@ -10,9 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.35`.
+- The app is now on `v0.36`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.36
+
+- Moved signed-in account status, profile details, current snapshot, overview tiles, and due soon into the preferred page order.
+- Changed the default current snapshot to Weight, Waist circumference, LDL, and Total cholesterol.
+- Added per-user editable snapshot metrics, saved into the dashboard settings.
+- Removed the add-measurement follow-on prompt such as `Next: Waist circumference`.
 
 ## Completed In v0.35
 
