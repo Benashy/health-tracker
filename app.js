@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.41";
+const APP_VERSION = "v0.42";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -9,6 +9,7 @@ const LAST_LOCAL_UPDATE_KEY = "health-dashboard-last-local-update:v1";
 const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
 const DATA_VERSION = 1;
+const PRODUCTION_AUTH_REDIRECT_URL = "https://benashy.github.io/health-tracker/";
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -266,6 +267,7 @@ const cloudState = {
   conflict: false,
   lastError: "",
 };
+let authRedirectMessage = getAuthRedirectMessage();
 
 const authPanel = document.querySelector("#authPanel");
 const authForm = document.querySelector("#authForm");
@@ -525,6 +527,32 @@ function getSupabaseConfig() {
   const anonKey = String(config.anonKey ?? "").trim();
   if (!url || !anonKey || url.includes("YOUR-PROJECT") || anonKey.includes("YOUR_PUBLIC")) return null;
   return { url, anonKey };
+}
+
+function getAuthRedirectUrl() {
+  const currentUrl = new URL(window.location.href);
+  if (currentUrl.origin === "https://benashy.github.io" && currentUrl.pathname.startsWith("/health-tracker")) {
+    return PRODUCTION_AUTH_REDIRECT_URL;
+  }
+  if (currentUrl.hostname === "localhost" || currentUrl.hostname === "127.0.0.1") {
+    return PRODUCTION_AUTH_REDIRECT_URL;
+  }
+  const cleanPath = currentUrl.pathname.replace(/index\.html$/i, "");
+  return `${currentUrl.origin}${cleanPath || "/"}`;
+}
+
+function getAuthRedirectMessage() {
+  const rawParams = window.location.hash ? window.location.hash.slice(1) : window.location.search.slice(1);
+  if (!rawParams) return "";
+  const params = new URLSearchParams(rawParams);
+  const errorCode = params.get("error_code") ?? "";
+  const description = params.get("error_description") ?? params.get("error") ?? "";
+  if (!description) return "";
+  const lowerMessage = `${errorCode} ${description}`.toLowerCase();
+  if (lowerMessage.includes("otp_expired") || lowerMessage.includes("expired")) {
+    return "That magic link is invalid or has expired. Request a fresh link and open the newest email.";
+  }
+  return description.replaceAll("+", " ");
 }
 
 function initSupabase() {
@@ -850,7 +878,7 @@ function renderAuthPanel() {
   authForm.classList.toggle("hidden", signedIn);
   authStatus.textContent = signedIn
     ? `Signed in as ${cloudState.user.email}.`
-    : "Sign in to access your private dashboard.";
+    : authRedirectMessage || "Sign in to access your private dashboard.";
 }
 
 function renderProfileScope() {
@@ -3271,7 +3299,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.41").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.42").catch(() => {});
   });
 }
 
@@ -3303,11 +3331,12 @@ async function sendMagicLink() {
   }
 
   authStatus.textContent = "Sending magic link...";
+  authRedirectMessage = "";
   const { error } = await cloudState.client.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: false,
-      emailRedirectTo: window.location.href.split("#")[0],
+      emailRedirectTo: getAuthRedirectUrl(),
     },
   });
   authStatus.textContent = error
