@@ -95,12 +95,14 @@ function createDocument() {
     "angelikaDob",
     "angelikaHeight",
     "personInput",
+    "contentGrid",
     "resultForm",
     "markerInput",
     "metricSearchInput",
     "quickMetricPanel",
     "entryAssist",
     "trendMetricInput",
+    "trendViewPanel",
     "trendPanel",
     "unitInput",
     "lowField",
@@ -128,6 +130,8 @@ function createDocument() {
     "sourceDocumentInput",
     "resultsBody",
     "emptyState",
+    "resultsViewPanel",
+    "mobileMenuPanel",
     "mobileActionBar",
     "totalResults",
     "flaggedResults",
@@ -172,6 +176,9 @@ function createDocument() {
   const classes = {
     ".results-table-wrap": new Element("results-table-wrap"),
     ".results-panel": new Element("results-panel"),
+    ".entry-panel": new Element("entry-panel"),
+    ".profile-section": new Element("profile-section"),
+    ".schedule-section": new Element("schedule-section"),
     ".account-sync-footer": new Element("account-sync-footer"),
     ".filters": new Element("filters"),
     ".status-strip": new Element("status-strip"),
@@ -222,6 +229,11 @@ function createContext() {
       },
       confirm: () => true,
       addEventListener: () => {},
+      matchMedia: () => ({
+        matches: Boolean(context.isMobile),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }),
       location: {
         href: "file:///test/index.html",
         origin: "file://",
@@ -285,8 +297,8 @@ const styles = fs.readFileSync("styles.css", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
 const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
 const faviconIco = fs.readFileSync("favicon.ico");
-assert(indexHtml.includes("app.js?v=0.43"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.43"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.44"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.44"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -297,6 +309,9 @@ assert(indexHtml.includes("snapshotEditor"), "snapshot editor should exist");
 assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
 assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
 assert(indexHtml.includes("mobileActionBar"), "mobile bottom action bar should exist");
+assert(indexHtml.includes("mobileMenuPanel"), "mobile menu panel should exist for secondary actions");
+assert(indexHtml.includes("trendViewPanel"), "trends should have a dedicated mobile view wrapper");
+assert(indexHtml.includes("resultsViewPanel"), "results should have a dedicated mobile view wrapper");
 assert(indexHtml.includes("entry-submit-button"), "mobile entry submit affordance should exist");
 assert(indexHtml.includes("referenceOptions"), "reference field selectors should exist");
 assert(indexHtml.includes("targetInput"), "target should have a dedicated input");
@@ -304,8 +319,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.43"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.43"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.44"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.44"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
@@ -327,29 +342,31 @@ assert(!indexHtml.includes("latest measurement"), "summary strip should not show
 assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.43"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.44"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.43")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.43"), "iOS touch icon should use PNG");
-assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.43"), "browser favicon should use a unique Health Dashboard ICO filename");
-assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.43"), "browser favicon should use a unique 32px PNG filename");
-assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.43"), "browser favicon should use a unique 16px PNG filename");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.44")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.44"), "iOS touch icon should use PNG");
+assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.44"), "browser favicon should use a unique Health Dashboard ICO filename");
+assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.44"), "browser favicon should use a unique 32px PNG filename");
+assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.44"), "browser favicon should use a unique 16px PNG filename");
 assert(faviconIco.length > 100, "favicon ICO should be generated");
 assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
 assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
 assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
-assert(serviceWorker.includes("health-dashboard-v0.43"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.43"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.43"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.43"), "service worker should cache the unique ICO favicon");
-assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.43"), "service worker should cache the unique PNG favicon");
-assert(serviceWorker.includes("app-icon-512.png?v=0.43"), "service worker should cache PNG app icons");
+assert(serviceWorker.includes("health-dashboard-v0.44"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.44"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.44"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.44"), "service worker should cache the unique ICO favicon");
+assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.44"), "service worker should cache the unique PNG favicon");
+assert(serviceWorker.includes("app-icon-512.png?v=0.44"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
 assert(styles.includes("@media (max-width: 340px)"), "very small screens should keep a tighter fallback breakpoint");
 assert(styles.includes(".mobile-action-bar"), "styles should include a mobile bottom action bar");
+assert(styles.includes(".mobile-view-hidden"), "mobile screens should use mobile-only section hiding");
+assert(styles.includes(".mobile-menu-panel"), "styles should include a mobile menu screen");
 assert(styles.includes("env(safe-area-inset-bottom)"), "iPhone safe-area spacing should be handled");
 assert(styles.includes(".entry-submit-button"), "mobile entry submit should be sticky");
 assert(styles.includes(".empty-actions"), "empty states should include compact action buttons");
@@ -360,7 +377,7 @@ assert(styles.includes(".value-fields input"), "primary value fields should be v
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.43", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.44", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -374,15 +391,19 @@ assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out sh
 assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
 assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
 assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
-context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.43";
+context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.44";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should redirect to the canonical live dashboard URL");
 context.window.location.href = "http://localhost:3000/";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should not redirect to localhost");
 context.window.location.hash = "#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired";
 assert(context.getAuthRedirectMessage().includes("expired"), "expired magic links should show a helpful message");
 context.window.location.hash = "";
+assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="home"'), "mobile action bar should render a Home action");
 assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="add"'), "mobile action bar should render an Add action");
-assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="due"'), "mobile action bar should render a Due action");
+assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="trends"'), "mobile action bar should render a Trends action");
+assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="results"'), "mobile action bar should render a Results action");
+assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="menu"'), "mobile action bar should render a Menu action");
+assert(!document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="review"'), "AI review should live in the mobile menu");
 assert(document.elements.emptyState.innerHTML.includes("empty-actions"), "empty state should offer mobile-friendly next actions");
 context.handleActionShortcut("add");
 assert(document.elements.resultForm.scrolledIntoView && document.elements.valueInput.focused, "Add shortcut should jump to measurement entry");
@@ -391,6 +412,19 @@ assert(document.elements.schedulePanel.scrolledIntoView, "Due shortcut should ju
 context.handleActionShortcut("review");
 assert(document.elements.exportReviewPackButton.clicked, "Review shortcut should prepare the AI review pack");
 context.setFilter("latest");
+context.isMobile = true;
+vm.runInContext('cloudState.user = { email: "ben_ashurst@me.com" }; state.mobileView = "home"; renderMobileLayout();', context);
+assert(!document.elements.snapshotSection.classList.contains("mobile-view-hidden"), "mobile home should show the current snapshot");
+assert(document.elements.contentGrid.classList.contains("mobile-view-hidden"), "mobile home should hide the add/results grid");
+context.handleActionShortcut("trends");
+assert(!document.elements.trendViewPanel.classList.contains("mobile-view-hidden"), "mobile Trends tab should show trend content");
+assert(document.elements.resultsViewPanel.classList.contains("mobile-view-hidden"), "mobile Trends tab should hide result rows");
+context.handleActionShortcut("results");
+assert(!document.elements.resultsViewPanel.classList.contains("mobile-view-hidden"), "mobile Results tab should show result rows");
+assert(document.elements.trendViewPanel.classList.contains("mobile-view-hidden"), "mobile Results tab should hide trend content");
+context.handleActionShortcut("menu");
+assert(!document.elements.mobileMenuPanel.classList.contains("mobile-view-hidden"), "mobile Menu tab should show export and import actions");
+context.isMobile = false;
 assert(context.getWarningDays(14) === 2, "14-day checks should only warn close to due date");
 assert(context.getWarningDays(30) === 3, "30-day checks should warn within three days");
 assert(context.getWarningDays(90) === 7, "quarterly checks should warn within seven days");

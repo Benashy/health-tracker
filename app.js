@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.43";
+const APP_VERSION = "v0.44";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -250,6 +250,7 @@ const state = {
   referenceDraftKey: null,
   activeTrendKey: "",
   trendRange: "all",
+  mobileView: "home",
   pendingImport: null,
 };
 
@@ -285,7 +286,9 @@ const profileForm = document.querySelector("#profileForm");
 const profileCards = document.querySelector("#profileCards");
 const personField = document.querySelector("#personField");
 const personInput = document.querySelector("#personInput");
+const contentGrid = document.querySelector("#contentGrid");
 const form = document.querySelector("#resultForm");
+const entryPanel = document.querySelector(".entry-panel");
 const metricInput = document.querySelector("#markerInput");
 const metricSearchInput = document.querySelector("#metricSearchInput");
 const quickMetricPanel = document.querySelector("#quickMetricPanel");
@@ -339,8 +342,12 @@ const snapshotMetricInputs = [
 const snapshotGrid = document.querySelector("#snapshotGrid");
 const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
+const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
 const statusStrip = document.querySelector(".status-strip");
+const trendViewPanel = document.querySelector("#trendViewPanel");
+const resultsViewPanel = document.querySelector("#resultsViewPanel");
+const mobileMenuPanel = document.querySelector("#mobileMenuPanel");
 const mobileActionBar = document.querySelector("#mobileActionBar");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const exportChatGptButton = document.querySelector("#exportChatGptButton");
@@ -647,6 +654,7 @@ function resetPrivateStateForSignedOut() {
   state.editingSnapshot = false;
   state.editingRangeKey = null;
   state.referenceDraftKey = null;
+  state.mobileView = "home";
   state.pendingImport = null;
   hydrateProfileForm();
   populatePeople();
@@ -1737,7 +1745,7 @@ function render() {
   const scopedResults = visibleResults();
   const latestScopedResults = getLatestByMetric([...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date)));
   const flaggedCount = latestScopedResults.filter(isActionableWarning).length;
-  const dueCount = getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state)).length;
+  const dueCount = getDueCount();
 
   totalResults.textContent = scopedResults.length;
   flaggedResults.textContent = flaggedCount;
@@ -1754,7 +1762,6 @@ function render() {
   renderSchedule();
   renderSummary();
   renderTrends();
-  renderMobileActions(dueCount);
 
   renderEmptyState(results.length, dueCount);
   renderSummarySelection();
@@ -1762,6 +1769,8 @@ function render() {
   tableWrap.classList.toggle("hidden", results.length === 0);
 
   resultsBody.innerHTML = renderResultRows(results);
+  renderMobileActions(dueCount);
+  renderMobileLayout();
 }
 
 function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
@@ -2396,14 +2405,97 @@ function renderCalmScheduleCard() {
 
 function renderMobileActions(dueCount) {
   if (!mobileActionBar) return;
-  const dueLabel = dueCount ? `Due ${dueCount}` : "Due";
+  const actions = [
+    { key: "home", label: "Home", count: dueCount },
+    { key: "add", label: "Add", primary: true },
+    { key: "trends", label: "Trends" },
+    { key: "results", label: "Results" },
+    { key: "menu", label: "Menu" },
+  ];
   mobileActionBar.classList.toggle("has-due", dueCount > 0);
-  mobileActionBar.innerHTML = `
-    <button class="${state.filter === "latest" ? "active" : ""}" type="button" data-mobile-action="current">Current</button>
-    <button class="${state.filter === "due" ? "active" : ""}" type="button" data-mobile-action="due">${escapeHtml(dueLabel)}</button>
-    <button class="primary" type="button" data-mobile-action="add">Add</button>
-    <button type="button" data-mobile-action="review">Review</button>
-  `;
+  mobileActionBar.innerHTML = actions
+    .map((action) => {
+      const isActive = state.mobileView === action.key;
+      const classes = [isActive ? "active" : "", action.primary && isActive ? "primary" : ""]
+        .filter(Boolean)
+        .join(" ");
+      const label = `${escapeHtml(action.label)}${action.count ? `<span class="mobile-tab-badge">${escapeHtml(action.count)}</span>` : ""}`;
+      return `<button class="${classes}" type="button" data-mobile-action="${escapeHtml(action.key)}">${label}</button>`;
+    })
+    .join("");
+}
+
+function isMobileLayout() {
+  return Boolean(window.matchMedia?.("(max-width: 700px)").matches);
+}
+
+function setMobileOnlyHidden(element, isHidden) {
+  if (!element) return;
+  element.classList.toggle("mobile-view-hidden", isHidden);
+}
+
+function renderMobileLayout() {
+  const mobile = isMobileLayout();
+  const signedIn = Boolean(cloudState.user);
+  const selectedView = state.mobileView || "home";
+  const allMobileSections = [
+    profileSection,
+    onboardingPanel,
+    snapshotSection,
+    statusStrip,
+    scheduleSection,
+    contentGrid,
+    entryPanel,
+    resultsPanel,
+    trendViewPanel,
+    resultsViewPanel,
+    mobileMenuPanel,
+  ];
+
+  if (!mobile || !signedIn) {
+    allMobileSections.forEach((section) => setMobileOnlyHidden(section, false));
+    contentGrid?.classList.remove("mobile-single-view");
+    resultsPanel?.classList.remove("mobile-tab-surface");
+    return;
+  }
+
+  const onHome = selectedView === "home";
+  const onAdd = selectedView === "add";
+  const onTrends = selectedView === "trends";
+  const onResults = selectedView === "results";
+  const onMenu = selectedView === "menu";
+
+  setMobileOnlyHidden(profileSection, !onHome);
+  setMobileOnlyHidden(onboardingPanel, !onHome);
+  setMobileOnlyHidden(snapshotSection, !onHome);
+  setMobileOnlyHidden(statusStrip, !onHome);
+  setMobileOnlyHidden(scheduleSection, !onHome);
+  setMobileOnlyHidden(contentGrid, !(onAdd || onTrends || onResults));
+  setMobileOnlyHidden(entryPanel, !onAdd);
+  setMobileOnlyHidden(resultsPanel, !(onTrends || onResults));
+  setMobileOnlyHidden(trendViewPanel, !onTrends);
+  setMobileOnlyHidden(resultsViewPanel, !onResults);
+  setMobileOnlyHidden(mobileMenuPanel, !onMenu);
+  contentGrid?.classList.toggle("mobile-single-view", onAdd || onTrends || onResults);
+  resultsPanel?.classList.toggle("mobile-tab-surface", onTrends || onResults);
+}
+
+function setMobileView(view, options = {}) {
+  const allowedViews = new Set(["home", "add", "trends", "results", "menu"]);
+  state.mobileView = allowedViews.has(view) ? view : "home";
+  renderMobileActions(getDueCount());
+  renderMobileLayout();
+
+  if (!isMobileLayout() || options.scroll === false) return;
+  const target = {
+    home: snapshotSection ?? profileSection,
+    add: form,
+    trends: resultsPanel,
+    results: resultsPanel,
+    menu: mobileMenuPanel,
+  }[state.mobileView];
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (state.mobileView === "add" && options.focusValue !== false) valueInput.focus();
 }
 
 function renderSummary() {
@@ -2453,6 +2545,10 @@ function getNextDueSummary() {
   return next ? { label: formatDate(toDateString(next)), state: "future" } : { label: "-", state: "none" };
 }
 
+function getDueCount() {
+  return getScheduleItems().filter((item) => ["due", "soon", "overdue"].includes(item.due.state)).length;
+}
+
 function focusMetricEntry(profileId, metricName) {
   const profile = getProfile(profileId);
   const selectedMetric = getMetric(metricName);
@@ -2467,20 +2563,24 @@ function focusMetricEntry(profileId, metricName) {
   syncRangeDefaults();
   syncSourceDefaults();
   renderQuickMetrics();
+  if (isMobileLayout()) setMobileView("add", { scroll: false, focusValue: false });
   focusEntryPanel();
 }
 
 function focusEntryPanel() {
+  if (isMobileLayout()) setMobileView("add", { scroll: false });
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   valueInput.focus();
 }
 
 function focusDuePanel() {
+  if (isMobileLayout()) state.mobileView = "home";
   setFilter("due");
   schedulePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function focusCurrentResults() {
+  if (isMobileLayout()) state.mobileView = "results";
   setFilter("latest");
   resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -2488,6 +2588,10 @@ function focusCurrentResults() {
 function handleActionShortcut(action) {
   if (action === "add") {
     focusEntryPanel();
+    return;
+  }
+  if (["home", "trends", "results", "menu"].includes(action)) {
+    setMobileView(action);
     return;
   }
   if (action === "due") {
@@ -2504,6 +2608,33 @@ function handleActionShortcut(action) {
   }
   if (action === "review") {
     exportReviewPackButton.click();
+  }
+}
+
+function handleMenuAction(action) {
+  if (action === "export-gpt") {
+    exportForChatGpt();
+    return;
+  }
+  if (action === "import-gpt") {
+    if (importChatGptButton.disabled) return;
+    importChatGptInput.click();
+    return;
+  }
+  if (action === "ai-review") {
+    exportReviewPack();
+    return;
+  }
+  if (action === "csv") exportCsv();
+}
+
+function activateSummaryFilter(card) {
+  const nextFilter = card.dataset.summaryFilter;
+  const summaryKey = card.dataset.summaryKey ?? nextFilter;
+  if (isMobileLayout()) state.mobileView = nextFilter === "due" ? "home" : "results";
+  setFilter(nextFilter, summaryKey);
+  if (isMobileLayout() && nextFilter === "due") {
+    schedulePanel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 
@@ -3299,7 +3430,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.43").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.44").catch(() => {});
   });
 }
 
@@ -3401,6 +3532,7 @@ window.addEventListener("offline", () => {
   renderSyncFooter();
   setEditingAvailability();
 });
+window.addEventListener("resize", renderMobileLayout);
 importReviewModal.addEventListener("click", (event) => {
   if (event.target === importReviewModal) closeImportReview();
 });
@@ -3445,7 +3577,7 @@ document.querySelector(".filters").addEventListener("click", (event) => {
 statusStrip.addEventListener("click", (event) => {
   const card = event.target.closest("[data-summary-filter]");
   if (!card) return;
-  setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
+  activateSummaryFilter(card);
 });
 
 statusStrip.addEventListener("keydown", (event) => {
@@ -3453,7 +3585,7 @@ statusStrip.addEventListener("keydown", (event) => {
   const card = event.target.closest("[data-summary-filter]");
   if (!card) return;
   event.preventDefault();
-  setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
+  activateSummaryFilter(card);
 });
 
 mobileActionBar.addEventListener("click", (event) => {
@@ -3461,6 +3593,14 @@ mobileActionBar.addEventListener("click", (event) => {
   if (!button) return;
   handleActionShortcut(button.dataset.mobileAction);
 });
+
+if (mobileMenuPanel) {
+  mobileMenuPanel.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-menu-action]");
+    if (!button) return;
+    handleMenuAction(button.dataset.menuAction);
+  });
+}
 
 emptyState.addEventListener("click", (event) => {
   const button = event.target.closest("[data-empty-action]");
@@ -3496,6 +3636,7 @@ markerSummary.addEventListener("click", (event) => {
   if (!card) return;
   state.activeTrendKey = card.dataset.summaryMetric;
   trendMetricInput.value = card.dataset.summaryMetric;
+  if (isMobileLayout()) state.mobileView = "trends";
   setFilter("latest");
   renderTrends();
 });
@@ -3507,6 +3648,7 @@ markerSummary.addEventListener("keydown", (event) => {
   event.preventDefault();
   state.activeTrendKey = card.dataset.summaryMetric;
   trendMetricInput.value = card.dataset.summaryMetric;
+  if (isMobileLayout()) state.mobileView = "trends";
   setFilter("latest");
   renderTrends();
 });

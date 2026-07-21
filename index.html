@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.43" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.43" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.43" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.43" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.43" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.43" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.43" />
-    <link rel="stylesheet" href="styles.css?v=0.43" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.44" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.44" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.44" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.44" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.44" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.44" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.44" />
+    <link rel="stylesheet" href="styles.css?v=0.44" />
   </head>
   <body>
     <main class="app-shell">
@@ -173,7 +173,7 @@
           <div class="schedule-grid" id="schedulePanel"></div>
         </section>
 
-        <section class="content-grid hidden" data-private aria-hidden="true">
+        <section class="content-grid hidden" id="contentGrid" data-private aria-hidden="true">
           <form class="entry-panel" id="resultForm">
             <div class="panel-heading">
               <h2>Add measurement</h2>
@@ -276,66 +276,83 @@
           </form>
 
           <section class="results-panel" aria-live="polite">
-            <div class="panel-heading">
-              <h2>Trends</h2>
-              <label class="compact-select">
-                Metric
-                <select id="trendMetricInput"></select>
-              </label>
+            <div class="trend-view-panel" id="trendViewPanel">
+              <div class="panel-heading">
+                <h2>Trends</h2>
+                <label class="compact-select">
+                  Metric
+                  <select id="trendMetricInput"></select>
+                </label>
+              </div>
+              <div class="trend-grid" id="trendPanel"></div>
             </div>
-            <div class="trend-grid" id="trendPanel"></div>
 
-            <div class="panel-heading">
-              <h2>Results</h2>
-              <div class="filters" role="group" aria-label="Filter results">
-                <button class="filter-button active" data-filter="latest" type="button">Current</button>
-                <button class="filter-button" data-filter="flagged" type="button">Flagged</button>
-                <button class="filter-button" data-filter="due" type="button">Due</button>
-                <button class="filter-button" data-filter="all" type="button">Archive</button>
+            <div class="results-view-panel" id="resultsViewPanel">
+              <div class="panel-heading">
+                <h2>Results</h2>
+                <div class="filters" role="group" aria-label="Filter results">
+                  <button class="filter-button active" data-filter="latest" type="button">Current</button>
+                  <button class="filter-button" data-filter="flagged" type="button">Flagged</button>
+                  <button class="filter-button" data-filter="due" type="button">Due</button>
+                  <button class="filter-button" data-filter="all" type="button">Archive</button>
+                </div>
+              </div>
+
+              <div class="marker-summary" id="markerSummary"></div>
+              <div class="empty-state" id="emptyState">
+                <strong>No results yet</strong>
+                <span>Add your first measurement to start tracking long-term trends.</span>
+              </div>
+              <div class="results-table-wrap">
+                <table class="results-table">
+                  <thead>
+                    <tr>
+                      <th>Person</th>
+                      <th>Date</th>
+                      <th>Metric</th>
+                      <th>Value</th>
+                      <th>Range / target</th>
+                      <th>Status</th>
+                      <th>Due</th>
+                      <th>Previous</th>
+                      <th>Abs change</th>
+                      <th>% change</th>
+                      <th>Trend</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsBody"></tbody>
+                </table>
               </div>
             </div>
-
-            <div class="marker-summary" id="markerSummary"></div>
-            <div class="empty-state" id="emptyState">
-              <strong>No results yet</strong>
-              <span>Add your first measurement to start tracking long-term trends.</span>
-            </div>
-            <div class="results-table-wrap">
-              <table class="results-table">
-                <thead>
-                  <tr>
-                    <th>Person</th>
-                    <th>Date</th>
-                    <th>Metric</th>
-                    <th>Value</th>
-                    <th>Range / target</th>
-                    <th>Status</th>
-                    <th>Due</th>
-                    <th>Previous</th>
-                    <th>Abs change</th>
-                    <th>% change</th>
-                    <th>Trend</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-              </table>
-            </div>
           </section>
+        </section>
+
+        <section class="mobile-menu-panel hidden" id="mobileMenuPanel" data-private aria-hidden="true">
+          <div class="panel-heading">
+            <h2>Menu</h2>
+          </div>
+          <div class="mobile-menu-actions">
+            <button class="ghost-button" type="button" data-menu-action="export-gpt">Export for ChatGPT</button>
+            <button class="ghost-button" type="button" data-menu-action="import-gpt">Import from ChatGPT</button>
+            <button class="ghost-button" type="button" data-menu-action="ai-review">Prepare AI Review</button>
+            <button class="ghost-button" type="button" data-menu-action="csv">Export CSV</button>
+          </div>
         </section>
 
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.43</span>
+          <span class="version-chip" id="appVersion">v0.44</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
         <nav class="mobile-action-bar hidden" id="mobileActionBar" data-private aria-label="Mobile actions" aria-hidden="true">
-          <button type="button" data-mobile-action="current">Current</button>
-          <button type="button" data-mobile-action="due">Due</button>
+          <button type="button" data-mobile-action="home">Home</button>
           <button class="primary" type="button" data-mobile-action="add">Add</button>
-          <button type="button" data-mobile-action="review">Review</button>
+          <button type="button" data-mobile-action="trends">Trends</button>
+          <button type="button" data-mobile-action="results">Results</button>
+          <button type="button" data-mobile-action="menu">Menu</button>
         </nav>
       </section>
     </main>
@@ -370,9 +387,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.43"></script>
+    <script src="supabase-config.js?v=0.44"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.43"></script>
-    <script src="privacy-guard.js?v=0.43"></script>
+    <script src="app.js?v=0.44"></script>
+    <script src="privacy-guard.js?v=0.44"></script>
   </body>
 </html>

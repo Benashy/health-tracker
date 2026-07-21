@@ -599,6 +599,16 @@ legend {
   margin-bottom: 16px;
 }
 
+.mobile-menu-panel {
+  display: none;
+}
+
+.mobile-menu-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .schedule-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr));
@@ -633,6 +643,10 @@ legend {
 
 .results-panel {
   overflow: hidden;
+}
+
+.trend-view-panel + .results-view-panel {
+  margin-top: 20px;
 }
 
 .panel-heading {
@@ -1553,17 +1567,7 @@ button.status-pill:focus-visible {
   }
 
   .topbar-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-  }
-
-  .topbar-actions .ghost-button {
-    min-height: 40px;
-    padding: 0 8px;
-    font-size: 0.78rem;
-    white-space: normal;
+    display: none;
   }
 
   .auth-panel,
@@ -1571,9 +1575,51 @@ button.status-pill:focus-visible {
   .profile-panel,
   .schedule-section,
   .snapshot-section,
+  .mobile-menu-panel,
   .entry-panel,
   .results-panel {
     padding: 14px;
+  }
+
+  .mobile-view-hidden {
+    display: none !important;
+  }
+
+  .content-grid.mobile-single-view {
+    display: block;
+  }
+
+  .content-grid.mobile-single-view .entry-panel,
+  .content-grid.mobile-single-view .results-panel {
+    margin-bottom: 0;
+  }
+
+  .results-panel.mobile-tab-surface {
+    display: block;
+  }
+
+  .trend-view-panel + .results-view-panel {
+    margin-top: 0;
+  }
+
+  .mobile-menu-panel {
+    display: block;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: var(--shadow);
+  }
+
+  .mobile-menu-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mobile-menu-actions .ghost-button {
+    justify-content: center;
+    width: 100%;
+    min-height: 46px;
   }
 
   .panel-heading {
@@ -1861,7 +1907,7 @@ button.status-pill:focus-visible {
     left: 10px;
     z-index: 15;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     border: 1px solid rgba(220, 226, 221, 0.92);
     border-radius: 8px;
@@ -1883,8 +1929,8 @@ button.status-pill:focus-visible {
     border-radius: 8px;
     background: transparent;
     color: var(--muted);
-    padding: 0 6px;
-    font-size: 0.76rem;
+    padding: 0 4px;
+    font-size: 0.7rem;
     font-weight: 850;
   }
 
@@ -1895,12 +1941,31 @@ button.status-pill:focus-visible {
   }
 
   .mobile-action-bar button.primary {
+    border-color: rgba(35, 111, 98, 0.28);
+    background: var(--surface-soft);
+    color: var(--accent-dark);
+  }
+
+  .mobile-action-bar button.primary.active {
     background: var(--accent);
     color: #ffffff;
   }
 
-  .mobile-action-bar.has-due button[data-mobile-action="due"]:not(.active) {
+  .mobile-action-bar.has-due button[data-mobile-action="home"]:not(.active) {
     color: var(--amber);
+  }
+
+  .mobile-tab-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 17px;
+    min-height: 17px;
+    margin-left: 4px;
+    border-radius: 999px;
+    background: var(--amber-bg);
+    color: var(--amber);
+    font-size: 0.66rem;
+    line-height: 1;
   }
 
   .modal {
@@ -1936,10 +2001,24 @@ button.status-pill:focus-visible {
   }
 
   .mobile-action-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+  }
+
+  .mobile-action-bar button {
+    font-size: 0.64rem;
+    min-height: 42px;
+    padding: 0 2px;
+  }
+
+  .mobile-tab-badge {
+    min-width: 15px;
+    min-height: 15px;
+    margin-left: 2px;
   }
 
   .entry-submit-button {
-    bottom: calc(122px + env(safe-area-inset-bottom));
+    bottom: calc(78px + env(safe-area-inset-bottom));
   }
 }
