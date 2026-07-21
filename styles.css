@@ -541,7 +541,8 @@ legend {
 .profile-card span,
 .schedule-card strong,
 .schedule-card span,
-.schedule-card em {
+.schedule-card em,
+.schedule-card small {
   display: block;
 }
 
@@ -552,9 +553,15 @@ legend {
 
 .profile-card span,
 .schedule-card span,
-.schedule-card em {
+.schedule-card em,
+.schedule-card small {
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.schedule-card small {
+  margin-top: 8px;
+  line-height: 1.35;
 }
 
 .schedule-card {
@@ -1144,6 +1151,14 @@ button.status-pill:focus-visible {
   color: var(--ink);
 }
 
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .empty-state.hidden,
 .results-table-wrap.hidden,
 .hidden {
@@ -1160,6 +1175,10 @@ button.status-pill:focus-visible {
   padding-top: 14px;
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.mobile-action-bar {
+  display: none;
 }
 
 .sync-status {
@@ -1410,12 +1429,18 @@ button.status-pill:focus-visible {
 
 @media (max-width: 700px) {
   .app-shell {
-    padding: 12px;
+    padding: 12px 12px calc(92px + env(safe-area-inset-bottom));
   }
 
   .topbar {
     gap: 14px;
     margin-bottom: 16px;
+  }
+
+  @supports (-webkit-touch-callout: none) {
+    .topbar {
+      padding-top: env(safe-area-inset-top);
+    }
   }
 
   h1 {
@@ -1520,6 +1545,16 @@ button.status-pill:focus-visible {
     padding: 12px;
   }
 
+  .schedule-card {
+    display: grid;
+    gap: 3px;
+  }
+
+  .schedule-card .snooze-button {
+    width: 100%;
+    margin-top: 8px;
+  }
+
   .quick-metrics {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1549,6 +1584,14 @@ button.status-pill:focus-visible {
   .filter-button,
   .primary-button {
     min-height: 44px;
+  }
+
+  .entry-submit-button {
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 5;
+    margin-top: 4px;
+    box-shadow: 0 12px 30px rgba(23, 76, 68, 0.22);
   }
 
   .mini-button {
@@ -1665,6 +1708,21 @@ button.status-pill:focus-visible {
     width: 100%;
   }
 
+  .empty-state {
+    min-height: 180px;
+    padding: 18px;
+  }
+
+  .empty-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .empty-actions .mini-button {
+    min-height: 40px;
+  }
+
   .sparkline {
     min-height: 190px;
   }
@@ -1682,6 +1740,71 @@ button.status-pill:focus-visible {
   .sync-status {
     min-width: 0;
   }
+
+  .mobile-action-bar {
+    position: fixed;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 15;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    border: 1px solid rgba(220, 226, 221, 0.92);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 18px 42px rgba(29, 37, 34, 0.22);
+    padding: 7px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .mobile-action-bar.hidden {
+    display: none;
+  }
+
+  .mobile-action-bar button {
+    min-width: 0;
+    min-height: 44px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    padding: 0 6px;
+    font-size: 0.76rem;
+    font-weight: 850;
+  }
+
+  .mobile-action-bar button.active {
+    border-color: rgba(35, 111, 98, 0.32);
+    background: var(--surface-soft);
+    color: var(--accent-dark);
+  }
+
+  .mobile-action-bar button.primary {
+    background: var(--accent);
+    color: #ffffff;
+  }
+
+  .mobile-action-bar.has-due button[data-mobile-action="due"]:not(.active) {
+    color: var(--amber);
+  }
+
+  .modal {
+    align-items: end;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .modal-panel {
+    width: 100%;
+    max-height: min(86dvh, 760px);
+    border-radius: 8px 8px 0 0;
+    padding: 14px;
+  }
+
+  .import-table {
+    min-width: 0;
+  }
 }
 
 @media (max-width: 340px) {
@@ -1697,5 +1820,13 @@ button.status-pill:focus-visible {
 
   .account-sync-footer {
     grid-template-columns: 1fr;
+  }
+
+  .mobile-action-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .entry-submit-button {
+    bottom: calc(122px + env(safe-area-inset-bottom));
   }
 }

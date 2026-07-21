@@ -10,9 +10,19 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.37`.
+- The app is now on `v0.38`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.38
+
+- Added a near-PWA/mobile-native pass for iPhone.
+- Added a mobile-only bottom action bar for Current, Due, Add, and AI Review.
+- Added a sticky mobile Add to tracker affordance inside measurement entry.
+- Improved mobile empty states with clear next-action buttons.
+- Improved due cards with clearer tap-to-enter and snooze-alignment language.
+- Added iPhone safe-area spacing and bottom-sheet-style mobile modals.
+- Refreshed manifest icon cache tags and PWA start URL cache-busting.
 
 ## Completed In v0.37
 
@@ -48,9 +58,9 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Current Outstanding Work
 
-9. Continue mobile and tablet UI refinement.
-   - Make iPhone and iPad layouts first-class.
-   - Reduce table heaviness on small screens.
+9. Continue tablet and post-use mobile refinement.
+   - Test on Ben's real iPhone/iPad after a few data-entry sessions.
+   - Refine any Safari/PWA keyboard, scrolling, or installed-app quirks found in real use.
    - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
 
 10. Add health events and notes.

@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.37";
+const APP_VERSION = "v0.38";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -293,6 +293,7 @@ const entryAssist = document.querySelector("#entryAssist");
 const resultsBody = document.querySelector("#resultsBody");
 const emptyState = document.querySelector("#emptyState");
 const tableWrap = document.querySelector(".results-table-wrap");
+const resultsPanel = document.querySelector(".results-panel");
 const totalResults = document.querySelector("#totalResults");
 const flaggedResults = document.querySelector("#flaggedResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
@@ -314,6 +315,7 @@ const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
 const schedulePanel = document.querySelector("#schedulePanel");
 const statusStrip = document.querySelector(".status-strip");
+const mobileActionBar = document.querySelector("#mobileActionBar");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const exportChatGptButton = document.querySelector("#exportChatGptButton");
 const exportReviewPackButton = document.querySelector("#exportReviewPackButton");
@@ -1511,6 +1513,7 @@ function render() {
   renderSchedule();
   renderSummary();
   renderTrends();
+  renderMobileActions(dueCount);
 
   renderEmptyState(results.length, dueCount);
   renderSummarySelection();
@@ -1785,15 +1788,41 @@ function renderEmptyState(resultCount, dueCount) {
   if (resultCount > 0) return;
   if (state.filter === "due") {
     emptyState.innerHTML = dueCount
-      ? "<strong>No due results recorded yet</strong><span>Click a due item above to add its next measurement.</span>"
-      : "<strong>Nothing due</strong><span>No tests are currently due or overdue.</span>";
+      ? `
+          <strong>Due checks are waiting</strong>
+          <span>Use the due list to enter the next measurement or snooze it into the next grouped set.</span>
+          <div class="empty-actions">
+            <button class="mini-button" type="button" data-empty-action="due">Show due list</button>
+            <button class="mini-button" type="button" data-empty-action="add">Add manually</button>
+          </div>
+        `
+      : `
+          <strong>Nothing due</strong>
+          <span>No tests are currently due or overdue.</span>
+          <div class="empty-actions">
+            <button class="mini-button" type="button" data-empty-action="current">View current results</button>
+          </div>
+        `;
     return;
   }
   if (state.filter === "flagged") {
-    emptyState.innerHTML = "<strong>No range warnings</strong><span>Current measurements have no active range or target warnings.</span>";
+    emptyState.innerHTML = `
+      <strong>No range warnings</strong>
+      <span>Current measurements have no active range or target warnings.</span>
+      <div class="empty-actions">
+        <button class="mini-button" type="button" data-empty-action="current">View current results</button>
+      </div>
+    `;
     return;
   }
-  emptyState.innerHTML = "<strong>No results yet</strong><span>Add your first measurement to start tracking long-term trends.</span>";
+  emptyState.innerHTML = `
+    <strong>No results yet</strong>
+    <span>Start with a regular metric, or import reviewed data from ChatGPT.</span>
+    <div class="empty-actions">
+      <button class="mini-button" type="button" data-empty-action="add">Add measurement</button>
+      <button class="mini-button" type="button" data-empty-action="import">Import file</button>
+    </div>
+  `;
 }
 
 function renderOnboarding(scopedResults, flaggedCount, dueCount) {
@@ -2081,12 +2110,37 @@ function renderSchedule() {
           <article class="schedule-card ${item.due.state}" role="button" tabindex="0" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">
             <strong>${escapeHtml(item.metric.name)}</strong>
             <span>${escapeHtml(item.profile.name)} · ${escapeHtml(getScheduleGroup(item.metric).label)} · ${escapeHtml(item.metric.cadence)}</span>
-            <em>${escapeHtml(item.due.label)}</em>
+            <em>${escapeHtml(item.due.label)} · tap to enter</em>
+            <small>Snooze aligns this with the next grouped check.</small>
             <button class="mini-button snooze-button" type="button" data-snooze-profile="${escapeHtml(item.profile.id)}" data-snooze-metric="${escapeHtml(item.metric.name)}">Snooze</button>
           </article>
         `)
         .join("")
-    : `<article class="schedule-card ok"><strong>Nothing due</strong><span>Priority metrics are up to date.</span><em>Nice and calm.</em></article>`;
+    : renderCalmScheduleCard();
+}
+
+function renderCalmScheduleCard() {
+  const nextDueSummary = getNextDueSummary();
+  const nextText = nextDueSummary.state === "future" ? `Next check: ${nextDueSummary.label}` : "No priority checks are waiting.";
+  return `
+    <article class="schedule-card ok calm-card">
+      <strong>Nothing due</strong>
+      <span>Priority metrics are up to date.</span>
+      <em>${escapeHtml(nextText)}</em>
+    </article>
+  `;
+}
+
+function renderMobileActions(dueCount) {
+  if (!mobileActionBar) return;
+  const dueLabel = dueCount ? `Due ${dueCount}` : "Due";
+  mobileActionBar.classList.toggle("has-due", dueCount > 0);
+  mobileActionBar.innerHTML = `
+    <button class="${state.filter === "latest" ? "active" : ""}" type="button" data-mobile-action="current">Current</button>
+    <button class="${state.filter === "due" ? "active" : ""}" type="button" data-mobile-action="due">${escapeHtml(dueLabel)}</button>
+    <button class="primary" type="button" data-mobile-action="add">Add</button>
+    <button type="button" data-mobile-action="review">Review</button>
+  `;
 }
 
 function renderSummary() {
@@ -2150,8 +2204,44 @@ function focusMetricEntry(profileId, metricName) {
   syncRangeDefaults();
   syncSourceDefaults();
   renderQuickMetrics();
+  focusEntryPanel();
+}
+
+function focusEntryPanel() {
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   valueInput.focus();
+}
+
+function focusDuePanel() {
+  setFilter("due");
+  schedulePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function focusCurrentResults() {
+  setFilter("latest");
+  resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function handleActionShortcut(action) {
+  if (action === "add") {
+    focusEntryPanel();
+    return;
+  }
+  if (action === "due") {
+    focusDuePanel();
+    return;
+  }
+  if (action === "current") {
+    focusCurrentResults();
+    return;
+  }
+  if (action === "import") {
+    importChatGptInput.click();
+    return;
+  }
+  if (action === "review") {
+    exportReviewPackButton.click();
+  }
 }
 
 function explainWarning(resultId) {
@@ -2907,7 +2997,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.37").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.38").catch(() => {});
   });
 }
 
@@ -2974,8 +3064,7 @@ quickMetricPanel.addEventListener("click", (event) => {
 });
 sourceTypeInput.addEventListener("change", syncSourceConfidence);
 focusEntryButton.addEventListener("click", () => {
-  form.scrollIntoView({ behavior: "smooth", block: "start" });
-  valueInput.focus();
+  focusEntryPanel();
 });
 focusImportButton.addEventListener("click", () => importChatGptInput.click());
 trendMetricInput.addEventListener("change", () => {
@@ -3059,6 +3148,18 @@ statusStrip.addEventListener("keydown", (event) => {
   if (!card) return;
   event.preventDefault();
   setFilter(card.dataset.summaryFilter, card.dataset.summaryKey ?? card.dataset.summaryFilter);
+});
+
+mobileActionBar.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mobile-action]");
+  if (!button) return;
+  handleActionShortcut(button.dataset.mobileAction);
+});
+
+emptyState.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-empty-action]");
+  if (!button) return;
+  handleActionShortcut(button.dataset.emptyAction);
 });
 
 snapshotSection.addEventListener("click", (event) => {
