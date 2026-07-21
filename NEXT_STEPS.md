@@ -10,9 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.36`.
+- The app is now on `v0.37`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.37
+
+- Added proper iPhone optimisation without changing the desktop table layout.
+- Results now render as labelled cards on iPhone-sized screens instead of relying on horizontal table scrolling.
+- Tightened mobile snapshot, overview, quick metric, filter, footer, and chart spacing.
+- Kept standard iPhones on useful two-column snapshot/overview grids, with a one-column fallback only for very small screens.
 
 ## Completed In v0.36
 

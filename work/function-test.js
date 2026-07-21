@@ -245,9 +245,10 @@ assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "i
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
+const styles = fs.readFileSync("styles.css", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
-assert(indexHtml.includes("app.js?v=0.36"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.36"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.37"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.37"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -261,8 +262,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.36"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.36"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.37"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.37"), "privacy guard should be cached with the app shell");
 assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(indexHtml.includes('<label class="hidden" id="lowField">'), "default weight form should hide lower limit before JavaScript runs");
@@ -283,15 +284,19 @@ assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata sho
 assert(manifest.display === "standalone", "manifest should enable standalone display");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(indexHtml.includes("app-icon-180.png?v=0.36"), "iOS touch icon should use PNG");
-assert(serviceWorker.includes("health-dashboard-v0.36"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.36"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.36"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("app-icon-512.png?v=0.36"), "service worker should cache PNG app icons");
+assert(indexHtml.includes("app-icon-180.png?v=0.37"), "iOS touch icon should use PNG");
+assert(serviceWorker.includes("health-dashboard-v0.37"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.37"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.37"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("app-icon-512.png?v=0.37"), "service worker should cache PNG app icons");
+assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
+assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
+assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
+assert(styles.includes("@media (max-width: 340px)"), "very small screens should keep a tighter fallback breakpoint");
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.36", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.37", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -525,6 +530,9 @@ assert(weightRows[1].status_vs_range === "Above target", "weight above updated t
 assert(document.elements.resultsBody.innerHTML.includes("Delete"), "results should expose a delete action");
 assert(document.elements.resultsBody.innerHTML.includes("result-group-row"), "results should include grouped section rows");
 assert(document.elements.resultsBody.innerHTML.includes("data-context-metric"), "result rows should expose metric context buttons");
+assert(document.elements.resultsBody.innerHTML.includes('data-label="Metric"'), "result rows should include mobile card labels");
+assert(document.elements.resultsBody.innerHTML.includes('data-label="Range / target"'), "range cells should include mobile card labels");
+assert(document.elements.resultsBody.innerHTML.includes('data-label="Action"'), "action cells should include mobile card labels");
 
 const imported = context.importChatGptPayload({
   import_type: "health_dashboard_measurements",

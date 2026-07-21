@@ -47,6 +47,10 @@ button {
   cursor: pointer;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 .app-shell {
   width: 100%;
   min-height: 100vh;
@@ -1401,5 +1405,297 @@ button.status-pill:focus-visible {
 
   .modal-actions {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    padding: 12px;
+  }
+
+  .topbar {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .topbar-actions .ghost-button {
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+    white-space: normal;
+  }
+
+  .auth-panel,
+  .onboarding-panel,
+  .profile-panel,
+  .schedule-section,
+  .snapshot-section,
+  .entry-panel,
+  .results-panel {
+    padding: 14px;
+  }
+
+  .panel-heading {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .status-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .status-strip article {
+    min-height: 74px;
+    padding: 12px;
+  }
+
+  .metric {
+    font-size: 1.45rem;
+  }
+
+  .label,
+  .privacy-note {
+    font-size: 0.78rem;
+  }
+
+  .snapshot-grid,
+  .marker-summary,
+  .trend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .snapshot-card {
+    min-height: 112px;
+    padding: 10px;
+  }
+
+  .snapshot-card strong {
+    font-size: 1.08rem;
+    overflow-wrap: anywhere;
+  }
+
+  .snapshot-card span {
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .snapshot-card em {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  .snapshot-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshot-editor-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .snapshot-editor-actions .mini-button,
+  .snapshot-editor-actions .primary-button {
+    width: 100%;
+    min-height: 38px;
+  }
+
+  .profile-card,
+  .schedule-card,
+  .trend-card,
+  .summary-card {
+    padding: 12px;
+  }
+
+  .quick-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-metric-button {
+    min-height: 38px;
+    border-radius: 8px;
+    padding: 0 8px;
+    white-space: normal;
+  }
+
+  .compact-select {
+    display: grid;
+    gap: 7px;
+    align-items: stretch;
+  }
+
+  .compact-select select {
+    min-width: 0;
+  }
+
+  input,
+  select,
+  textarea,
+  .ghost-button,
+  .filter-button,
+  .primary-button {
+    min-height: 44px;
+  }
+
+  .mini-button {
+    min-height: 36px;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .results-table-wrap {
+    overflow: visible;
+  }
+
+  .results-table {
+    display: block;
+    min-width: 0;
+    table-layout: auto;
+  }
+
+  .results-table thead {
+    display: none;
+  }
+
+  .results-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .results-table tr {
+    display: block;
+  }
+
+  .results-table tr:not(.result-group-row) {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 10px 26px rgba(40, 52, 48, 0.08);
+    padding: 8px 10px;
+  }
+
+  .results-table td {
+    display: grid;
+    grid-template-columns: minmax(92px, 36%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    width: auto !important;
+    border-bottom: 1px solid var(--line);
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 8px 0;
+    position: static !important;
+    text-align: left !important;
+  }
+
+  .results-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .results-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 850;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .results-table td[data-label="Metric"],
+  .results-table td[data-label="Action"] {
+    grid-template-columns: 1fr;
+  }
+
+  .results-table td[data-label="Metric"]::before {
+    margin-bottom: -2px;
+  }
+
+  .results-table td[data-label="Action"]::before {
+    display: none;
+  }
+
+  .result-group-row th {
+    display: block;
+    width: 100% !important;
+    border: 0;
+    border-radius: 8px;
+    background: #eef6f0;
+    padding: 7px 10px;
+    position: static;
+  }
+
+  .metric-cell {
+    align-items: center;
+  }
+
+  .value-cell strong {
+    display: inline;
+    font-size: 1.08rem;
+  }
+
+  .value-cell span {
+    display: inline;
+    margin-left: 4px;
+  }
+
+  .status-pill,
+  .due-pill {
+    width: fit-content;
+  }
+
+  .delete-button {
+    width: 100%;
+  }
+
+  .sparkline {
+    min-height: 190px;
+  }
+
+  .sparkline text {
+    font-size: 10px;
+  }
+
+  .account-sync-footer {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+  }
+
+  .sync-status {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 340px) {
+  .snapshot-grid,
+  .status-strip,
+  .marker-summary,
+  .trend-grid,
+  .quick-metrics,
+  .topbar-actions,
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .account-sync-footer {
+    grid-template-columns: 1fr;
   }
 }

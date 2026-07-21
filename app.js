@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.36";
+const APP_VERSION = "v0.37";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -1709,23 +1709,23 @@ function renderResultRows(results) {
       return `
         ${heading}
         <tr>
-          <td>${escapeHtml(result.person_name)}</td>
-          <td>${formatDate(result.sample_date)}</td>
-          <td>
+          <td data-label="Person">${escapeHtml(result.person_name)}</td>
+          <td data-label="Date">${formatDate(result.sample_date)}</td>
+          <td data-label="Metric">
             <div class="metric-cell">
               <strong>${escapeHtml(result.metric)}</strong>
               <button class="info-button" type="button" data-context-metric="${escapeHtml(result.metric)}" aria-label="Show context for ${escapeHtml(result.metric)}">Info</button>
             </div>
           </td>
-          <td class="value-cell"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
-          <td>${range}</td>
-          <td>${status}</td>
-          <td><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></td>
-          <td>${formatValue(result.previous_result, result.unit)}</td>
-          <td>${formatChange(result.absolute_change_since_previous_test, result)}</td>
-          <td>${formatPercent(result.percentage_change_since_previous_test, result)}</td>
-          <td>${escapeHtml(result.trend_direction)}</td>
-          <td><button class="delete-button" type="button" data-id="${result.id}" aria-label="Delete result">Delete</button></td>
+          <td class="value-cell" data-label="Value"><strong>${escapeHtml(result.result_value)}</strong><span>${escapeHtml(result.unit)}</span></td>
+          <td data-label="Range / target">${range}</td>
+          <td data-label="Status">${status}</td>
+          <td data-label="Due"><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></td>
+          <td data-label="Previous">${formatValue(result.previous_result, result.unit)}</td>
+          <td data-label="Abs change">${formatChange(result.absolute_change_since_previous_test, result)}</td>
+          <td data-label="% change">${formatPercent(result.percentage_change_since_previous_test, result)}</td>
+          <td data-label="Trend">${escapeHtml(result.trend_direction)}</td>
+          <td data-label="Action"><button class="delete-button" type="button" data-id="${result.id}" aria-label="Delete result">Delete</button></td>
         </tr>
       `;
     })
@@ -2907,7 +2907,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.36").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.37").catch(() => {});
   });
 }
 
