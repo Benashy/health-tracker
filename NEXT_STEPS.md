@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-20
+Last updated: 2026-07-21
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -58,6 +58,9 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 12. Add reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
+   - Add a Ben-only annual pilot medical reminder as a due-date-only item, with no pass/fail tracking required.
+   - Add a two-yearly eye test reminder available to every user.
+   - For Ben, allow the eye test due date to be aligned roughly one month before the annual pilot medical once the pilot medical due date is known.
 
 13. Add backup scheduling.
    - Use the backup process below.
