@@ -74,32 +74,44 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Current Outstanding Work
 
-9. Continue tablet and post-use mobile refinement.
+1. Add Telegram due reminders.
+   - Treat this as the next highest-priority feature.
+   - Use a Telegram bot created through BotFather.
+   - Do not put the Telegram bot token in GitHub Pages, browser JavaScript, or any public file.
+   - Store the bot token securely in Supabase secrets/Vault.
+   - Add per-user Telegram `chat_id` settings so Ben and Angelika can receive separate private reminders.
+   - Use Supabase Cron to call a Supabase Edge Function on a daily schedule.
+   - The Edge Function should inspect each user's due/overdue metrics and send a low-detail privacy-safe Telegram message.
+   - Avoid sending health values, DOB, or sensitive clinical detail in Telegram by default.
+   - Add duplicate prevention with `last_notified` or equivalent, so the same due item does not nag repeatedly.
+   - Include a test-send mode before enabling the daily scheduled reminder.
+
+2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.
    - Refine any Safari/PWA keyboard, scrolling, or installed-app quirks found in real use.
    - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
 
-10. Add health events and notes.
+3. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
-11. Add document upload/storage.
+4. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-12. Add reminders and review scheduling.
+5. Add in-app reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
    - Add a Ben-only annual pilot medical reminder as a due-date-only item, with no pass/fail tracking required.
    - Add a two-yearly eye test reminder available to every user.
    - For Ben, allow the eye test due date to be aligned roughly one month before the annual pilot medical once the pilot medical due date is known.
 
-13. Add backup scheduling.
+6. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-14. Consider structured database tables later.
+7. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
 
