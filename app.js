@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.61";
+const APP_VERSION = "v0.62";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -33,6 +33,7 @@ const REMINDER_MILESTONES_SIX_MONTHLY = [30, 14, 7, 0];
 const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
 const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
+const IMPORT_REVIEW_PAGE_SIZE = 10;
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -357,6 +358,7 @@ const state = {
   entryUnlockTimer: null,
   saveFeedbackTimer: null,
   pendingImport: null,
+  pendingImportPage: 1,
 };
 
 const telegramSetupState = {
@@ -4064,9 +4066,24 @@ function commitPreparedImport(prepared) {
 function renderImportReview(review) {
   if (!assertCanEdit()) return;
   state.pendingImport = review;
+  state.pendingImportPage = 1;
   confirmImportButton.disabled = !review.measurements.length && !review.ranges.length;
+  renderImportReviewContent();
+  importReviewModal.classList.remove("hidden");
+  importReviewModal.setAttribute("aria-hidden", "false");
+}
+
+function renderImportReviewContent() {
+  const review = state.pendingImport;
+  if (!review) return;
+  const totalMeasurements = review.measurements.length;
+  const pageCount = Math.max(1, Math.ceil(totalMeasurements / IMPORT_REVIEW_PAGE_SIZE));
+  state.pendingImportPage = Math.min(Math.max(state.pendingImportPage || 1, 1), pageCount);
+  const page = state.pendingImportPage;
+  const startIndex = (page - 1) * IMPORT_REVIEW_PAGE_SIZE;
+  const endIndex = Math.min(startIndex + IMPORT_REVIEW_PAGE_SIZE, totalMeasurements);
   const measurementRows = review.measurements
-    .slice(0, 12)
+    .slice(startIndex, endIndex)
     .map(
       (result) => `
         <tr>
@@ -4085,6 +4102,17 @@ function renderImportReview(review) {
     .map((item) => `<li><strong>${escapeHtml(item.reason)}</strong><span>${escapeHtml(formatSkippedImportItem(item.item))}</span></li>`)
     .join("");
   const skippedBreakdown = countSkippedReasons(review.skipped);
+  const pagination =
+    totalMeasurements > IMPORT_REVIEW_PAGE_SIZE
+      ? `<div class="import-pagination" role="navigation" aria-label="Import measurement pages">
+          <span>Showing ${startIndex + 1}-${endIndex} of ${totalMeasurements}</span>
+          <div class="import-pagination-actions">
+            <button class="mini-button" type="button" data-import-page="prev" ${page === 1 ? "disabled" : ""}>Previous</button>
+            <span>Page ${page} of ${pageCount}</span>
+            <button class="mini-button" type="button" data-import-page="next" ${page === pageCount ? "disabled" : ""}>Next</button>
+          </div>
+        </div>`
+      : "";
 
   importReviewContent.innerHTML = `
     <div class="import-summary">
@@ -4099,16 +4127,29 @@ function renderImportReview(review) {
             .join("")}</div>`
         : ""
     }
+    ${pagination}
     ${
       review.measurements.length
         ? `<div class="import-table-wrap"><table class="import-table"><thead><tr><th>Person</th><th>Metric</th><th>Value</th><th>Date</th><th>Range</th><th>Source</th></tr></thead><tbody>${measurementRows}</tbody></table></div>`
         : `<p>No measurements are ready to import.</p>`
     }
-    ${review.measurements.length > 12 ? `<p class="privacy-note">Showing first 12 measurements only.</p>` : ""}
     ${review.skipped.length ? `<div class="import-skipped"><strong>Skipped items</strong><ul>${skippedRows}</ul></div>` : ""}
   `;
-  importReviewModal.classList.remove("hidden");
-  importReviewModal.setAttribute("aria-hidden", "false");
+}
+
+function setImportReviewPage(page) {
+  if (!state.pendingImport) return;
+  const totalPages = Math.max(1, Math.ceil(state.pendingImport.measurements.length / IMPORT_REVIEW_PAGE_SIZE));
+  state.pendingImportPage = Math.min(Math.max(page, 1), totalPages);
+  renderImportReviewContent();
+}
+
+function handleImportReviewNavigation(event) {
+  const button = event.target.closest("[data-import-page]");
+  if (!button || button.disabled) return;
+  const direction = button.dataset.importPage;
+  const nextPage = direction === "next" ? state.pendingImportPage + 1 : state.pendingImportPage - 1;
+  setImportReviewPage(nextPage);
 }
 
 function countSkippedReasons(skippedItems) {
@@ -4129,6 +4170,7 @@ function formatSkippedImportItem(item) {
 
 function closeImportReview() {
   state.pendingImport = null;
+  state.pendingImportPage = 1;
   importReviewContent.innerHTML = "";
   confirmImportButton.disabled = false;
   importReviewModal.classList.add("hidden");
@@ -4218,7 +4260,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.61").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.62").catch(() => {});
   });
 }
 
@@ -4342,6 +4384,7 @@ window.addEventListener("resize", renderMobileLayout);
 importReviewModal.addEventListener("click", (event) => {
   if (event.target === importReviewModal) closeImportReview();
 });
+importReviewContent.addEventListener("click", handleImportReviewNavigation);
 metricContextModal.addEventListener("click", (event) => {
   if (event.target === metricContextModal) closeMetricContext();
 });
