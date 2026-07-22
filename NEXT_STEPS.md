@@ -10,9 +10,19 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.49`.
+- The app is now on `v0.50`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.50
+
+- Added Telegram inline snooze buttons to due-reminder messages.
+- Added `Snooze all 3d` and `Snooze all 7d` Telegram actions.
+- Added group-specific next-cycle snooze buttons, with visible cycle labels such as 14d, 30d, 3m, 6m, and 12m.
+- Switched Telegram pairing from `getUpdates` polling to webhook-captured pairing codes, so the bot can support inline button callbacks.
+- Added a private `health_dashboard_telegram_pairing_codes` table for temporary Telegram pairing codes.
+- Added a Vault-backed Telegram webhook secret and restricted webhook-secret helper functions.
+- Added a protected webhook configuration/status action for the Telegram Edge Function.
 
 ## Completed In v0.49
 
@@ -140,9 +150,9 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Use one Telegram bot/chat per project going forward, but keep the underlying reminder architecture reusable so other personal apps can adopt the same pattern quickly.
    - Do not put the Telegram bot token in GitHub Pages, browser JavaScript, or any public file.
    - Monitor the first few 09:00 scheduled reminders to confirm the message timing and grouping feel calm.
-   - Add Telegram inline snooze actions such as 3 days, 7 days, and until the next reporting cycle, with the cycle length shown in the button label.
-   - Consider whether inline snooze should be implemented with Telegram webhooks or a low-frequency callback polling job.
-   - Consider whether users should be able to choose reminder time and timezone later.
+   - Keep the reminder time fixed at 09:00 UK/Lisbon time for now.
+   - Later consider letting each user choose reminder time and timezone.
+   - Review whether the first snooze button wording feels right after Ben and Angelika use it in real reminders.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.

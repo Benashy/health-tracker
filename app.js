@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.49";
+const APP_VERSION = "v0.50";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -3776,7 +3776,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.49").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.50").catch(() => {});
   });
 }
 

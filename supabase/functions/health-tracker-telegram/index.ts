@@ -3,6 +3,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const REMINDER_TIME_ZONE = "Europe/Lisbon";
 const REMINDER_HOUR = 9;
 const CRON_SECRET_RPC = "health_tracker_cron_secret_matches";
+const WEBHOOK_SECRET_RPC = "health_tracker_telegram_webhook_secret";
+const WEBHOOK_SECRET_MATCH_RPC = "health_tracker_telegram_webhook_secret_matches";
 const APPROVED_EMAILS = new Set(["ben_ashurst@me.com", "angelika_kleczka@hotmail.com"]);
 const ALLOWED_ORIGINS = new Set([
   "https://benashy.github.io",
@@ -22,14 +24,22 @@ type TelegramChat = {
 };
 
 type TelegramMessage = {
+  message_id?: number;
   date?: number;
   text?: string;
   chat?: TelegramChat;
 };
 
+type TelegramCallbackQuery = {
+  id?: string;
+  message?: TelegramMessage;
+  data?: string;
+};
+
 type TelegramUpdate = {
   update_id?: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 };
 
 type DashboardUser = {
@@ -72,6 +82,9 @@ type ReminderStateRow = {
 };
 
 const DASHBOARD_URL = "https://benashy.github.io/health-tracker/";
+const TELEGRAM_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/health-tracker-telegram`;
+const PAIRING_CODE_TTL_MINUTES = 30;
+const SNOOZE_CALLBACK_PREFIX = "hts";
 const REMINDER_METRICS: DashboardMetric[] = [
   metric("Weight", "Core body metrics", 14, "highest"),
   metric("Waist circumference", "Core body metrics", 14, "highest"),
@@ -147,7 +160,7 @@ function corsHeaders(req: Request) {
     : "https://benashy.github.io";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-health-tracker-cron-secret",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-health-tracker-cron-secret, x-telegram-bot-api-secret-token",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
@@ -260,6 +273,41 @@ async function requireCronRequest(req: Request) {
   }
 }
 
+async function requireTelegramWebhookRequest(req: Request) {
+  const providedSecret = req.headers.get("x-telegram-bot-api-secret-token")?.trim() ?? "";
+  if (!providedSecret) {
+    throw new Response(JSON.stringify({ ok: false, error: "Missing Telegram webhook credential." }), {
+      status: 401,
+      headers: corsHeaders(req),
+    });
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${WEBHOOK_SECRET_MATCH_RPC}`, {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ provided_secret: providedSecret }),
+  });
+  const isValid = response.ok ? await response.json().catch(() => false) : false;
+  if (isValid !== true) {
+    throw new Response(JSON.stringify({ ok: false, error: "Invalid Telegram webhook credential." }), {
+      status: 403,
+      headers: corsHeaders(req),
+    });
+  }
+}
+
+async function getTelegramWebhookSecret() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${WEBHOOK_SECRET_RPC}`, {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: "{}",
+  });
+  if (!response.ok) throw new Error("Could not load Telegram webhook secret.");
+  const secret = String(await response.json()).trim();
+  if (!secret || secret === "null") throw new Error("Telegram webhook secret is not configured.");
+  return secret;
+}
+
 async function telegramApi(method: string, payload: Record<string, unknown> = {}) {
   if (!TELEGRAM_BOT_TOKEN) {
     return { ok: false, description: "Telegram token is not configured." };
@@ -293,17 +341,6 @@ function getChatLabel(chat: TelegramChat) {
   return "Telegram chat";
 }
 
-function getMatchingChat(updates: TelegramUpdate[], code: string) {
-  const thirtyMinutesAgo = Math.floor(Date.now() / 1000) - 30 * 60;
-  return updates
-    .map((update) => update.message)
-    .filter((message): message is TelegramMessage => Boolean(message?.chat))
-    .filter((message) => message.chat?.type === "private")
-    .filter((message) => Number(message.date ?? 0) >= thirtyMinutesAgo)
-    .filter((message) => normalisePairingCode(message.text).includes(code))
-    .sort((a, b) => Number(b.date ?? 0) - Number(a.date ?? 0))[0]?.chat ?? null;
-}
-
 async function handleProbe(req: Request) {
   const bot = await telegramApi("getMe");
   if (!bot.ok) return jsonResponse(req, { ok: false, error: bot.description ?? "Telegram bot check failed." }, 502);
@@ -322,13 +359,7 @@ async function handleResolveChat(req: Request, body: Record<string, unknown>) {
     return jsonResponse(req, { ok: false, error: "Use a fresh pairing code from the dashboard." }, 400);
   }
 
-  const updates = await telegramApi("getUpdates", {
-    limit: 50,
-    allowed_updates: ["message"],
-  });
-  if (!updates.ok) return jsonResponse(req, { ok: false, error: updates.description ?? "Could not read Telegram updates." }, 502);
-
-  const chat = getMatchingChat(updates.result ?? [], code);
+  const chat = await getStoredPairingChat(code);
   if (!chat) {
     return jsonResponse(req, {
       ok: true,
@@ -337,13 +368,14 @@ async function handleResolveChat(req: Request, body: Record<string, unknown>) {
     });
   }
 
+  await deletePairingCode(code);
   return jsonResponse(req, {
     ok: true,
     status: "linked",
     chat: {
-      id: String(chat.id),
-      label: getChatLabel(chat),
-      username: chat.username ? `@${chat.username}` : "",
+      id: chat.id,
+      label: chat.label,
+      username: chat.username,
     },
   });
 }
@@ -421,6 +453,82 @@ async function upsertReminderState(userId: string, reminderDate: string, signatu
   }
 }
 
+async function updateDashboardData(userId: string, data: Record<string, unknown>, updatedAt: string) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?user_id=eq.${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: {
+      ...getAdminHeaders(),
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      data,
+      updated_at: updatedAt,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Could not save Telegram snooze state.");
+  }
+}
+
+async function getDashboardRowForTelegramChat(chatId: string) {
+  const rows = await getAllDashboardRows();
+  return rows.find((row) => getTelegramSettings(row.data).chatId === chatId) ?? null;
+}
+
+function extractPairingCode(text: unknown) {
+  const match = normalisePairingCode(text).match(/HT-[A-Z0-9]{6}/);
+  return match?.[0] ?? "";
+}
+
+async function upsertPairingCode(code: string, chat: TelegramChat) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MINUTES * 60 * 1000).toISOString();
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_telegram_pairing_codes?on_conflict=code`, {
+    method: "POST",
+    headers: {
+      ...getAdminHeaders(),
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      code,
+      chat_id: String(chat.id),
+      chat_label: getChatLabel(chat),
+      chat_username: chat.username ? `@${chat.username}` : "",
+      received_at: now.toISOString(),
+      expires_at: expiresAt,
+      updated_at: now.toISOString(),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Could not save Telegram pairing code.");
+  }
+}
+
+async function getStoredPairingChat(code: string) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_telegram_pairing_codes?select=code,chat_id,chat_label,chat_username,expires_at&code=eq.${encodeURIComponent(code)}&limit=1`, {
+    headers: getAdminHeaders(),
+  });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row || new Date(String(row.expires_at)).getTime() < Date.now()) return null;
+  return {
+    id: String(row.chat_id ?? ""),
+    label: String(row.chat_label ?? "Telegram chat"),
+    username: String(row.chat_username ?? ""),
+  };
+}
+
+async function deletePairingCode(code: string) {
+  await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_telegram_pairing_codes?code=eq.${encodeURIComponent(code)}`, {
+    method: "DELETE",
+    headers: {
+      ...getAdminHeaders(),
+      Prefer: "return=minimal",
+    },
+  });
+}
+
 function getTelegramSettings(data: Record<string, unknown>) {
   const settings = data?.settings as Record<string, unknown> | undefined;
   const telegram = settings?.telegram as Record<string, unknown> | undefined;
@@ -471,6 +579,48 @@ function getScheduleGroup(selectedMetric: DashboardMetric) {
     key: selectedMetric.group.toLowerCase().replaceAll(" ", "-"),
     label: selectedMetric.group,
     cycleLabel: selectedMetric.cadence,
+  };
+}
+
+function getShortCycleLabel(cycleLabel: string) {
+  return cycleLabel
+    .replace("14-day cycle", "14d")
+    .replace("30-day cycle", "30d")
+    .replace("3-month cycle", "3m")
+    .replace("6-month cycle", "6m")
+    .replace("12-month cycle", "12m")
+    .replace("5-10 year cycle", "5-10y");
+}
+
+function getDueReminderGroups(dueItems: ReturnType<typeof getDueItems>) {
+  const groups = new Map<string, { key: string; label: string; cycleLabel: string; names: string[] }>();
+  dueItems.forEach((item) => {
+    const group = getScheduleGroup(item.metric);
+    const existing = groups.get(group.key) ?? { key: group.key, label: group.label, cycleLabel: group.cycleLabel, names: [] };
+    existing.names.push(item.metric.name);
+    groups.set(group.key, existing);
+  });
+  return [...groups.values()];
+}
+
+function buildSnoozeReplyMarkup(dueItems: ReturnType<typeof getDueItems>) {
+  if (!dueItems.length) return undefined;
+  const groupRows = getDueReminderGroups(dueItems)
+    .filter((group) => dueItems.some((item) => getScheduleGroup(item.metric).key === group.key && Boolean(item.metric.intervalDays)))
+    .map((group) => ([
+      {
+        text: `${group.label}: next ${getShortCycleLabel(group.cycleLabel)}`,
+        callback_data: `${SNOOZE_CALLBACK_PREFIX}:g:${group.key}`,
+      },
+    ]));
+  return {
+    inline_keyboard: [
+      [
+        { text: "Snooze all 3d", callback_data: `${SNOOZE_CALLBACK_PREFIX}:all:3` },
+        { text: "Snooze all 7d", callback_data: `${SNOOZE_CALLBACK_PREFIX}:all:7` },
+      ],
+      ...groupRows,
+    ],
   };
 }
 
@@ -599,18 +749,12 @@ function buildDueMessage(data: Record<string, unknown>) {
         "",
         "No priority checks are due right now.",
       ].join("\n"),
+      replyMarkup: undefined,
     };
   }
 
-  const groups = new Map<string, { label: string; cycleLabel: string; names: string[] }>();
-  dueItems.forEach((item) => {
-    const group = getScheduleGroup(item.metric);
-    const existing = groups.get(group.key) ?? { label: group.label, cycleLabel: group.cycleLabel, names: [] };
-    existing.names.push(item.metric.name);
-    groups.set(group.key, existing);
-  });
-
-  const lines = [...groups.values()].map((group) => `- ${group.label} (${group.cycleLabel}): ${summariseMetricNames(group.names)}`);
+  const groups = getDueReminderGroups(dueItems);
+  const lines = groups.map((group) => `- ${group.label} (${group.cycleLabel}): ${summariseMetricNames(group.names)}`);
   const message = [
     "Health Tracker reminder",
     "",
@@ -620,7 +764,7 @@ function buildDueMessage(data: Record<string, unknown>) {
     "",
     `Open dashboard: ${DASHBOARD_URL}`,
   ].join("\n");
-  return { dueCount: dueItems.length, message };
+  return { dueCount: dueItems.length, message, replyMarkup: buildSnoozeReplyMarkup(dueItems) };
 }
 
 function getReminderLocalTime(now = new Date()) {
@@ -652,6 +796,77 @@ function getDueSignature(data: Record<string, unknown>) {
     .join("|");
 }
 
+function getDatePlusDays(dateString: string, days: number) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDate(date);
+}
+
+function parseSnoozeCallbackData(data: string) {
+  const parts = data.split(":");
+  if (parts[0] !== SNOOZE_CALLBACK_PREFIX) return null;
+  if (parts[1] === "all" && ["3", "7"].includes(parts[2])) {
+    return { mode: "all", days: Number(parts[2]), groupKey: "" };
+  }
+  if (parts[1] === "g" && parts[2]) {
+    return { mode: "group", days: null, groupKey: parts[2] };
+  }
+  return null;
+}
+
+function getMutableScheduleState(data: Record<string, unknown>) {
+  const current = (data.schedule_state ?? data.scheduleState ?? {}) as Record<string, unknown>;
+  const currentSnoozes = current.snoozes && typeof current.snoozes === "object"
+    ? current.snoozes as Record<string, unknown>
+    : {};
+  const next = {
+    ...current,
+    snoozes: { ...currentSnoozes },
+  };
+  data.schedule_state = next;
+  return next as Record<string, unknown> & { snoozes: Record<string, unknown> };
+}
+
+function applySnoozeCallback(data: Record<string, unknown>, callbackData: string) {
+  const selection = parseSnoozeCallbackData(callbackData);
+  if (!selection) return { count: 0, label: "That snooze option is no longer available." };
+
+  const dueItems = getDueItems(data);
+  const selectedItems = dueItems.filter((item) => {
+    if (selection.mode === "all") return true;
+    return getScheduleGroup(item.metric).key === selection.groupKey && Boolean(item.metric.intervalDays);
+  });
+  if (!selectedItems.length) return { count: 0, label: "Nothing matching that snooze option is due now." };
+
+  const localDate = getReminderLocalTime().date;
+  const updatedAt = new Date().toISOString();
+  const scheduleState = getMutableScheduleState(data);
+  const dueDates = new Set<string>();
+
+  selectedItems.forEach((item) => {
+    const profileId = item.profile.id ?? "profile";
+    const days = selection.mode === "all" ? Number(selection.days) : Number(item.metric.intervalDays ?? 0);
+    if (!days) return;
+    const dueDate = getDatePlusDays(localDate, days);
+    scheduleState.snoozes[getSnoozeKey(profileId, item.metric.name)] = {
+      due_date: dueDate,
+      updated_at: updatedAt,
+      source: "telegram",
+    };
+    dueDates.add(dueDate);
+  });
+
+  const count = dueDates.size ? selectedItems.length : 0;
+  if (!count) return { count: 0, label: "That check cannot be snoozed to a cycle." };
+  if (selection.mode === "all") return { count, label: `Snoozed ${count} due check${count === 1 ? "" : "s"} for ${selection.days} days.` };
+
+  const group = getDueReminderGroups(selectedItems)[0];
+  return {
+    count,
+    label: `Snoozed ${group?.label ?? "checks"} to the next cycle (${group?.cycleLabel ?? "cycle"}).`,
+  };
+}
+
 async function handleSendDueSummary(req: Request, user: DashboardUser) {
   const data = await getDashboardData(user);
   if (!data) return jsonResponse(req, { ok: false, error: "Dashboard data was not found." }, 404);
@@ -666,6 +881,7 @@ async function handleSendDueSummary(req: Request, user: DashboardUser) {
     chat_id: telegram.chatId,
     text: summary.message,
     disable_web_page_preview: true,
+    ...(summary.replyMarkup ? { reply_markup: summary.replyMarkup } : {}),
   });
   if (!result.ok) return jsonResponse(req, { ok: false, error: result.description ?? "Telegram due reminder failed." }, 502);
 
@@ -729,6 +945,7 @@ async function handleSendScheduledReminders(req: Request, body: Record<string, u
       chat_id: settings.chatId,
       text: summary.message,
       disable_web_page_preview: true,
+      ...(summary.replyMarkup ? { reply_markup: summary.replyMarkup } : {}),
     });
 
     if (!result.ok) {
@@ -752,15 +969,102 @@ async function handleSendScheduledReminders(req: Request, body: Record<string, u
   }, failed ? 502 : 200);
 }
 
+async function handleTelegramMessageWebhook(message: TelegramMessage) {
+  const code = extractPairingCode(message.text);
+  if (!code || !message.chat || message.chat.type !== "private") return;
+
+  await upsertPairingCode(code, message.chat);
+  await telegramApi("sendMessage", {
+    chat_id: String(message.chat.id),
+    text: "Pairing code received. Return to Health Dashboard and tap Check code.",
+    disable_web_page_preview: true,
+  });
+}
+
+async function handleTelegramCallbackWebhook(callback: TelegramCallbackQuery) {
+  const callbackId = String(callback.id ?? "");
+  const callbackData = String(callback.data ?? "");
+  const chatId = callback.message?.chat?.id === undefined ? "" : String(callback.message.chat.id);
+  const messageId = callback.message?.message_id;
+
+  if (!callbackId || !chatId) return;
+  const row = await getDashboardRowForTelegramChat(chatId);
+  if (!row) {
+    await telegramApi("answerCallbackQuery", {
+      callback_query_id: callbackId,
+      text: "Telegram is not linked to a Health Dashboard account.",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const result = applySnoozeCallback(row.data, callbackData);
+  if (result.count > 0) {
+    await updateDashboardData(row.user_id, row.data, new Date().toISOString());
+    if (messageId) {
+      await telegramApi("editMessageReplyMarkup", {
+        chat_id: chatId,
+        message_id: messageId,
+      });
+    }
+  }
+
+  await telegramApi("answerCallbackQuery", {
+    callback_query_id: callbackId,
+    text: result.label,
+    show_alert: false,
+  });
+}
+
+async function handleTelegramWebhook(req: Request, update: TelegramUpdate) {
+  await requireTelegramWebhookRequest(req);
+  if (update.message) await handleTelegramMessageWebhook(update.message);
+  if (update.callback_query) await handleTelegramCallbackWebhook(update.callback_query);
+  return jsonResponse(req, { ok: true });
+}
+
+async function handleConfigureWebhook(req: Request) {
+  await requireCronRequest(req);
+  const secret = await getTelegramWebhookSecret();
+  const result = await telegramApi("setWebhook", {
+    url: TELEGRAM_FUNCTION_URL,
+    secret_token: secret,
+    allowed_updates: ["message", "callback_query"],
+    drop_pending_updates: false,
+  });
+  if (!result.ok) return jsonResponse(req, { ok: false, error: result.description ?? "Could not configure Telegram webhook." }, 502);
+  return jsonResponse(req, { ok: true, configured: true, result: result.result ?? true });
+}
+
+async function handleWebhookStatus(req: Request) {
+  await requireCronRequest(req);
+  const result = await telegramApi("getWebhookInfo");
+  if (!result.ok) return jsonResponse(req, { ok: false, error: result.description ?? "Could not load Telegram webhook status." }, 502);
+  return jsonResponse(req, {
+    ok: true,
+    url: result.result?.url ?? "",
+    pending_update_count: result.result?.pending_update_count ?? 0,
+    allowed_updates: result.result?.allowed_updates ?? [],
+    last_error_date: result.result?.last_error_date ?? null,
+    last_error_message: result.result?.last_error_message ?? "",
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return jsonResponse(req, { ok: false, error: "POST required." }, 405);
 
   try {
     const body = await req.json().catch(() => ({}));
+    if (body?.update_id !== undefined || body?.message || body?.callback_query) {
+      return await handleTelegramWebhook(req, body as TelegramUpdate);
+    }
+
     const action = String(body.action ?? "probe");
 
     if (action === "send_scheduled_reminders") return await handleSendScheduledReminders(req, body);
+    if (action === "configure_webhook") return await handleConfigureWebhook(req);
+    if (action === "webhook_status") return await handleWebhookStatus(req);
 
     const user = await requireApprovedUser(req);
     if (action === "probe") return await handleProbe(req);
