@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.59";
+const APP_VERSION = "v0.60";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -92,6 +92,26 @@ const relaxedNearLimitMetrics = new Set([
 const defaultSnapshotMetricNames = ["Weight", "Waist circumference", "LDL", "Total cholesterol"];
 const riskContextMetricNames = new Set(["Lipoprotein(a)"]);
 const inRangeStableTrendMetrics = new Set(["Blood pressure systolic", "Blood pressure diastolic"]);
+const metricInputGroupOrder = [
+  "Core body metrics",
+  "Vitals and fitness",
+  "Health checks",
+  "Full blood count",
+  "Vitamins and iron",
+  "Metabolic",
+  "Lipids",
+  "Cardiovascular markers",
+  "Amino acids",
+  "Proteins",
+  "Renal and purines",
+  "Liver and enzymes",
+  "Electrolytes",
+  "Endocrine",
+  "Hormone panel",
+  "Hormone panel - escalation",
+  "Urinalysis",
+  "One-off and infrequent",
+];
 const meaningfulChangeRules = {
   "Weight": { absolute: 0.5 },
   "Waist circumference": { absolute: 1 },
@@ -943,7 +963,7 @@ function scheduleCloudSave() {
 }
 
 async function saveCloudData() {
-  if (!cloudState.client || !cloudState.user || cloudState.saving || isReadOnlyMode()) return;
+  if (!cloudState.client || !cloudState.user || cloudState.saving || isReadOnlyMode()) return false;
   cloudState.saving = true;
   cloudState.lastError = "";
   renderSyncFooter();
@@ -964,18 +984,27 @@ async function saveCloudData() {
       cloudState.lastError = "Cloud changed on another device. Tap Refresh before saving again.";
       setEditingAvailability();
       window.alert(cloudState.lastError);
-      return;
+      return false;
     }
 
     cloudState.cloudUpdatedAt = data.updated_at;
     cloudState.loadedAt = new Date().toISOString();
     localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(nextDashboardData));
+    return true;
   } catch (error) {
     cloudState.lastError = error.message;
+    return false;
   } finally {
     cloudState.saving = false;
     renderSyncFooter();
   }
+}
+
+async function flushCloudSaveNow() {
+  if (!cloudState.enabled || !cloudState.user) return true;
+  if (typeof clearTimeout === "function" && cloudState.saveTimer) clearTimeout(cloudState.saveTimer);
+  cloudState.saveTimer = null;
+  return saveCloudData();
 }
 
 function isReadOnlyMode() {
@@ -1221,6 +1250,7 @@ function populateMetrics() {
   const availableMetrics = getMetricsForProfile();
   const filteredGroups = groupBy(availableMetrics, "group");
   metricInput.innerHTML = Object.entries(filteredGroups)
+    .sort(([groupA], [groupB]) => compareMetricInputGroups(groupA, groupB))
     .map(([group, groupMetrics]) => {
       const options = groupMetrics
         .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
@@ -1235,6 +1265,17 @@ function populateMetrics() {
   }
   syncMetricDefaults();
   renderQuickMetrics();
+}
+
+function compareMetricInputGroups(groupA, groupB) {
+  const indexA = getMetricInputGroupIndex(groupA);
+  const indexB = getMetricInputGroupIndex(groupB);
+  return indexA - indexB || groupA.localeCompare(groupB);
+}
+
+function getMetricInputGroupIndex(group) {
+  const index = metricInputGroupOrder.indexOf(group);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
 function renderQuickMetrics() {
@@ -2374,6 +2415,7 @@ function getDisplayGroupOrder(metricName) {
   const order = [
     "Body composition",
     "Vitals and fitness",
+    "Health checks",
     "Cardiovascular",
     "Metabolic",
     "Full blood count",
@@ -2384,7 +2426,6 @@ function getDisplayGroupOrder(metricName) {
     "Thyroid and endocrine",
     "Hormones",
     "Urinalysis",
-    "Health checks",
     "Infrequent checks",
     "Other",
   ];
@@ -4071,13 +4112,22 @@ function closeImportReview() {
   importReviewModal.setAttribute("aria-hidden", "true");
 }
 
-function confirmReviewedImport() {
+async function confirmReviewedImport() {
   if (!assertCanEdit()) return;
   if (!state.pendingImport) return;
+  confirmImportButton.disabled = true;
+  confirmImportButton.textContent = "Saving...";
   const imported = commitPreparedImport(state.pendingImport);
+  const cloudSaved = await flushCloudSaveNow();
   closeImportReview();
+  confirmImportButton.textContent = "Import reviewed data";
+  const cloudText = cloudState.enabled && cloudState.user
+    ? cloudSaved
+      ? " Saved to cloud."
+      : ` Imported locally, but cloud save did not complete: ${cloudState.lastError || "check sync status and refresh before leaving the app."}`
+    : "";
   window.alert(
-    `Imported ${imported.measurementCount} measurements and ${imported.rangeCount} reference ranges. Skipped ${imported.skippedCount}.`,
+    `Imported ${imported.measurementCount} measurements and ${imported.rangeCount} reference ranges. Skipped ${imported.skippedCount}.${cloudText}`,
   );
 }
 
@@ -4145,7 +4195,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.59").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.60").catch(() => {});
   });
 }
 
