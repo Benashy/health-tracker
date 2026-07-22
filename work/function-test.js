@@ -151,6 +151,14 @@ function createDocument() {
     "snapshotList",
     "markerSummary",
     "schedulePanel",
+    "telegramPanel",
+    "telegramStatus",
+    "telegramConnectionTitle",
+    "telegramConnectionText",
+    "telegramPairingCode",
+    "telegramPairButton",
+    "telegramCheckButton",
+    "telegramTestButton",
     "exportCsvButton",
     "exportChatGptButton",
     "exportReviewPackButton",
@@ -179,6 +187,7 @@ function createDocument() {
     ".entry-panel": new Element("entry-panel"),
     ".profile-section": new Element("profile-section"),
     ".schedule-section": new Element("schedule-section"),
+    ".telegram-section": new Element("telegram-section"),
     ".account-sync-footer": new Element("account-sync-footer"),
     ".filters": new Element("filters"),
     ".status-strip": new Element("status-strip"),
@@ -223,7 +232,15 @@ function createContext() {
       },
     },
     window: {
-      crypto: { randomUUID: () => `id-${Math.random().toString(16).slice(2)}` },
+      crypto: {
+        randomUUID: () => `id-${Math.random().toString(16).slice(2)}`,
+        getRandomValues: (values) => {
+          values.forEach((_, index) => {
+            values[index] = index + 1;
+          });
+          return values;
+        },
+      },
       alert: (message) => {
         context.lastAlert = message;
       },
@@ -295,10 +312,11 @@ const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
 const styles = fs.readFileSync("styles.css", "utf8");
 const supabaseSql = fs.readFileSync("supabase/health_dashboard_data.sql", "utf8");
+const telegramFunction = fs.readFileSync("supabase/functions/health-tracker-telegram/index.ts", "utf8");
 const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
 const faviconIco = fs.readFileSync("favicon.ico");
-assert(indexHtml.includes("app.js?v=0.45"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.45"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.46"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.46"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -307,6 +325,9 @@ assert(indexHtml.includes("Prepare AI Review"), "AI review action should be clea
 assert(indexHtml.includes("Current snapshot"), "current health snapshot section should exist");
 assert(indexHtml.includes("snapshotEditor"), "snapshot editor should exist");
 assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
+assert(indexHtml.includes("telegramPanel"), "Telegram reminder setup panel should exist");
+assert(telegramFunction.includes("HEALTH_TRACKER_TELEGRAM_BOT_TOKEN"), "Telegram token should be read from Supabase secrets");
+assert(telegramFunction.includes("requireApprovedUser"), "Telegram function should require an approved signed-in user");
 assert(indexHtml.includes("metricContextModal"), "metric context modal should exist");
 assert(indexHtml.includes("mobileActionBar"), "mobile bottom action bar should exist");
 assert(indexHtml.includes("mobileMenuPanel"), "mobile menu panel should exist for secondary actions");
@@ -319,8 +340,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.45"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.45"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.46"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.46"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
@@ -342,24 +363,24 @@ assert(!indexHtml.includes("latest measurement"), "summary strip should not show
 assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.45"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.46"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.45")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.45"), "iOS touch icon should use PNG");
-assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.45"), "browser favicon should use a unique Health Dashboard ICO filename");
-assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.45"), "browser favicon should use a unique 32px PNG filename");
-assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.45"), "browser favicon should use a unique 16px PNG filename");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.46")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.46"), "iOS touch icon should use PNG");
+assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.46"), "browser favicon should use a unique Health Dashboard ICO filename");
+assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.46"), "browser favicon should use a unique 32px PNG filename");
+assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.46"), "browser favicon should use a unique 16px PNG filename");
 assert(faviconIco.length > 100, "favicon ICO should be generated");
 assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
 assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
 assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
-assert(serviceWorker.includes("health-dashboard-v0.45"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.45"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.45"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.45"), "service worker should cache the unique ICO favicon");
-assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.45"), "service worker should cache the unique PNG favicon");
-assert(serviceWorker.includes("app-icon-512.png?v=0.45"), "service worker should cache PNG app icons");
+assert(serviceWorker.includes("health-dashboard-v0.46"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.46"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.46"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.46"), "service worker should cache the unique ICO favicon");
+assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.46"), "service worker should cache the unique PNG favicon");
+assert(serviceWorker.includes("app-icon-512.png?v=0.46"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -379,7 +400,7 @@ assert(styles.includes(".value-fields input"), "primary value fields should be v
 assert(supabaseSql.includes("revoke all privileges on table public.health_dashboard_data from anon"), "Supabase SQL should revoke anon table access");
 assert(supabaseSql.includes("Approved users can read their own health dashboard data"), "Supabase SQL should use approved-user RLS policies");
 assert(supabaseSql.includes("angelika_kleczka@hotmail.com"), "Supabase SQL should restrict to Angelika's approved email");
-assert(document.elements.appVersion.textContent === "v0.45", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.46", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -393,7 +414,7 @@ assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out sh
 assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
 assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
 assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
-context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.45";
+context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.46";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should redirect to the canonical live dashboard URL");
 context.window.location.href = "http://localhost:3000/";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should not redirect to localhost");

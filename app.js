@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.45";
+const APP_VERSION = "v0.46";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -10,6 +10,8 @@ const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
 const DATA_VERSION = 1;
 const PRODUCTION_AUTH_REDIRECT_URL = "https://benashy.github.io/health-tracker/";
+const TELEGRAM_FUNCTION_NAME = "health-tracker-telegram";
+const TELEGRAM_BOT_USERNAME = "HealthTrackerReminderBot";
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -254,6 +256,13 @@ const state = {
   pendingImport: null,
 };
 
+const telegramSetupState = {
+  pairingCode: "",
+  busy: false,
+  status: "",
+  error: "",
+};
+
 const cloudState = {
   enabled: false,
   client: null,
@@ -344,6 +353,14 @@ const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
 const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
+const telegramPanel = document.querySelector("#telegramPanel");
+const telegramStatus = document.querySelector("#telegramStatus");
+const telegramConnectionTitle = document.querySelector("#telegramConnectionTitle");
+const telegramConnectionText = document.querySelector("#telegramConnectionText");
+const telegramPairingCode = document.querySelector("#telegramPairingCode");
+const telegramPairButton = document.querySelector("#telegramPairButton");
+const telegramCheckButton = document.querySelector("#telegramCheckButton");
+const telegramTestButton = document.querySelector("#telegramTestButton");
 const statusStrip = document.querySelector(".status-strip");
 const trendViewPanel = document.querySelector("#trendViewPanel");
 const resultsViewPanel = document.querySelector("#resultsViewPanel");
@@ -487,6 +504,17 @@ function normaliseSettings(settings = {}) {
   return {
     ...settings,
     snapshot_metrics_by_profile: normalisedSnapshotMetrics,
+    telegram: normaliseTelegramSettings(settings?.telegram),
+  };
+}
+
+function normaliseTelegramSettings(settings = {}) {
+  const chatId = String(settings?.chat_id ?? settings?.chatId ?? "").trim();
+  return {
+    chat_id: chatId,
+    chat_label: String(settings?.chat_label ?? settings?.chatLabel ?? "").trim(),
+    linked_at: settings?.linked_at ?? settings?.linkedAt ?? "",
+    test_sent_at: settings?.test_sent_at ?? settings?.testSentAt ?? "",
   };
 }
 
@@ -857,6 +885,9 @@ function setEditingAvailability() {
     exportReviewPackButton,
     snapshotEditor,
     snapshotEditButton,
+    telegramPairButton,
+    telegramCheckButton,
+    telegramTestButton,
     resetButton,
   ].forEach((element) => {
     if (element) element.classList.toggle("read-only", disabled);
@@ -866,6 +897,9 @@ function setEditingAvailability() {
   });
   importChatGptButton.disabled = disabled;
   if (snapshotEditButton) snapshotEditButton.disabled = disabled;
+  if (telegramPairButton) telegramPairButton.disabled = disabled || telegramSetupState.busy;
+  if (telegramCheckButton) telegramCheckButton.disabled = disabled || telegramSetupState.busy || !telegramSetupState.pairingCode;
+  if (telegramTestButton) telegramTestButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
   if (resetButton) resetButton.disabled = disabled;
   if (!disabled && metricInput.value) {
     syncRangeDefaults();
@@ -1760,6 +1794,7 @@ function render() {
   renderHealthSnapshot(scopedResults, flaggedCount, dueCount);
   renderProfiles();
   renderSchedule();
+  renderTelegramPanel();
   renderSummary();
   renderTrends();
 
@@ -2403,6 +2438,136 @@ function renderCalmScheduleCard() {
   `;
 }
 
+function getTelegramSettings() {
+  state.settings.telegram = normaliseTelegramSettings(state.settings.telegram);
+  return state.settings.telegram;
+}
+
+function renderTelegramPanel() {
+  if (!telegramPanel) return;
+  const settings = getTelegramSettings();
+  const isConnected = Boolean(settings.chat_id);
+  const isPairing = Boolean(telegramSetupState.pairingCode);
+  const showConnected = isConnected && !isPairing;
+  const statusParts = [];
+  if (telegramSetupState.busy) statusParts.push("Checking...");
+  else if (telegramSetupState.error) statusParts.push(telegramSetupState.error);
+  else if (telegramSetupState.status) statusParts.push(telegramSetupState.status);
+  else statusParts.push(showConnected ? "Connected" : "Not connected");
+
+  telegramStatus.textContent = statusParts.join(" ");
+  telegramStatus.className = `privacy-note ${telegramSetupState.error ? "telegram-error" : showConnected ? "telegram-ok" : ""}`;
+  telegramConnectionTitle.textContent = showConnected
+    ? `Connected to ${settings.chat_label || "Telegram"}`
+    : isPairing
+      ? "Send this code to Health Tracker Bot"
+    : "Connect Health Tracker Bot";
+  telegramConnectionText.innerHTML = showConnected
+    ? `Reminders will use this private chat. Test messages contain no health values.`
+    : `Open <a href="https://t.me/${TELEGRAM_BOT_USERNAME}" target="_blank" rel="noopener">Health Tracker Bot</a>, send the pairing code, then check it here.`;
+
+  telegramPairingCode.textContent = telegramSetupState.pairingCode;
+  telegramPairingCode.classList.toggle("hidden", !isPairing);
+  telegramPairButton.textContent = showConnected ? "Replace Telegram" : isPairing ? "New code" : "Pair Telegram";
+  telegramCheckButton.classList.toggle("hidden", !isPairing);
+  telegramTestButton.classList.toggle("hidden", !showConnected);
+  telegramPairButton.disabled = telegramSetupState.busy || isReadOnlyMode();
+  telegramCheckButton.disabled = telegramSetupState.busy || !telegramSetupState.pairingCode || isReadOnlyMode();
+  telegramTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+}
+
+function generateTelegramPairingCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const values = new Uint32Array(6);
+  window.crypto.getRandomValues(values);
+  return `HT-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`;
+}
+
+async function invokeTelegramFunction(action, body = {}) {
+  if (!cloudState.client || !cloudState.user) {
+    throw new Error("Sign in before setting up Telegram reminders.");
+  }
+  const { data, error } = await cloudState.client.functions.invoke(TELEGRAM_FUNCTION_NAME, {
+    body: { action, ...body },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? "Telegram setup failed.");
+  return data;
+}
+
+async function startTelegramPairing() {
+  if (!assertCanEdit()) return;
+  telegramSetupState.pairingCode = generateTelegramPairingCode();
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Send this code to the bot.";
+  renderTelegramPanel();
+}
+
+async function checkTelegramPairingCode() {
+  if (!assertCanEdit()) return;
+  if (!telegramSetupState.pairingCode) {
+    startTelegramPairing();
+    return;
+  }
+
+  telegramSetupState.busy = true;
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Looking for your Telegram message...";
+  renderTelegramPanel();
+
+  try {
+    const data = await invokeTelegramFunction("resolve_chat", { code: telegramSetupState.pairingCode });
+    if (data.status === "waiting") {
+      telegramSetupState.status = data.message ?? "No matching Telegram message found yet.";
+      return;
+    }
+
+    state.settings.telegram = normaliseTelegramSettings({
+      chat_id: data.chat.id,
+      chat_label: data.chat.label,
+      linked_at: new Date().toISOString(),
+      test_sent_at: "",
+    });
+    telegramSetupState.pairingCode = "";
+    telegramSetupState.status = "Telegram linked.";
+    saveSettings();
+  } catch (error) {
+    telegramSetupState.error = error.message;
+  } finally {
+    telegramSetupState.busy = false;
+    render();
+  }
+}
+
+async function sendTelegramTestMessage() {
+  if (!assertCanEdit()) return;
+  const settings = getTelegramSettings();
+  if (!settings.chat_id) {
+    startTelegramPairing();
+    return;
+  }
+
+  telegramSetupState.busy = true;
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Sending test...";
+  renderTelegramPanel();
+
+  try {
+    await invokeTelegramFunction("send_test", { chat_id: settings.chat_id });
+    state.settings.telegram = normaliseTelegramSettings({
+      ...settings,
+      test_sent_at: new Date().toISOString(),
+    });
+    telegramSetupState.status = "Test sent.";
+    saveSettings();
+  } catch (error) {
+    telegramSetupState.error = error.message;
+  } finally {
+    telegramSetupState.busy = false;
+    render();
+  }
+}
+
 function renderMobileActions(dueCount) {
   if (!mobileActionBar) return;
   if (!cloudState.user) {
@@ -2449,6 +2614,7 @@ function renderMobileLayout() {
     snapshotSection,
     statusStrip,
     scheduleSection,
+    telegramPanel,
     contentGrid,
     entryPanel,
     resultsPanel,
@@ -2475,6 +2641,7 @@ function renderMobileLayout() {
   setMobileOnlyHidden(snapshotSection, !onHome);
   setMobileOnlyHidden(statusStrip, !onHome);
   setMobileOnlyHidden(scheduleSection, !onHome);
+  setMobileOnlyHidden(telegramPanel, !onMenu);
   setMobileOnlyHidden(contentGrid, !(onAdd || onTrends || onResults));
   setMobileOnlyHidden(entryPanel, !onAdd);
   setMobileOnlyHidden(resultsPanel, !(onTrends || onResults));
@@ -3445,7 +3612,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.45").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.46").catch(() => {});
   });
 }
 
@@ -3555,6 +3722,9 @@ metricContextModal.addEventListener("click", (event) => {
   if (event.target === metricContextModal) closeMetricContext();
 });
 closeContextButton.addEventListener("click", closeMetricContext);
+if (telegramPairButton) telegramPairButton.addEventListener("click", startTelegramPairing);
+if (telegramCheckButton) telegramCheckButton.addEventListener("click", checkTelegramPairingCode);
+if (telegramTestButton) telegramTestButton.addEventListener("click", sendTelegramTestMessage);
 if (resetButton) {
   resetButton.addEventListener("click", () => {
     if (!assertCanEdit()) return;

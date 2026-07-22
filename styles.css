@@ -198,6 +198,7 @@ h2 {
 .onboarding-panel,
 .profile-panel,
 .schedule-section,
+.telegram-section,
 .entry-panel,
 .results-panel {
   border: 1px solid var(--line);
@@ -508,7 +509,8 @@ body:not(.signed-in) .auth-actions .ghost-button {
 }
 
 .profile-panel,
-.schedule-section {
+.schedule-section,
+.telegram-section {
   padding: 18px;
 }
 
@@ -617,6 +619,72 @@ legend {
 
 .schedule-section {
   margin-bottom: 16px;
+}
+
+.telegram-section {
+  margin-bottom: 16px;
+}
+
+.telegram-setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.telegram-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 14px;
+}
+
+.telegram-card strong,
+.telegram-card span {
+  display: block;
+}
+
+.telegram-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.telegram-card a {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.telegram-code {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  border: 1px solid rgba(35, 111, 98, 0.24);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--accent-dark);
+  padding: 8px 10px;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.telegram-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, auto));
+  gap: 8px;
+  align-content: start;
+}
+
+.telegram-ok {
+  color: var(--ok);
+}
+
+.telegram-error {
+  color: var(--bad);
 }
 
 .mobile-menu-panel {
@@ -1513,6 +1581,8 @@ button.status-pill:focus-visible {
   .content-grid,
   .profile-section,
   .auth-form,
+  .telegram-setup,
+  .telegram-actions,
   .status-strip {
     grid-template-columns: 1fr;
   }
@@ -1599,6 +1669,7 @@ button.status-pill:focus-visible {
   .profile-panel,
   .schedule-section,
   .snapshot-section,
+  .telegram-section,
   .mobile-menu-panel,
   .entry-panel,
   .results-panel {
@@ -1644,6 +1715,15 @@ button.status-pill:focus-visible {
     justify-content: center;
     width: 100%;
     min-height: 46px;
+  }
+
+  .telegram-section {
+    margin-bottom: 16px;
+  }
+
+  .telegram-setup,
+  .telegram-actions {
+    grid-template-columns: 1fr;
   }
 
   .mobile-menu-panel.hidden,

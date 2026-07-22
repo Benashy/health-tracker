@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,9 +10,17 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.45`.
+- The app is now on `v0.46`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.46
+
+- Created the first Health Tracker Telegram Edge Function in Supabase.
+- Added a signed-in Telegram setup panel that pairs a user with Health Tracker Bot using a temporary one-time code.
+- Added a harmless test-message flow so Telegram delivery can be verified before scheduled health reminders are enabled.
+- Kept the Telegram bot token server-side in Supabase secrets via `HEALTH_TRACKER_TELEGRAM_BOT_TOKEN`.
+- Added cache-busting updates for the new app version.
 
 ## Completed In v0.45
 
@@ -101,17 +109,21 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Current Outstanding Work
 
-1. Add Telegram due reminders.
+1. Finish Telegram due reminders.
    - Treat this as the next highest-priority feature.
-   - Use a Telegram bot created through BotFather.
+   - Health Tracker now has a dedicated Telegram bot created through BotFather, so reminders stay in their own Telegram chat.
+   - Use one Telegram bot/chat per project going forward, but keep the underlying reminder architecture reusable so other personal apps can adopt the same pattern quickly.
    - Do not put the Telegram bot token in GitHub Pages, browser JavaScript, or any public file.
-   - Store the bot token securely in Supabase secrets/Vault.
-   - Add per-user Telegram `chat_id` settings so Ben and Angelika can receive separate private reminders.
+   - Store the bot token securely in Supabase secrets/Vault. The first secret is `HEALTH_TRACKER_TELEGRAM_BOT_TOKEN`.
+   - Complete real-device pairing for Ben and Angelika so each account stores its own private Telegram `chat_id`.
    - Use Supabase Cron to call a Supabase Edge Function on a daily schedule.
    - The Edge Function should inspect each user's due/overdue metrics and send a low-detail privacy-safe Telegram message.
+   - Group related due items into calm reminder summaries, for example "Your six-monthly bloods are due" rather than separate messages for each blood marker.
+   - Limit medical reminders to one message per user per day by default.
    - Avoid sending health values, DOB, or sensitive clinical detail in Telegram by default.
    - Add duplicate prevention with `last_notified` or equivalent, so the same due item does not nag repeatedly.
-   - Include a test-send mode before enabling the daily scheduled reminder.
+   - Use the v0.46 test-send mode before enabling the daily scheduled reminder.
+   - Later add snooze actions such as 1 day, 3 days, and until the next reporting cycle.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.
