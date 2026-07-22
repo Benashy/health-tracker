@@ -150,6 +150,24 @@ h2 {
   justify-content: flex-end;
 }
 
+@media (min-width: 941px) {
+  .topbar > div:first-child {
+    min-width: 0;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .topbar-actions .ghost-button {
+    min-height: 38px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+}
+
 .ghost-button,
 .filter-button,
 .primary-button,
@@ -1675,6 +1693,18 @@ button.status-pill:focus-visible {
 
   .onboarding-actions {
     justify-content: stretch;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .topbar-actions .ghost-button {
+    min-width: 0;
+    padding: 0 8px;
+    white-space: normal;
   }
 
   .content-grid,
