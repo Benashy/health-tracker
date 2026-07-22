@@ -162,6 +162,11 @@ const REMINDER_METRICS: DashboardMetric[] = [
     intervalMonths: 12,
     entryMode: "completion",
   }),
+  metric("Pap smear", "Health checks", 1095, "medium", "Every 3 years", {
+    intervalMonths: 36,
+    profileIds: ["angelika"],
+    entryMode: "completion",
+  }),
 ];
 
 function metric(
@@ -189,6 +194,7 @@ function formatInterval(intervalDays: number | null) {
   if (intervalDays === 180) return "Every 6 months";
   if (intervalDays === 365) return "Every 12 months";
   if (intervalDays === 730) return "Every 2 years";
+  if (intervalDays === 1095) return "Every 3 years";
   if (intervalDays === 1825) return "Every 5 years";
   if (intervalDays === 3650) return "Every 10 years";
   return `Every ${intervalDays} days`;
@@ -609,6 +615,7 @@ function getScheduleGroup(selectedMetric: DashboardMetric) {
   if (selectedMetric.name === "Pilot medical") return { key: "pilot-medical", label: "Pilot medical", cycleLabel: "annual CAA cycle" };
   if (selectedMetric.name === "Eye test") return { key: "eye-test", label: "Eye test", cycleLabel: "2-year cycle" };
   if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology", cycleLabel: "12-month cycle" };
+  if (selectedMetric.name === "Pap smear") return { key: "pap-smear", label: "Pap smear", cycleLabel: "3-year cycle" };
   if (selectedMetric.group === "Vitals and fitness") {
     return { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30-day cycle" };
   }

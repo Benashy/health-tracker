@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.56";
+const APP_VERSION = "v0.57";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -21,6 +21,7 @@ const TELEGRAM_REMINDER_GROUPS = [
   { key: "pilot-medical", label: "Pilot medical", cycleLabel: "12 months" },
   { key: "eye-test", label: "Eye test", cycleLabel: "2 years" },
   { key: "dermatology", label: "Dermatology", cycleLabel: "12 months" },
+  { key: "pap-smear", label: "Pap smear", cycleLabel: "3 years" },
   { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 years" },
 ];
 const APPROVED_EMAILS = new Set([
@@ -66,6 +67,7 @@ const clinicianSourceMetrics = new Set([
   "Pilot medical",
   "Eye test",
   "Dermatology checkup",
+  "Pap smear",
 ]);
 const starterMetricNames = [
   "Weight",
@@ -75,7 +77,7 @@ const starterMetricNames = [
   "Resting heart rate",
 ];
 const targetMetricNames = new Set(["Weight", "Waist circumference"]);
-const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup"]);
+const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup", "Pap smear"]);
 const relaxedNearLimitMetrics = new Set([
   "Blood pressure systolic",
   "Blood pressure diastolic",
@@ -176,6 +178,7 @@ const metricContextNotes = {
   "Pilot medical": "Ben's annual UK CAA pilot medical is a standalone administrative/clinical fitness check. It is tracked mainly for expiry and reminder timing rather than trend interpretation.",
   "Eye test": "A routine eye test is tracked as a recurring preventative check. In this dashboard it is aligned one month before the pilot medical date, so there is time to complete it before the annual medical.",
   "Dermatology checkup": "A dermatology checkup is tracked as a yearly skin review, including moles and general skin condition. The main value is regular review and documentation of changes over time.",
+  "Pap smear": "A Pap smear is tracked here as a recurring cervical screening health check for Angelika. The dashboard records completion and the next due date rather than interpreting clinical results.",
 };
 
 const metrics = [
@@ -272,6 +275,12 @@ const metrics = [
   metric("Dermatology checkup", "Health checks", "", null, null, "qualitative", "medium", 365, "context", "Every 12 months", null, {
     firstDueDate: "2027-07-01",
     intervalMonths: 12,
+    placeholder: "Completed",
+    entryMode: "completion",
+  }),
+  metric("Pap smear", "Health checks", "", null, null, "qualitative", "medium", 1095, "context", "Every 3 years", null, {
+    intervalMonths: 36,
+    profileIds: ["angelika"],
     placeholder: "Completed",
     entryMode: "completion",
   }),
@@ -479,6 +488,7 @@ function formatInterval(intervalDays) {
   if (intervalDays === 180) return "Every 6 months";
   if (intervalDays === 365) return "Every 12 months";
   if (intervalDays === 730) return "Every 2 years";
+  if (intervalDays === 1095) return "Every 3 years";
   if (intervalDays === 1825) return "Every 5 years";
   if (intervalDays === 3650) return "Every 10 years";
   return `Every ${intervalDays} days`;
@@ -1904,6 +1914,7 @@ function getScheduleGroup(selectedMetric) {
   if (selectedMetric.name === "Pilot medical") return { key: "pilot-medical", label: "Pilot medical" };
   if (selectedMetric.name === "Eye test") return { key: "eye-test", label: "Eye test" };
   if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology" };
+  if (selectedMetric.name === "Pap smear") return { key: "pap-smear", label: "Pap smear" };
   if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
   if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
     return { key: "six-month-bloods", label: "Six-monthly bloods" };
@@ -4115,7 +4126,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.56").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.57").catch(() => {});
   });
 }
 
