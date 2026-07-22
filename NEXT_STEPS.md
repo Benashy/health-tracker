@@ -10,9 +10,15 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.60`.
+- The app is now on `v0.61`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.61
+
+- Implemented the agreed reminder warning windows: 14-day checks warn 1 day before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, six-month checks warn 30 days before, annual checks warn 30 days before, two/three-year checks warn 90 days before, and Colonoscopy warns 120 days before.
+- Added matching Telegram reminder milestones so scheduled 09:00 reminders can warn at practical booking intervals rather than only on the due date.
+- Kept Pilot medical on its custom CAA reminder pattern of 6 weeks, 1 month, 2 weeks, 1 week, 1 day, and once expired.
 
 ## Completed In v0.60
 
@@ -213,15 +219,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Keep the reminder time fixed at 09:00 UK/Lisbon time for now.
    - Later consider letting each user choose reminder time and timezone.
    - Review whether the first snooze button wording feels right after Ben and Angelika use it in real reminders.
-   - Review and sign off metric-specific warning periods. Current app warning windows are: 14-day checks warn 2 days before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, 180-day checks warn 14 days before, annual checks warn 30 days before, and multi-year checks warn 90 days before. Pilot medical already has custom Telegram milestones at 6 weeks, 1 month, 2 weeks, 1 week, 1 day, and once expired.
-   - Proposed reminder logic to review together:
-     - Weight / waist, every 14 days: remind on the day or 1 day before, then keep overdue reminders calm.
-     - Blood pressure / resting heart rate, every 30 days: remind 3 days before and on the day.
-     - VO2 max, every 3 months: remind 7 days before and on the day.
-     - Six-month bloods: consider 30 days, 14 days, 7 days, and on the day because blood tests may need booking.
-     - Annual bloods / dermatology / routine annual checks: consider 45 or 30 days, 14 days, 7 days, and on the day.
-     - Eye test / Pap smear / breast screening, every 2-3 years: consider 90 days, 60 days, 30 days, 14 days, 7 days, and on the day.
-     - Colonoscopy, every 5 years: consider 120 days, 90 days, 60 days, 30 days, 14 days, 7 days, and on the day because booking may need more lead time.
+   - Review the new v0.61 warning periods after real reminders have been received: 14-day checks warn 1 day before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, six-month checks warn 30 days before, annual checks warn 30 days before, two/three-year checks warn 90 days before, and Colonoscopy warns 120 days before.
    - Decide separately how each category should continue after the due date has passed, for example daily for short-cycle home readings, weekly for bloods/checks, and monthly for multi-year screening if not yet completed.
 
 2. Continue tablet and post-use mobile refinement.

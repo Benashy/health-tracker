@@ -97,6 +97,13 @@ const DASHBOARD_URL = "https://benashy.github.io/health-tracker/";
 const TELEGRAM_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/health-tracker-telegram`;
 const PAIRING_CODE_TTL_MINUTES = 30;
 const SNOOZE_CALLBACK_PREFIX = "hts";
+const REMINDER_MILESTONES_FORTNIGHTLY = [1, 0];
+const REMINDER_MILESTONES_MONTHLY = [3, 0];
+const REMINDER_MILESTONES_QUARTERLY = [7, 0];
+const REMINDER_MILESTONES_SIX_MONTHLY = [30, 14, 7, 0];
+const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
+const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
+const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const REMINDER_METRICS: DashboardMetric[] = [
   metric("Weight", "Core body metrics", 14, "highest"),
   metric("Waist circumference", "Core body metrics", 14, "highest"),
@@ -807,11 +814,17 @@ function shouldIncludeScheduledReminder(
   item: { metric: DashboardMetric; due: { state: string; nextDate: Date | null } },
   localDate: string,
 ) {
-  if (!item.metric.telegramReminderDays?.length) return true;
   if (!item.due.nextDate) return true;
+  const reminderDays = getScheduledReminderDays(item.metric);
+  if (!reminderDays.length) return true;
   const daysRemaining = daysBetween(new Date(`${localDate}T00:00:00Z`), item.due.nextDate);
-  if (daysRemaining < 0) return daysRemaining === (item.metric.telegramOverdueReminderDay ?? -1);
-  return item.metric.telegramReminderDays.includes(daysRemaining);
+  if (daysRemaining < 0) {
+    if (item.metric.telegramOverdueReminderDay !== undefined) {
+      return daysRemaining === item.metric.telegramOverdueReminderDay;
+    }
+    return true;
+  }
+  return reminderDays.includes(daysRemaining);
 }
 
 function getDueItems(data: Record<string, unknown>, options: { scheduledOnly?: boolean; localDate?: string } = {}) {
@@ -836,12 +849,28 @@ function getWarningDays(metricOrIntervalDays: DashboardMetric | number) {
     return metricOrIntervalDays.warningDays;
   }
   const intervalDays = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays.intervalDays ?? 0 : metricOrIntervalDays;
-  if (intervalDays <= 14) return 2;
+  const metricName = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays.name : "";
+  if (!intervalDays) return 0;
+  if (metricName === "Colonoscopy") return 120;
+  if (intervalDays <= 14) return 1;
   if (intervalDays <= 31) return 3;
   if (intervalDays <= 90) return 7;
-  if (intervalDays <= 210) return 14;
+  if (intervalDays <= 210) return 30;
   if (intervalDays <= 400) return 30;
   return 90;
+}
+
+function getScheduledReminderDays(metric: DashboardMetric) {
+  if (metric.telegramReminderDays?.length) return metric.telegramReminderDays;
+  const intervalDays = metric.intervalDays ?? 0;
+  if (!intervalDays) return [];
+  if (metric.name === "Colonoscopy") return REMINDER_MILESTONES_COLONOSCOPY;
+  if (intervalDays <= 14) return REMINDER_MILESTONES_FORTNIGHTLY;
+  if (intervalDays <= 31) return REMINDER_MILESTONES_MONTHLY;
+  if (intervalDays <= 90) return REMINDER_MILESTONES_QUARTERLY;
+  if (intervalDays <= 210) return REMINDER_MILESTONES_SIX_MONTHLY;
+  if (intervalDays <= 400) return REMINDER_MILESTONES_ANNUAL;
+  return REMINDER_MILESTONES_SCREENING;
 }
 
 function addDays(dateString: string, days: number) {

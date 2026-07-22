@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.60";
+const APP_VERSION = "v0.61";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -26,6 +26,13 @@ const TELEGRAM_REMINDER_GROUPS = [
   { key: "colonoscopy", label: "Colonoscopy", cycleLabel: "5 years" },
   { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 years" },
 ];
+const REMINDER_MILESTONES_FORTNIGHTLY = [1, 0];
+const REMINDER_MILESTONES_MONTHLY = [3, 0];
+const REMINDER_MILESTONES_QUARTERLY = [7, 0];
+const REMINDER_MILESTONES_SIX_MONTHLY = [30, 14, 7, 0];
+const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
+const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
+const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -2040,12 +2047,28 @@ function getWarningDays(metricOrIntervalDays) {
     return metricOrIntervalDays.warningDays;
   }
   const intervalDays = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays?.intervalDays : metricOrIntervalDays;
-  if (intervalDays <= 14) return 2;
+  const metricName = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays?.name : "";
+  if (!intervalDays) return 0;
+  if (metricName === "Colonoscopy") return 120;
+  if (intervalDays <= 14) return 1;
   if (intervalDays <= 31) return 3;
   if (intervalDays <= 90) return 7;
-  if (intervalDays <= 210) return 14;
+  if (intervalDays <= 210) return 30;
   if (intervalDays <= 400) return 30;
   return 90;
+}
+
+function getTelegramReminderMilestoneDays(selectedMetric) {
+  if (selectedMetric?.telegramReminderDays?.length) return selectedMetric.telegramReminderDays;
+  const intervalDays = selectedMetric?.intervalDays ?? 0;
+  if (!intervalDays) return [];
+  if (selectedMetric.name === "Colonoscopy") return REMINDER_MILESTONES_COLONOSCOPY;
+  if (intervalDays <= 14) return REMINDER_MILESTONES_FORTNIGHTLY;
+  if (intervalDays <= 31) return REMINDER_MILESTONES_MONTHLY;
+  if (intervalDays <= 90) return REMINDER_MILESTONES_QUARTERLY;
+  if (intervalDays <= 210) return REMINDER_MILESTONES_SIX_MONTHLY;
+  if (intervalDays <= 400) return REMINDER_MILESTONES_ANNUAL;
+  return REMINDER_MILESTONES_SCREENING;
 }
 
 function addDays(dateString, days) {
@@ -4195,7 +4218,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.60").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.61").catch(() => {});
   });
 }
 
