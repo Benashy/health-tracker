@@ -55,6 +55,13 @@ html {
   width: 100%;
   min-height: 100vh;
   padding: 28px;
+  transition: opacity 120ms ease;
+}
+
+body.app-booting .app-shell {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .workspace {
@@ -66,10 +73,6 @@ body:not(.signed-in) .workspace {
   width: min(560px, 100%);
 }
 
-body.app-booting .workspace {
-  width: min(560px, 100%);
-}
-
 body:not(.signed-in) .eyebrow,
 body:not(.signed-in) .topbar-actions,
 body.app-booting .eyebrow,
@@ -77,8 +80,7 @@ body.app-booting .topbar-actions {
   display: none;
 }
 
-body:not(.signed-in) .topbar,
-body.app-booting .topbar {
+body:not(.signed-in) .topbar {
   display: block;
   margin-bottom: 18px;
 }
@@ -94,12 +96,12 @@ body.app-booting #importReviewModal,
 body.app-booting #metricContextModal,
 body.app-booting #syncStatus,
 body.app-booting #manualRefreshButton,
+body.app-booting .account-sync-footer,
 body.app-booting #signOutButton {
   display: none !important;
 }
 
-body:not(.signed-in) h1,
-body.app-booting h1 {
+body:not(.signed-in) h1 {
   font-size: clamp(2.3rem, 9vw, 4.2rem);
 }
 
