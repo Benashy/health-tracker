@@ -17,6 +17,13 @@
 
   function setPrivateVisibility(isVisible) {
     document.querySelectorAll("[data-private]").forEach((section) => {
+      if (section.classList.contains("modal")) {
+        if (!isVisible) {
+          section.classList.add("hidden");
+          section.setAttribute("aria-hidden", "true");
+        }
+        return;
+      }
       section.classList.toggle("hidden", !isVisible);
       section.setAttribute("aria-hidden", isVisible ? "false" : "true");
     });

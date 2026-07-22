@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.52";
+const APP_VERSION = "v0.53";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -75,6 +75,7 @@ const starterMetricNames = [
   "Resting heart rate",
 ];
 const targetMetricNames = new Set(["Weight", "Waist circumference"]);
+const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup"]);
 const relaxedNearLimitMetrics = new Set([
   "Blood pressure systolic",
   "Blood pressure diastolic",
@@ -258,16 +259,21 @@ const metrics = [
     telegramReminderDays: [42, 30, 14, 7, 1],
     telegramOverdueReminderDay: -1,
     placeholder: "Completed",
+    entryMode: "completion",
+    manualNextDueDate: true,
+    nextDueLabel: "Expiry date",
   }),
   metric("Eye test", "Health checks", "", null, null, "qualitative", "medium", 730, "context", "Every 2 years", null, {
     firstDueDate: "2027-06-01",
     intervalMonths: 24,
     placeholder: "Completed",
+    entryMode: "completion",
   }),
   metric("Dermatology checkup", "Health checks", "", null, null, "qualitative", "medium", 365, "context", "Every 12 months", null, {
     firstDueDate: "2027-07-01",
     intervalMonths: 12,
     placeholder: "Completed",
+    entryMode: "completion",
   }),
   metric("ECG", "One-off and infrequent", "", null, null, "qualitative", "lower", 1825, "context", "Every 5 years or as clinically indicated"),
   metric("Coronary artery calcium score", "One-off and infrequent", "Agatston", null, null, "numeric", "lower", 3650, "lower", "Around age 45, then infrequent if useful"),
@@ -343,6 +349,14 @@ const metricSearchInput = document.querySelector("#metricSearchInput");
 const quickMetricPanel = document.querySelector("#quickMetricPanel");
 const trendMetricInput = document.querySelector("#trendMetricInput");
 const trendPanel = document.querySelector("#trendPanel");
+const dateLabelText = document.querySelector("#dateLabelText");
+const valueFields = document.querySelector("#valueFields");
+const completionPanel = document.querySelector("#completionPanel");
+const completionInput = document.querySelector("#completionInput");
+const nextDueField = document.querySelector("#nextDueField");
+const nextDueLabel = document.querySelector("#nextDueLabel");
+const nextDueInput = document.querySelector("#nextDueInput");
+const completionHint = document.querySelector("#completionHint");
 const unitInput = document.querySelector("#unitInput");
 const lowField = document.querySelector("#lowField");
 const targetField = document.querySelector("#targetField");
@@ -353,6 +367,7 @@ const highLabel = document.querySelector("#highLabel");
 const lowInput = document.querySelector("#lowInput");
 const targetInput = document.querySelector("#targetInput");
 const highInput = document.querySelector("#highInput");
+const referencePanel = document.querySelector("#referencePanel");
 const referenceOptions = document.querySelector("#referenceOptions");
 const referenceLowerEnabled = document.querySelector("#referenceLowerEnabled");
 const targetEnabled = document.querySelector("#targetEnabled");
@@ -1214,12 +1229,29 @@ function selectMetric(name) {
 function syncMetricDefaults() {
   const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (!selectedMetric) return;
+  const isCompletion = isCompletionMetric(selectedMetric);
   unitInput.value = selectedMetric.unit;
   valueInput.type = selectedMetric.type === "numeric" ? "number" : "text";
   valueInput.step = selectedMetric.type === "numeric" ? "0.01" : "";
   valueInput.inputMode = selectedMetric.type === "numeric" ? "decimal" : "text";
   valueInput.placeholder =
     selectedMetric.type === "numeric" ? "Result value" : `e.g. ${selectedMetric.placeholder ?? selectedMetric.normal ?? "Normal"}`;
+  valueInput.required = !isCompletion;
+  if (dateLabelText) dateLabelText.textContent = isCompletion ? "Completed date" : "Date";
+  if (valueFields) valueFields.classList.toggle("hidden", isCompletion);
+  if (completionPanel) completionPanel.classList.toggle("hidden", !isCompletion);
+  if (completionInput) {
+    completionInput.checked = isCompletion;
+    completionInput.required = isCompletion;
+  }
+  if (nextDueLabel) nextDueLabel.textContent = selectedMetric.nextDueLabel ?? "Next due date";
+  if (nextDueInput) {
+    nextDueInput.required = Boolean(isCompletion && selectedMetric.manualNextDueDate);
+    nextDueInput.disabled = Boolean(isCompletion && !selectedMetric.manualNextDueDate);
+    nextDueInput.value = isCompletion ? getCompletionNextDueInputValue(selectedMetric, testDateInput.value) : "";
+  }
+  if (nextDueField) nextDueField.classList.toggle("hidden", !isCompletion || !selectedMetric.manualNextDueDate);
+  if (completionHint) completionHint.textContent = getCompletionHint(selectedMetric, testDateInput.value);
   syncRangeDefaults();
   syncSourceDefaults();
   renderEntryAssist();
@@ -1256,6 +1288,19 @@ function renderEntryAssist() {
     return;
   }
 
+  if (isCompletionMetric(selectedMetric)) {
+    const nextDueText = selectedMetric.manualNextDueDate
+      ? "Enter the certificate expiry date as the next due date"
+      : `Next due is calculated from the completed date (${selectedMetric.cadence})`;
+    entryAssist.innerHTML = `
+      <div>
+        <strong>${escapeHtml(getDisplayGroupForMetric(selectedMetric.name))}</strong>
+        <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(nextDueText)}</span>
+      </div>
+    `;
+    return;
+  }
+
   const savedRange = getSavedRange(profile.id, selectedMetric.name);
   const fields = savedRange?.fields ?? getDefaultReferenceFields(selectedMetric);
   const rangeLabel = getReferenceSetupLabel(fields);
@@ -1275,6 +1320,52 @@ function renderEntryAssist() {
       <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(rangeLabel)} ${escapeHtml(rangeText)}</span>
     </div>
   `;
+}
+
+function isCompletionMetric(metricOrName) {
+  const selectedMetric = typeof metricOrName === "string" ? getMetric(metricOrName) : metricOrName;
+  return Boolean(selectedMetric?.entryMode === "completion" || completionMetricNames.has(selectedMetric?.name));
+}
+
+function getCompletionNextDueInputValue(selectedMetric, completedDate) {
+  if (!isCompletionMetric(selectedMetric)) return "";
+  if (selectedMetric.manualNextDueDate) return nextDueInput?.value ?? "";
+  const nextDueDate = getAutoCompletionNextDueDate(selectedMetric, completedDate);
+  return nextDueDate ?? "";
+}
+
+function getAutoCompletionNextDueDate(selectedMetric, completedDate) {
+  if (!selectedMetric?.intervalMonths || !completedDate) return "";
+  const date = parseDateString(completedDate);
+  return date ? toDateString(addMonths(date, selectedMetric.intervalMonths)) : "";
+}
+
+function getCompletionHint(selectedMetric, completedDate) {
+  if (!isCompletionMetric(selectedMetric)) return "";
+  if (selectedMetric.manualNextDueDate) {
+    return "Record the completion date and the certificate expiry date.";
+  }
+  const nextDueDate = getAutoCompletionNextDueDate(selectedMetric, completedDate);
+  return nextDueDate ? `Next due will be ${formatDate(nextDueDate)}.` : "Record the date completed.";
+}
+
+function getCompletionResultNextDueDate(selectedMetric, completedDate) {
+  if (!isCompletionMetric(selectedMetric)) return "";
+  if (selectedMetric.manualNextDueDate) return nextDueInput?.value ?? "";
+  return getAutoCompletionNextDueDate(selectedMetric, completedDate);
+}
+
+function getResultStoredNextDueDate(result) {
+  return result?.next_due_date ?? result?.nextDueDate ?? result?.expiry_date ?? result?.expiryDate ?? "";
+}
+
+function syncCompletionDueFields() {
+  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
+  if (!isCompletionMetric(selectedMetric)) return;
+  if (nextDueInput && !selectedMetric.manualNextDueDate) {
+    nextDueInput.value = getAutoCompletionNextDueDate(selectedMetric, testDateInput.value);
+  }
+  if (completionHint) completionHint.textContent = getCompletionHint(selectedMetric, testDateInput.value);
 }
 
 function getMetric(name, profileId = null) {
@@ -1327,6 +1418,7 @@ function normaliseSavedRange(range = {}, metricName = "") {
 
 function getDefaultReferenceFields(selectedMetric, values = {}) {
   if (!selectedMetric) return { lower: false, target: false, upper: false };
+  if (isCompletionMetric(selectedMetric)) return { lower: false, target: false, upper: false };
   return {
     lower: values.low !== null && values.low !== undefined ? true : !isTargetMetric(selectedMetric.name) && selectedMetric.low !== null,
     target: values.target !== null && values.target !== undefined ? true : isTargetMetric(selectedMetric.name),
@@ -1368,6 +1460,23 @@ function syncRangeDefaults() {
   const profile = getSelectedProfile();
   const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
+  if (isCompletionMetric(selectedMetric)) {
+    referencePanel?.classList.add("hidden");
+    referenceOptions?.classList.add("hidden");
+    lowField?.classList.add("hidden");
+    targetField?.classList.add("hidden");
+    highField?.classList.add("hidden");
+    if (referenceLowerEnabled) referenceLowerEnabled.checked = false;
+    if (targetEnabled) targetEnabled.checked = false;
+    if (referenceUpperEnabled) referenceUpperEnabled.checked = false;
+    if (lowInput) lowInput.value = "";
+    if (targetInput) targetInput.value = "";
+    if (highInput) highInput.value = "";
+    state.editingRangeKey = null;
+    state.referenceDraftKey = null;
+    return;
+  }
+  referencePanel?.classList.remove("hidden");
 
   const key = getRangeKey(profile.id, selectedMetric.name);
   const savedRange = getSavedRange(profile.id, selectedMetric.name);
@@ -1726,6 +1835,15 @@ function getDueStatus(profile, selectedMetric) {
 }
 
 function getNextDueDate(profileId, selectedMetric, latest) {
+  if (isCompletionMetric(selectedMetric)) {
+    const storedNextDueDate = getResultStoredNextDueDate(latest);
+    if (storedNextDueDate) return parseDateString(storedNextDueDate);
+    if (latest?.sample_date && selectedMetric.intervalMonths && !selectedMetric.manualNextDueDate) {
+      return addMonths(parseDateString(latest.sample_date), selectedMetric.intervalMonths);
+    }
+    if (selectedMetric.firstDueDate) return parseDateString(selectedMetric.firstDueDate);
+  }
+
   if (selectedMetric.firstDueDate) {
     const firstDueDate = parseDateString(selectedMetric.firstDueDate);
     if (!firstDueDate) return null;
@@ -1803,10 +1921,9 @@ function snoozeScheduleItem(profileId, metricName) {
 }
 
 function getNextSnoozeDate(profileId, selectedMetric) {
-  if (selectedMetric.firstDueDate && selectedMetric.intervalMonths) {
+  if ((selectedMetric.firstDueDate || isCompletionMetric(selectedMetric)) && selectedMetric.intervalMonths) {
     const nextDate = getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], selectedMetric).nextDate;
-    const today = new Date();
-    return nextDate && daysBetween(today, nextDate) >= 0
+    return nextDate
       ? addMonths(nextDate, selectedMetric.intervalMonths)
       : addMonths(parseDateString(selectedMetric.firstDueDate), selectedMetric.intervalMonths);
   }
@@ -2204,6 +2321,7 @@ function getDisplayGroupForMetric(metricName) {
   if (group === "Endocrine") return "Thyroid and endocrine";
   if (group.startsWith("Hormone panel")) return "Hormones";
   if (group === "Urinalysis") return "Urinalysis";
+  if (group === "Health checks") return "Health checks";
   if (group === "One-off and infrequent") return "Infrequent checks";
   return group || "Other";
 }
@@ -2222,6 +2340,7 @@ function getDisplayGroupOrder(metricName) {
     "Thyroid and endocrine",
     "Hormones",
     "Urinalysis",
+    "Health checks",
     "Infrequent checks",
     "Other",
   ];
@@ -2290,6 +2409,12 @@ function renderOnboarding(scopedResults, flaggedCount, dueCount) {
 }
 
 function formatRangeOrTarget(result) {
+  if (isCompletionMetric(result.metric)) {
+    const nextDueDate = getResultStoredNextDueDate(result);
+    if (!nextDueDate) return "-";
+    const label = getMetric(result.metric)?.manualNextDueDate ? "Expiry" : "Next due";
+    return `${label} ${formatDate(nextDueDate)}`;
+  }
   const low = getResultReferenceLower(result);
   const target = getResultTarget(result);
   const high = getResultReferenceUpper(result);
@@ -2303,6 +2428,7 @@ function formatRangeOrTarget(result) {
 }
 
 function saveRangeForResult(result) {
+  if (isCompletionMetric(result.metric)) return;
   const key = getRangeKey(result.profile_id, result.metric);
   const fields = normaliseReferenceFields(result.reference_fields, getMetric(result.metric), {
     low: result.reference_lower_limit,
@@ -2962,7 +3088,7 @@ function setMobileView(view, options = {}) {
     menu: mobileMenuPanel,
   }[state.mobileView];
   target?.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (state.mobileView === "add" && options.focusValue !== false) valueInput.focus();
+  if (state.mobileView === "add" && options.focusValue !== false) focusCurrentEntryControl();
 }
 
 function renderSummary() {
@@ -3037,6 +3163,16 @@ function focusMetricEntry(profileId, metricName) {
 function focusEntryPanel() {
   if (isMobileLayout()) setMobileView("add", { scroll: false });
   form.scrollIntoView({ behavior: "smooth", block: "start" });
+  focusCurrentEntryControl();
+}
+
+function focusCurrentEntryControl() {
+  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
+  if (isCompletionMetric(selectedMetric)) {
+    if (selectedMetric.manualNextDueDate) nextDueInput?.focus();
+    else completionInput?.focus();
+    return;
+  }
   valueInput.focus();
 }
 
@@ -3160,7 +3296,7 @@ function showMetricContext(metricName) {
     <p>${escapeHtml(rawNote)}</p>
     <div class="context-meta">
       <span>${escapeHtml(selectedMetric.type === "qualitative" ? "Qualitative metric" : "Numeric metric")}</span>
-      <span>${escapeHtml(isTargetMetric(metricName) ? "Target based" : "Reference range based")}</span>
+      <span>${escapeHtml(isCompletionMetric(selectedMetric) ? "Completion based" : isTargetMetric(metricName) ? "Target based" : "Reference range based")}</span>
       <span>${escapeHtml(getDefaultSourceType(metricName))}</span>
     </div>
     <p class="privacy-note">General prevention context only. Use persistent, marked, symptomatic, or concerning changes as prompts for clinician discussion.</p>
@@ -3197,12 +3333,22 @@ function addResult(event) {
   const profile = getProfile(personInput.value);
   const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
+  const isCompletion = isCompletionMetric(selectedMetric);
 
-  const resultValue = parseResultValue(valueInput.value, selectedMetric.type);
+  const resultValue = isCompletion ? "Completed" : parseResultValue(valueInput.value, selectedMetric.type);
   if (resultValue === null || resultValue === "") return;
+  if (isCompletion && !completionInput.checked) {
+    window.alert("Tick completed before saving this health check.");
+    return;
+  }
 
   const measurementDate = testDateInput.value;
-  const referenceFields = getReferenceOptionValues();
+  const completionNextDueDate = getCompletionResultNextDueDate(selectedMetric, measurementDate);
+  if (isCompletion && selectedMetric.manualNextDueDate && !completionNextDueDate) {
+    window.alert("Enter the next due or expiry date before saving this health check.");
+    return;
+  }
+  const referenceFields = isCompletion ? { lower: false, target: false, upper: false } : getReferenceOptionValues();
   const result = {
     id: getId(),
     profile_id: profile.id,
@@ -3213,7 +3359,7 @@ function addResult(event) {
     group: selectedMetric.group,
     metric_type: selectedMetric.type,
     result_value: resultValue,
-    unit: unitInput.value.trim(),
+    unit: isCompletion ? "" : unitInput.value.trim(),
     reference_lower_limit: referenceFields.lower ? parseLimit(lowInput.value) : null,
     target_value: referenceFields.target ? parseLimit(targetInput.value) : null,
     reference_upper_limit: referenceFields.upper ? parseLimit(highInput.value) : null,
@@ -3227,6 +3373,9 @@ function addResult(event) {
     absolute_change_since_previous_test: null,
     percentage_change_since_previous_test: null,
     trend_direction: "first",
+    completed: isCompletion ? true : undefined,
+    next_due_date: isCompletion ? completionNextDueDate : undefined,
+    expiry_date: isCompletion && selectedMetric.manualNextDueDate ? completionNextDueDate : undefined,
     notes: notesInput.value.trim(),
     source_type: sourceTypeInput.value,
     source_confidence: sourceConfidenceInput.value,
@@ -3236,7 +3385,7 @@ function addResult(event) {
 
   state.results.push(result);
   delete state.scheduleState.snoozes[getSnoozeKey(profile.id, selectedMetric.name)];
-  saveRangeForResult(result);
+  if (!isCompletion) saveRangeForResult(result);
   saveScheduleState();
   saveResults();
   form.reset();
@@ -3297,6 +3446,9 @@ function exportCsv() {
     "sample_date",
     "metric",
     "result_value",
+    "completed",
+    "next_due_date",
+    "expiry_date",
     "unit",
     "reference_lower_limit",
     "target_value",
@@ -3645,6 +3797,7 @@ function prepareChatGptImport(payload) {
     }
     const importedRangeTarget = parseLimit(range.target_value ?? (isTargetMetric(selectedMetric.name) ? range.reference_upper_limit : null));
     const importedRangeHigh = parseLimit(isTargetMetric(selectedMetric.name) && range.target_value === undefined ? null : range.reference_upper_limit);
+    if (isCompletionMetric(selectedMetric)) return;
     prepared.ranges.push({
       profile_id: profile.id,
       person_name: profile.name,
@@ -3668,7 +3821,9 @@ function prepareChatGptImport(payload) {
       return;
     }
 
-    const resultValue = parseResultValue(item.result_value, selectedMetric.type);
+    const resultValue = isCompletionMetric(selectedMetric)
+      ? "Completed"
+      : parseResultValue(item.result_value, selectedMetric.type);
     if (resultValue === null || resultValue === "") {
       prepared.skipped.push({ reason: "Missing or invalid result value", item });
       return;
@@ -3677,6 +3832,7 @@ function prepareChatGptImport(payload) {
     const importedTarget = parseLimit(item.target_value ?? (isTargetMetric(selectedMetric.name) ? item.reference_upper_limit : null));
     const importedHigh = parseLimit(isTargetMetric(selectedMetric.name) && item.target_value === undefined ? null : item.reference_upper_limit);
 
+    const importedNextDueDate = item.next_due_date ?? item.nextDueDate ?? item.expiry_date ?? item.expiryDate ?? "";
     const result = {
       id: getId(),
       profile_id: profile.id,
@@ -3687,11 +3843,16 @@ function prepareChatGptImport(payload) {
       group: selectedMetric.group,
       metric_type: selectedMetric.type,
       result_value: resultValue,
-      unit: item.unit ?? selectedMetric.unit,
-      reference_lower_limit: parseLimit(item.reference_lower_limit),
-      target_value: importedTarget,
-      reference_upper_limit: importedHigh,
-      reference_fields: normaliseReferenceFields(item.reference_fields, selectedMetric, {
+      completed: isCompletionMetric(selectedMetric) ? true : undefined,
+      next_due_date: isCompletionMetric(selectedMetric)
+        ? importedNextDueDate || getAutoCompletionNextDueDate(selectedMetric, item.date || item.sample_date || item.result_date || item.test_date)
+        : undefined,
+      expiry_date: isCompletionMetric(selectedMetric) && selectedMetric.manualNextDueDate ? importedNextDueDate : undefined,
+      unit: isCompletionMetric(selectedMetric) ? "" : item.unit ?? selectedMetric.unit,
+      reference_lower_limit: isCompletionMetric(selectedMetric) ? null : parseLimit(item.reference_lower_limit),
+      target_value: isCompletionMetric(selectedMetric) ? null : importedTarget,
+      reference_upper_limit: isCompletionMetric(selectedMetric) ? null : importedHigh,
+      reference_fields: isCompletionMetric(selectedMetric) ? { lower: false, target: false, upper: false } : normaliseReferenceFields(item.reference_fields, selectedMetric, {
         low: parseLimit(item.reference_lower_limit),
         target: importedTarget,
         high: importedHigh,
@@ -3745,7 +3906,7 @@ function commitPreparedImport(prepared) {
 
   prepared.measurements.forEach((result) => {
     state.results.push(result);
-    saveRangeForResult(result);
+    if (!isCompletionMetric(result.metric)) saveRangeForResult(result);
   });
 
   saveMetricRanges();
@@ -3874,7 +4035,8 @@ function getLatestResultsForExport(results) {
 }
 
 function formatResultForExport(result) {
-  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}; status ${result.status_vs_range}; reference/target ${formatRangeOrTarget(result)}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}; source ${result.source_type ?? "not set"} (${result.source_confidence ?? "not set"})${result.linked_source_document ? `; document: ${result.linked_source_document}` : ""}${result.source_notes ? `; source notes: ${result.source_notes}` : ""}${result.notes ? `; notes: ${result.notes}` : ""}`;
+  const dueText = getResultStoredNextDueDate(result) ? `; next due ${getResultStoredNextDueDate(result)}` : "";
+  return `- ${result.person_name}: ${result.metric} = ${formatValue(result.result_value, result.unit)} on ${result.sample_date}${dueText}; status ${result.status_vs_range}; reference/target ${formatRangeOrTarget(result)}; previous ${formatValue(result.previous_result, result.unit)}; change ${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)}); trend ${result.trend_direction}; cadence ${result.cadence}; source ${result.source_type ?? "not set"} (${result.source_confidence ?? "not set"})${result.linked_source_document ? `; document: ${result.linked_source_document}` : ""}${result.source_notes ? `; source notes: ${result.source_notes}` : ""}${result.notes ? `; notes: ${result.notes}` : ""}`;
 }
 
 function downloadText(filename, content, type) {
@@ -3905,7 +4067,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.52").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.53").catch(() => {});
   });
 }
 
@@ -3967,6 +4129,7 @@ metricInput.addEventListener("change", () => {
   syncMetricDefaults();
   renderQuickMetrics();
 });
+testDateInput.addEventListener("change", syncCompletionDueFields);
 metricSearchInput.addEventListener("input", populateMetrics);
 quickMetricPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-metric-name]");

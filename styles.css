@@ -807,6 +807,36 @@ legend {
   font-weight: 800;
 }
 
+.completion-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(35, 111, 98, 0.22);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
+}
+
+.completion-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0;
+  border: 1px solid rgba(35, 111, 98, 0.24);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--accent-dark);
+  padding: 10px 12px;
+  font-weight: 850;
+}
+
+.completion-check input {
+  width: auto;
+  min-height: 0;
+  transform: scale(1.15);
+}
+
 .reference-panel {
   margin-bottom: 14px;
   border: 1px solid #d7ded8;

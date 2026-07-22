@@ -10,9 +10,20 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.52`.
+- The app is now on `v0.53`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.53
+
+- Fixed the Telegram settings modal flash on login by preventing the privacy guard from opening private modals automatically.
+- Reworked Pilot medical, Eye test, and Dermatology checkup as completion-style health checks rather than lab-style measurements.
+- Hid reference setup, value, and unit fields for those completion-only health checks.
+- Added a manual expiry/next-due date field for Ben's UK CAA pilot medical.
+- Set Eye test and Dermatology checkup to calculate their next due dates from the completed date entered.
+- Added a dedicated `Health checks` group in the Results section.
+- Added completion, next due date, and expiry date metadata to CSV/GPT-style exports and imports.
+- Updated the Telegram reminder backend to respect manually-entered pilot medical expiry dates and completion-date-based health-check cycles.
 
 ## Completed In v0.52
 
@@ -21,7 +32,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - Added custom Telegram milestone reminders for the pilot medical at six weeks, one month, two weeks, one week, one day, and once expired.
 - Added two-year eye test tracking for Ben and Angelika, first due on 1 June 2027.
 - Added annual dermatology checkup tracking for Ben and Angelika, first due on 1 July 2027.
-- Added fixed calendar recurrence support so annual/two-year health checks do not drift through leap years.
+- Added initial fixed calendar recurrence support for annual/two-year health checks; revised in v0.53 for completion-date-based checks.
 
 ## Completed In v0.51
 

@@ -61,6 +61,8 @@ type DashboardMetric = {
   warningDays?: number;
   telegramReminderDays?: number[];
   telegramOverdueReminderDay?: number;
+  entryMode?: string;
+  manualNextDueDate?: boolean;
 };
 
 type DashboardProfile = {
@@ -73,6 +75,10 @@ type DashboardMeasurement = {
   metric?: string;
   sample_date?: string;
   test_date?: string;
+  next_due_date?: string;
+  nextDueDate?: string;
+  expiry_date?: string;
+  expiryDate?: string;
 };
 
 type DashboardRow = {
@@ -143,14 +149,18 @@ const REMINDER_METRICS: DashboardMetric[] = [
     warningDays: 42,
     telegramReminderDays: [42, 30, 14, 7, 1],
     telegramOverdueReminderDay: -1,
+    entryMode: "completion",
+    manualNextDueDate: true,
   }),
   metric("Eye test", "Health checks", 730, "medium", "Every 2 years", {
     firstDueDate: "2027-06-01",
     intervalMonths: 24,
+    entryMode: "completion",
   }),
   metric("Dermatology checkup", "Health checks", 365, "medium", "Every 12 months", {
     firstDueDate: "2027-07-01",
     intervalMonths: 12,
+    entryMode: "completion",
   }),
 ];
 
@@ -669,6 +679,14 @@ function isMetricAvailableForProfile(selectedMetric: DashboardMetric, profileId?
   return selectedMetric.profileIds.includes(profileId);
 }
 
+function isCompletionMetric(selectedMetric: DashboardMetric) {
+  return selectedMetric.entryMode === "completion";
+}
+
+function getStoredNextDueDate(result: DashboardMeasurement | null) {
+  return result?.next_due_date ?? result?.nextDueDate ?? result?.expiry_date ?? result?.expiryDate ?? "";
+}
+
 function getLatestResult(profileId: string, metricName: string, measurements: DashboardMeasurement[]) {
   return [...measurements]
     .filter((result) => result.profile_id === profileId && result.metric === metricName)
@@ -700,6 +718,17 @@ function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetri
 }
 
 function getNextDueDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[], latest: DashboardMeasurement | null) {
+  if (isCompletionMetric(selectedMetric)) {
+    const storedNextDueDate = getStoredNextDueDate(latest);
+    if (storedNextDueDate) return parseDateString(storedNextDueDate);
+    const latestDate = latest?.sample_date ?? latest?.test_date ?? "";
+    if (latestDate && selectedMetric.intervalMonths && !selectedMetric.manualNextDueDate) {
+      const parsedLatestDate = parseDateString(latestDate);
+      return parsedLatestDate ? addMonths(parsedLatestDate, selectedMetric.intervalMonths) : null;
+    }
+    if (selectedMetric.firstDueDate) return parseDateString(selectedMetric.firstDueDate);
+  }
+
   if (selectedMetric.firstDueDate) {
     const firstDueDate = parseDateString(selectedMetric.firstDueDate);
     if (!firstDueDate) return null;

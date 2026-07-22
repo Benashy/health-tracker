@@ -108,6 +108,14 @@ function createDocument() {
     "trendMetricInput",
     "trendViewPanel",
     "trendPanel",
+    "dateLabelText",
+    "valueFields",
+    "completionPanel",
+    "completionInput",
+    "nextDueField",
+    "nextDueLabel",
+    "nextDueInput",
+    "completionHint",
     "unitInput",
     "lowField",
     "targetField",
@@ -118,6 +126,7 @@ function createDocument() {
     "lowInput",
     "targetInput",
     "highInput",
+    "referencePanel",
     "referenceOptions",
     "referenceLowerEnabled",
     "targetEnabled",
@@ -326,8 +335,8 @@ const telegramScheduleSql = fs.readFileSync("supabase/telegram_reminder_schedule
 const telegramFunction = fs.readFileSync("supabase/functions/health-tracker-telegram/index.ts", "utf8");
 const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
 const faviconIco = fs.readFileSync("favicon.ico");
-assert(indexHtml.includes("app.js?v=0.52"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.52"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.53"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.53"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -343,7 +352,7 @@ assert(indexHtml.includes("telegramDueTestButton"), "Telegram due reminder test 
 assert(indexHtml.includes("telegramPauseButton"), "Telegram reminders should have a pause control");
 assert(indexHtml.includes("telegramDisconnectButton"), "Telegram reminders should have a disconnect control");
 assert(indexHtml.includes("telegramReminderGroups"), "Telegram reminder groups should show cycle labels");
-assert(indexHtml.includes("v0.52"), "app shell should expose the new version");
+assert(indexHtml.includes("v0.53"), "app shell should expose the new version");
 assert(telegramFunction.includes("HEALTH_TRACKER_TELEGRAM_BOT_TOKEN"), "Telegram token should be read from Supabase secrets");
 assert(telegramFunction.includes("requireApprovedUser"), "Telegram function should require an approved signed-in user");
 assert(telegramFunction.includes("requireCronRequest"), "scheduled Telegram reminders should require a private scheduler credential");
@@ -360,6 +369,7 @@ assert(telegramFunction.includes('"Pilot medical"'), "Telegram reminders should 
 assert(telegramFunction.includes('"Eye test"'), "Telegram reminders should include the shared eye test");
 assert(telegramFunction.includes('"Dermatology checkup"'), "Telegram reminders should include the shared dermatology check");
 assert(telegramFunction.includes("telegramReminderDays: [42, 30, 14, 7, 1]"), "pilot medical should use the requested reminder milestones");
+assert(telegramFunction.includes("manualNextDueDate: true"), "pilot medical reminders should use the manually entered expiry date");
 assert(telegramFunction.includes("scheduledOnly"), "scheduled Telegram reminders should support milestone-only filtering");
 assert(telegramFunction.includes("health_dashboard_telegram_pairing_codes"), "Telegram pairing should use webhook-captured pairing codes");
 assert(!telegramFunction.includes("getUpdates"), "Telegram pairing should not use polling once webhook callbacks are enabled");
@@ -377,16 +387,19 @@ assert(indexHtml.includes("resultsViewPanel"), "results should have a dedicated 
 assert(indexHtml.includes("entry-submit-button"), "mobile entry submit affordance should exist");
 assert(indexHtml.includes("referenceOptions"), "reference field selectors should exist");
 assert(indexHtml.includes("targetInput"), "target should have a dedicated input");
+assert(indexHtml.includes("completionPanel"), "completion-only health checks should have a dedicated panel");
+assert(indexHtml.includes("nextDueInput"), "pilot medical should support a manually entered next due or expiry date");
 assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "account should appear before profile details");
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.52"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.52"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.53"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.53"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
-assert(/<label>\s*Date\s*<input id="dateInput"/.test(indexHtml), "measurement form should show one date field");
+assert(fs.readFileSync("privacy-guard.js", "utf8").includes('section.classList.contains("modal")'), "privacy guard should not auto-open private modals");
+assert(indexHtml.includes('<span id="dateLabelText">Date</span>'), "measurement form should show one date field with a dynamic label");
 assert(!indexHtml.includes(">Sample date"), "measurement form should not show a separate sample date field");
 assert(/<label class="hidden reference-field" id="lowField">/.test(indexHtml), "default weight form should hide lower limit before JavaScript runs");
 assert(indexHtml.includes("<span id=\"targetLabel\">Target</span>"), "target should use its own label");
@@ -404,24 +417,24 @@ assert(!indexHtml.includes("latest measurement"), "summary strip should not show
 assert(indexHtml.includes("nextDueCard"), "next due tile should have a dedicated status card");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.52"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.53"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.52")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.52"), "iOS touch icon should use PNG");
-assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.52"), "browser favicon should use a unique Health Dashboard ICO filename");
-assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.52"), "browser favicon should use a unique 32px PNG filename");
-assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.52"), "browser favicon should use a unique 16px PNG filename");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.53")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.53"), "iOS touch icon should use PNG");
+assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.53"), "browser favicon should use a unique Health Dashboard ICO filename");
+assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.53"), "browser favicon should use a unique 32px PNG filename");
+assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.53"), "browser favicon should use a unique 16px PNG filename");
 assert(faviconIco.length > 100, "favicon ICO should be generated");
 assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
 assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
 assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
-assert(serviceWorker.includes("health-dashboard-v0.52"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.52"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.52"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.52"), "service worker should cache the unique ICO favicon");
-assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.52"), "service worker should cache the unique PNG favicon");
-assert(serviceWorker.includes("app-icon-512.png?v=0.52"), "service worker should cache PNG app icons");
+assert(serviceWorker.includes("health-dashboard-v0.53"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.53"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.53"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.53"), "service worker should cache the unique ICO favicon");
+assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.53"), "service worker should cache the unique PNG favicon");
+assert(serviceWorker.includes("app-icon-512.png?v=0.53"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -448,7 +461,7 @@ assert(telegramScheduleSql.includes("health_dashboard_telegram_pairing_codes"), 
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret"), "Telegram webhook should use a Vault-backed secret");
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret_matches"), "Telegram webhook secret matcher should exist");
 assert(telegramScheduleSql.includes("'0 8,9 * * *'"), "Telegram scheduled reminders should run around 09:00 Europe/Lisbon across DST");
-assert(document.elements.appVersion.textContent === "v0.52", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.53", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(
   document.elements.nextDueCard.classList.contains("due-now") ||
@@ -462,7 +475,7 @@ assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out sh
 assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
 assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
 assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
-context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.52";
+context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.53";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should redirect to the canonical live dashboard URL");
 context.window.location.href = "http://localhost:3000/";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should not redirect to localhost");
@@ -474,11 +487,21 @@ assert(context.getMetric("Pilot medical", "ben"), "Ben should have the pilot med
 assert(context.getMetric("Pilot medical", "angelika") === null, "Angelika should not have Ben's pilot medical check");
 assert(context.getMetric("Eye test", "angelika"), "Angelika should have the shared eye test");
 assert(context.getMetric("Dermatology checkup", "ben"), "Ben should have the shared dermatology check");
+assert(context.isCompletionMetric(context.getMetric("Pilot medical", "ben")), "pilot medical should use completion entry mode");
+assert(context.getMetric("Pilot medical", "ben").manualNextDueDate === true, "pilot medical should require a manually entered expiry date");
 assert(context.getWarningDays(context.getMetric("Pilot medical", "ben")) === 42, "pilot medical should warn six weeks before expiry");
-assert(context.getNextFixedDueDate("2027-06-01", 24, "2027-06-01").toISOString().slice(0, 10) === "2029-06-01", "two-year eye test should stay fixed to 1 June");
-assert(context.getNextFixedDueDate("2027-07-14", 12, "2027-07-14").toISOString().slice(0, 10) === "2028-07-14", "annual pilot medical should stay fixed to 14 July");
+assert(context.getAutoCompletionNextDueDate(context.getMetric("Eye test", "ben"), "2027-06-10") === "2029-06-10", "two-year eye test should run from completion date");
+assert(context.getAutoCompletionNextDueDate(context.getMetric("Dermatology checkup", "ben"), "2027-07-20") === "2028-07-20", "annual dermatology should run from completion date");
+document.elements.personInput.value = "ben";
+document.elements.markerInput.value = "Pilot medical";
+context.syncMetricDefaults();
+assert(document.elements.valueFields.classList.contains("hidden"), "pilot medical should hide numeric value fields");
+assert(document.elements.referencePanel.classList.contains("hidden"), "pilot medical should hide reference setup");
+assert(!document.elements.nextDueField.classList.contains("hidden"), "pilot medical should show the expiry date field");
 context.handleActionShortcut("menu");
 assert(vm.runInContext('state.mobileView', context) === "home", "signed-out shortcut guard should not switch mobile views");
+document.elements.markerInput.value = "Weight";
+context.syncMetricDefaults();
 vm.runInContext('cloudState.user = { email: "ben_ashurst@me.com" }; cloudState.profileId = null; render();', context);
 assert(document.elements.telegramModal.classList.contains("hidden"), "signed-in render should keep Telegram settings closed");
 assert(document.elements.mobileActionBar.innerHTML.includes('data-mobile-action="home"'), "mobile action bar should render a Home action");
