@@ -674,7 +674,7 @@ legend {
 
 .telegram-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, auto));
+  grid-template-columns: repeat(4, minmax(120px, auto));
   gap: 8px;
   align-content: start;
 }

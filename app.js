@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.46";
+const APP_VERSION = "v0.47";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -361,6 +361,7 @@ const telegramPairingCode = document.querySelector("#telegramPairingCode");
 const telegramPairButton = document.querySelector("#telegramPairButton");
 const telegramCheckButton = document.querySelector("#telegramCheckButton");
 const telegramTestButton = document.querySelector("#telegramTestButton");
+const telegramDueTestButton = document.querySelector("#telegramDueTestButton");
 const statusStrip = document.querySelector(".status-strip");
 const trendViewPanel = document.querySelector("#trendViewPanel");
 const resultsViewPanel = document.querySelector("#resultsViewPanel");
@@ -888,6 +889,7 @@ function setEditingAvailability() {
     telegramPairButton,
     telegramCheckButton,
     telegramTestButton,
+    telegramDueTestButton,
     resetButton,
   ].forEach((element) => {
     if (element) element.classList.toggle("read-only", disabled);
@@ -900,6 +902,7 @@ function setEditingAvailability() {
   if (telegramPairButton) telegramPairButton.disabled = disabled || telegramSetupState.busy;
   if (telegramCheckButton) telegramCheckButton.disabled = disabled || telegramSetupState.busy || !telegramSetupState.pairingCode;
   if (telegramTestButton) telegramTestButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
+  if (telegramDueTestButton) telegramDueTestButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
   if (resetButton) resetButton.disabled = disabled;
   if (!disabled && metricInput.value) {
     syncRangeDefaults();
@@ -2471,9 +2474,11 @@ function renderTelegramPanel() {
   telegramPairButton.textContent = showConnected ? "Replace Telegram" : isPairing ? "New code" : "Pair Telegram";
   telegramCheckButton.classList.toggle("hidden", !isPairing);
   telegramTestButton.classList.toggle("hidden", !showConnected);
+  telegramDueTestButton.classList.toggle("hidden", !showConnected);
   telegramPairButton.disabled = telegramSetupState.busy || isReadOnlyMode();
   telegramCheckButton.disabled = telegramSetupState.busy || !telegramSetupState.pairingCode || isReadOnlyMode();
   telegramTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  telegramDueTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
 }
 
 function generateTelegramPairingCode() {
@@ -2560,6 +2565,32 @@ async function sendTelegramTestMessage() {
     });
     telegramSetupState.status = "Test sent.";
     saveSettings();
+  } catch (error) {
+    telegramSetupState.error = error.message;
+  } finally {
+    telegramSetupState.busy = false;
+    render();
+  }
+}
+
+async function sendTelegramDueTestMessage() {
+  if (!assertCanEdit()) return;
+  const settings = getTelegramSettings();
+  if (!settings.chat_id) {
+    startTelegramPairing();
+    return;
+  }
+
+  telegramSetupState.busy = true;
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Sending due test...";
+  renderTelegramPanel();
+
+  try {
+    const data = await invokeTelegramFunction("send_due_summary");
+    telegramSetupState.status = data.due_count
+      ? `Due test sent with ${data.due_count} checks.`
+      : "Due test sent. Nothing is due right now.";
   } catch (error) {
     telegramSetupState.error = error.message;
   } finally {
@@ -3612,7 +3643,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.46").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.47").catch(() => {});
   });
 }
 
@@ -3725,6 +3756,7 @@ closeContextButton.addEventListener("click", closeMetricContext);
 if (telegramPairButton) telegramPairButton.addEventListener("click", startTelegramPairing);
 if (telegramCheckButton) telegramCheckButton.addEventListener("click", checkTelegramPairingCode);
 if (telegramTestButton) telegramTestButton.addEventListener("click", sendTelegramTestMessage);
+if (telegramDueTestButton) telegramDueTestButton.addEventListener("click", sendTelegramDueTestMessage);
 if (resetButton) {
   resetButton.addEventListener("click", () => {
     if (!assertCanEdit()) return;

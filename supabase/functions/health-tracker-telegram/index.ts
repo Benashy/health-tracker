@@ -29,6 +29,102 @@ type TelegramUpdate = {
   message?: TelegramMessage;
 };
 
+type DashboardUser = {
+  id: string;
+  email: string;
+  token: string;
+  publishableKey: string;
+};
+
+type DashboardMetric = {
+  name: string;
+  group: string;
+  intervalDays: number | null;
+  priority: string;
+  cadence: string;
+};
+
+type DashboardProfile = {
+  id?: string;
+  name?: string;
+};
+
+type DashboardMeasurement = {
+  profile_id?: string;
+  metric?: string;
+  sample_date?: string;
+  test_date?: string;
+};
+
+const DASHBOARD_URL = "https://benashy.github.io/health-tracker/";
+const REMINDER_METRICS: DashboardMetric[] = [
+  metric("Weight", "Core body metrics", 14, "highest"),
+  metric("Waist circumference", "Core body metrics", 14, "highest"),
+  metric("Blood pressure systolic", "Vitals and fitness", 30, "highest"),
+  metric("Blood pressure diastolic", "Vitals and fitness", 30, "highest"),
+  metric("Resting heart rate", "Vitals and fitness", 30, "highest"),
+  metric("VO2 Max", "Vitals and fitness", 90, "highest"),
+  metric("Haemoglobin", "Full blood count", 365, "medium"),
+  metric("Erythrocytes", "Full blood count", 365, "medium"),
+  metric("Haematocrit", "Full blood count", 365, "medium"),
+  metric("MCV", "Full blood count", 365, "medium"),
+  metric("MCH", "Full blood count", 365, "medium"),
+  metric("MCHC", "Full blood count", 365, "medium"),
+  metric("RDW", "Full blood count", 365, "medium"),
+  metric("Leukocytes", "Full blood count", 365, "medium"),
+  metric("Neutrophils", "Full blood count", 365, "medium"),
+  metric("Eosinophils", "Full blood count", 365, "medium"),
+  metric("Basophils", "Full blood count", 365, "medium"),
+  metric("Lymphocytes", "Full blood count", 365, "medium"),
+  metric("Monocytes", "Full blood count", 365, "medium"),
+  metric("Platelets", "Full blood count", 365, "medium"),
+  metric("B12", "Vitamins and iron", 365, "medium"),
+  metric("Folate", "Vitamins and iron", 365, "medium"),
+  metric("Ferritin", "Vitamins and iron", 365, "medium"),
+  metric("Vitamin D", "Vitamins and iron", 365, "medium"),
+  metric("Glucose", "Metabolic", 180, "medium"),
+  metric("Fasting glucose", "Metabolic", 180, "medium"),
+  metric("HbA1c NGSP", "Metabolic", 180, "medium"),
+  metric("HbA1c IFCC", "Metabolic", 180, "medium"),
+  metric("Total cholesterol", "Lipids", 180, "medium"),
+  metric("LDL", "Lipids", 180, "medium"),
+  metric("HDL", "Lipids", 180, "medium"),
+  metric("Triglycerides", "Lipids", 180, "medium"),
+  metric("ApoB", "Cardiovascular markers", 365, "highest", "Annual if clinically indicated"),
+  metric("Lipoprotein(a)", "Cardiovascular markers", null, "highest", "One-time lifetime measurement"),
+  metric("CRP", "Inflammation", 365, "medium"),
+  metric("Creatinine", "Renal and purines", 365, "medium"),
+  metric("eGFR", "Renal and purines", 365, "medium"),
+  metric("AST", "Liver and enzymes", 365, "medium"),
+  metric("ALT", "Liver and enzymes", 365, "medium"),
+  metric("GGT", "Liver and enzymes", 365, "medium"),
+  metric("TSH", "Endocrine", 365, "medium"),
+  metric("FT4", "Endocrine", 365, "medium"),
+  metric("Total testosterone", "Hormone panel", 365, "highest", "If symptoms or clinically indicated"),
+  metric("SHBG", "Hormone panel", 365, "highest", "If symptoms or clinically indicated"),
+];
+
+function metric(name: string, group: string, intervalDays: number | null, priority: string, cadence?: string): DashboardMetric {
+  return {
+    name,
+    group,
+    intervalDays,
+    priority,
+    cadence: cadence ?? formatInterval(intervalDays),
+  };
+}
+
+function formatInterval(intervalDays: number | null) {
+  if (intervalDays === null) return "Clinically indicated or one-off";
+  if (intervalDays <= 31) return `${intervalDays} days`;
+  if (intervalDays === 90) return "Every 3 months";
+  if (intervalDays === 180) return "Every 6 months";
+  if (intervalDays === 365) return "Every 12 months";
+  if (intervalDays === 1825) return "Every 5 years";
+  if (intervalDays === 3650) return "Every 10 years";
+  return `Every ${intervalDays} days`;
+}
+
 function corsHeaders(req: Request) {
   const origin = req.headers.get("Origin") ?? "";
   const allowOrigin = ALLOWED_ORIGINS.has(origin) || origin.startsWith("http://localhost:")
@@ -62,7 +158,7 @@ function getPublishableKey() {
   return Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 }
 
-async function requireApprovedUser(req: Request) {
+async function requireApprovedUser(req: Request): Promise<DashboardUser> {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   const publishableKey = getPublishableKey();
   if (!token || !SUPABASE_URL || !publishableKey) {
@@ -94,7 +190,7 @@ async function requireApprovedUser(req: Request) {
     });
   }
 
-  return { id: String(user.id ?? ""), email };
+  return { id: String(user.id ?? ""), email, token, publishableKey };
 }
 
 async function telegramApi(method: string, payload: Record<string, unknown> = {}) {
@@ -201,18 +297,252 @@ async function handleSendTest(req: Request, body: Record<string, unknown>) {
   return jsonResponse(req, { ok: true, sent: true });
 }
 
+async function getDashboardData(user: DashboardUser) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?select=data&user_id=eq.${encodeURIComponent(user.id)}`, {
+    headers: {
+      apikey: user.publishableKey,
+      Authorization: `Bearer ${user.token}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    return null;
+  }
+
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows[0]?.data ?? null : null;
+}
+
+function getTelegramSettings(data: Record<string, unknown>) {
+  const settings = data?.settings as Record<string, unknown> | undefined;
+  const telegram = settings?.telegram as Record<string, unknown> | undefined;
+  return {
+    chatId: String(telegram?.chat_id ?? telegram?.chatId ?? "").trim(),
+    chatLabel: String(telegram?.chat_label ?? telegram?.chatLabel ?? "").trim(),
+  };
+}
+
+function getDashboardProfiles(data: Record<string, unknown>) {
+  const profiles = Array.isArray(data?.profiles) ? data.profiles as DashboardProfile[] : [];
+  return profiles.length ? profiles : [{ id: "profile", name: "Health Tracker" }];
+}
+
+function getDashboardMeasurements(data: Record<string, unknown>) {
+  const measurements = Array.isArray(data?.measurements)
+    ? data.measurements as DashboardMeasurement[]
+    : Array.isArray(data?.results)
+      ? data.results as DashboardMeasurement[]
+      : [];
+  return measurements.filter((item) => item.metric && (item.sample_date || item.test_date));
+}
+
+function getScheduleState(data: Record<string, unknown>) {
+  const scheduleState = (data?.schedule_state ?? data?.scheduleState ?? {}) as Record<string, unknown>;
+  const snoozes = (scheduleState.snoozes ?? {}) as Record<string, { due_date?: string }>;
+  return { snoozes };
+}
+
+function getScheduleGroup(selectedMetric: DashboardMetric) {
+  if (["Weight", "Waist circumference"].includes(selectedMetric.name)) return { key: "body", label: "Body composition" };
+  if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
+  if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
+    return { key: "six-month-bloods", label: "Six-monthly bloods" };
+  }
+  if (selectedMetric.group === "One-off and infrequent") return { key: "infrequent", label: "Infrequent checks" };
+  if ((selectedMetric.intervalDays ?? 0) >= 365) return { key: "annual-bloods", label: "Annual bloods" };
+  return { key: selectedMetric.group.toLowerCase().replaceAll(" ", "-"), label: selectedMetric.group };
+}
+
+function getSnoozeKey(profileId: string, metricName: string) {
+  return `${profileId}:${metricName}`;
+}
+
+function getLatestResult(profileId: string, metricName: string, measurements: DashboardMeasurement[]) {
+  return [...measurements]
+    .filter((result) => result.profile_id === profileId && result.metric === metricName)
+    .sort((a, b) => {
+      const aDate = a.sample_date ?? a.test_date ?? "";
+      const bDate = b.sample_date ?? b.test_date ?? "";
+      return bDate.localeCompare(aDate);
+    })[0] ?? null;
+}
+
+function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[]) {
+  const group = getScheduleGroup(selectedMetric);
+  const matchingMetrics = REMINDER_METRICS
+    .filter((item) => getScheduleGroup(item).key === group.key && item.intervalDays === selectedMetric.intervalDays)
+    .map((item) => item.name);
+  const matchingResults = measurements
+    .filter((result) => result.profile_id === profileId && matchingMetrics.includes(result.metric ?? ""))
+    .sort((a, b) => {
+      const aDate = a.sample_date ?? a.test_date ?? "";
+      const bDate = b.sample_date ?? b.test_date ?? "";
+      return bDate.localeCompare(aDate);
+    });
+  return matchingResults[0]?.sample_date ?? matchingResults[0]?.test_date ?? null;
+}
+
+function getDueStatus(
+  profile: DashboardProfile,
+  selectedMetric: DashboardMetric,
+  measurements: DashboardMeasurement[],
+  snoozes: Record<string, { due_date?: string }>,
+) {
+  const profileId = profile.id ?? "profile";
+  const latest = getLatestResult(profileId, selectedMetric.name, measurements);
+  if (!selectedMetric.intervalDays) {
+    return latest
+      ? { state: "complete", label: "Recorded", nextDate: null }
+      : { state: "due", label: selectedMetric.cadence, nextDate: null };
+  }
+
+  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric, measurements);
+  let nextDate = anchorDate ? addDays(anchorDate, selectedMetric.intervalDays) : null;
+  if (!latest && !nextDate) return { state: "due", label: "No result yet", nextDate: null };
+
+  const snoozedDate = snoozes[getSnoozeKey(profileId, selectedMetric.name)]?.due_date;
+  if (snoozedDate && (!nextDate || new Date(`${snoozedDate}T00:00:00Z`) > nextDate)) {
+    nextDate = new Date(`${snoozedDate}T00:00:00Z`);
+  }
+
+  if (!nextDate) return { state: "due", label: "No result yet", nextDate: null };
+
+  const daysRemaining = daysBetween(new Date(), nextDate);
+  const warningDays = getWarningDays(selectedMetric.intervalDays);
+  if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, nextDate };
+  if (daysRemaining === 0) return { state: "due", label: "Due today", nextDate };
+  if (daysRemaining <= warningDays) return { state: "soon", label: `Due in ${daysRemaining} days`, nextDate };
+  return { state: "ok", label: `Due ${formatDate(nextDate)}`, nextDate };
+}
+
+function getDueItems(data: Record<string, unknown>) {
+  const profiles = getDashboardProfiles(data);
+  const measurements = getDashboardMeasurements(data);
+  const { snoozes } = getScheduleState(data);
+  return profiles.flatMap((profile) =>
+    REMINDER_METRICS
+      .filter((item) => ["highest", "medium"].includes(item.priority))
+      .map((selectedMetric) => ({
+        profile,
+        metric: selectedMetric,
+        due: getDueStatus(profile, selectedMetric, measurements, snoozes),
+      }))
+      .filter((item) => ["overdue", "due", "soon"].includes(item.due.state)),
+  );
+}
+
+function getWarningDays(intervalDays: number) {
+  if (intervalDays <= 14) return 2;
+  if (intervalDays <= 31) return 3;
+  if (intervalDays <= 90) return 7;
+  if (intervalDays <= 210) return 14;
+  if (intervalDays <= 400) return 30;
+  return 90;
+}
+
+function addDays(dateString: string, days: number) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date;
+}
+
+function daysBetween(start: Date, end: Date) {
+  const startDate = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const endDate = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  return Math.ceil((endDate - startDate) / 86400000);
+}
+
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function summariseMetricNames(names: string[]) {
+  const uniqueNames = [...new Set(names)];
+  if (uniqueNames.length <= 6) return uniqueNames.join(", ");
+  return `${uniqueNames.slice(0, 6).join(", ")} and ${uniqueNames.length - 6} more`;
+}
+
+function getStatusHeadline(dueItems: ReturnType<typeof getDueItems>) {
+  if (dueItems.some((item) => item.due.state === "overdue")) return "Some Health Tracker checks are overdue.";
+  if (dueItems.some((item) => item.due.state === "due")) return "Some Health Tracker checks are due today.";
+  return "Some Health Tracker checks are due soon.";
+}
+
+function buildDueMessage(data: Record<string, unknown>) {
+  const dueItems = getDueItems(data);
+  if (!dueItems.length) {
+    return {
+      dueCount: 0,
+      message: [
+        "Health Tracker reminder",
+        "",
+        "No priority checks are due right now.",
+        "",
+        "No health values are included in Telegram reminders.",
+      ].join("\n"),
+    };
+  }
+
+  const groups = new Map<string, { label: string; names: string[] }>();
+  dueItems.forEach((item) => {
+    const group = getScheduleGroup(item.metric);
+    const existing = groups.get(group.key) ?? { label: group.label, names: [] };
+    existing.names.push(item.metric.name);
+    groups.set(group.key, existing);
+  });
+
+  const lines = [...groups.values()].map((group) => `- ${group.label}: ${summariseMetricNames(group.names)}`);
+  const message = [
+    "Health Tracker reminder",
+    "",
+    getStatusHeadline(dueItems),
+    "",
+    ...lines,
+    "",
+    `Open dashboard: ${DASHBOARD_URL}`,
+    "",
+    "No health values are included in Telegram reminders.",
+  ].join("\n");
+  return { dueCount: dueItems.length, message };
+}
+
+async function handleSendDueSummary(req: Request, user: DashboardUser) {
+  const data = await getDashboardData(user);
+  if (!data) return jsonResponse(req, { ok: false, error: "Dashboard data was not found." }, 404);
+
+  const telegram = getTelegramSettings(data);
+  if (!telegram.chatId) {
+    return jsonResponse(req, { ok: false, error: "Telegram is not linked for this account yet." }, 400);
+  }
+
+  const summary = buildDueMessage(data as Record<string, unknown>);
+  const result = await telegramApi("sendMessage", {
+    chat_id: telegram.chatId,
+    text: summary.message,
+    disable_web_page_preview: true,
+  });
+  if (!result.ok) return jsonResponse(req, { ok: false, error: result.description ?? "Telegram due reminder failed." }, 502);
+
+  return jsonResponse(req, {
+    ok: true,
+    sent: true,
+    due_count: summary.dueCount,
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return jsonResponse(req, { ok: false, error: "POST required." }, 405);
 
   try {
-    await requireApprovedUser(req);
+    const user = await requireApprovedUser(req);
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "probe");
 
     if (action === "probe") return await handleProbe(req);
     if (action === "resolve_chat") return await handleResolveChat(req, body);
     if (action === "send_test") return await handleSendTest(req, body);
+    if (action === "send_due_summary") return await handleSendDueSummary(req, user);
 
     return jsonResponse(req, { ok: false, error: "Unknown Telegram action." }, 400);
   } catch (error) {
