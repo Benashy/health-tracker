@@ -198,7 +198,6 @@ h2 {
 .onboarding-panel,
 .profile-panel,
 .schedule-section,
-.telegram-section,
 .entry-panel,
 .results-panel {
   border: 1px solid var(--line);
@@ -509,8 +508,7 @@ body:not(.signed-in) .auth-actions .ghost-button {
 }
 
 .profile-panel,
-.schedule-section,
-.telegram-section {
+.schedule-section {
   padding: 18px;
 }
 
@@ -621,10 +619,6 @@ legend {
   margin-bottom: 16px;
 }
 
-.telegram-section {
-  margin-bottom: 16px;
-}
-
 .telegram-setup {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -674,7 +668,7 @@ legend {
 
 .telegram-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, auto));
+  grid-template-columns: repeat(3, minmax(120px, auto));
   gap: 8px;
   align-content: start;
 }
@@ -685,6 +679,50 @@ legend {
 
 .telegram-error {
   color: var(--bad);
+}
+
+.telegram-paused {
+  color: var(--amber);
+}
+
+.telegram-reminder-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.telegram-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.telegram-group-heading strong,
+.telegram-group-grid strong,
+.telegram-group-grid span,
+.telegram-group-grid em {
+  display: block;
+}
+
+.telegram-group-heading span,
+.telegram-group-grid span,
+.telegram-group-grid em {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.telegram-group-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.telegram-group-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
 }
 
 .mobile-menu-panel {
@@ -1669,7 +1707,6 @@ button.status-pill:focus-visible {
   .profile-panel,
   .schedule-section,
   .snapshot-section,
-  .telegram-section,
   .mobile-menu-panel,
   .entry-panel,
   .results-panel {
@@ -1717,13 +1754,15 @@ button.status-pill:focus-visible {
     min-height: 46px;
   }
 
-  .telegram-section {
-    margin-bottom: 16px;
+  .telegram-setup,
+  .telegram-actions,
+  .telegram-group-heading,
+  .telegram-group-grid {
+    grid-template-columns: 1fr;
   }
 
-  .telegram-setup,
-  .telegram-actions {
-    grid-template-columns: 1fr;
+  .telegram-group-heading {
+    align-items: stretch;
   }
 
   .mobile-menu-panel.hidden,

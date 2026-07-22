@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.47";
+const APP_VERSION = "v0.48";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -12,6 +12,14 @@ const DATA_VERSION = 1;
 const PRODUCTION_AUTH_REDIRECT_URL = "https://benashy.github.io/health-tracker/";
 const TELEGRAM_FUNCTION_NAME = "health-tracker-telegram";
 const TELEGRAM_BOT_USERNAME = "HealthTrackerReminderBot";
+const TELEGRAM_REMINDER_GROUPS = [
+  { key: "body", label: "Body composition", cycleLabel: "14 days" },
+  { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30 days" },
+  { key: "fitness", label: "Fitness", cycleLabel: "3 months" },
+  { key: "six-month-bloods", label: "Six-monthly bloods", cycleLabel: "6 months" },
+  { key: "annual-bloods", label: "Annual bloods and urine", cycleLabel: "12 months" },
+  { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 years" },
+];
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -353,15 +361,21 @@ const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
 const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
+const telegramModal = document.querySelector("#telegramModal");
 const telegramPanel = document.querySelector("#telegramPanel");
 const telegramStatus = document.querySelector("#telegramStatus");
 const telegramConnectionTitle = document.querySelector("#telegramConnectionTitle");
 const telegramConnectionText = document.querySelector("#telegramConnectionText");
 const telegramPairingCode = document.querySelector("#telegramPairingCode");
+const telegramOpenButton = document.querySelector("#telegramOpenButton");
+const telegramCloseButton = document.querySelector("#telegramCloseButton");
 const telegramPairButton = document.querySelector("#telegramPairButton");
 const telegramCheckButton = document.querySelector("#telegramCheckButton");
 const telegramTestButton = document.querySelector("#telegramTestButton");
 const telegramDueTestButton = document.querySelector("#telegramDueTestButton");
+const telegramPauseButton = document.querySelector("#telegramPauseButton");
+const telegramDisconnectButton = document.querySelector("#telegramDisconnectButton");
+const telegramReminderGroups = document.querySelector("#telegramReminderGroups");
 const statusStrip = document.querySelector(".status-strip");
 const trendViewPanel = document.querySelector("#trendViewPanel");
 const resultsViewPanel = document.querySelector("#resultsViewPanel");
@@ -511,11 +525,19 @@ function normaliseSettings(settings = {}) {
 
 function normaliseTelegramSettings(settings = {}) {
   const chatId = String(settings?.chat_id ?? settings?.chatId ?? "").trim();
+  const explicitEnabled = settings?.enabled ?? settings?.reminders_enabled ?? settings?.remindersEnabled;
+  const snoozes = settings?.snoozes && typeof settings.snoozes === "object" ? settings.snoozes : {};
   return {
     chat_id: chatId,
     chat_label: String(settings?.chat_label ?? settings?.chatLabel ?? "").trim(),
     linked_at: settings?.linked_at ?? settings?.linkedAt ?? "",
     test_sent_at: settings?.test_sent_at ?? settings?.testSentAt ?? "",
+    due_test_sent_at: settings?.due_test_sent_at ?? settings?.dueTestSentAt ?? "",
+    enabled: chatId ? explicitEnabled !== false : false,
+    paused_at: settings?.paused_at ?? settings?.pausedAt ?? "",
+    last_reminder_sent_date: settings?.last_reminder_sent_date ?? settings?.lastReminderSentDate ?? "",
+    last_reminder_signature: settings?.last_reminder_signature ?? settings?.lastReminderSignature ?? "",
+    snoozes,
   };
 }
 
@@ -886,10 +908,13 @@ function setEditingAvailability() {
     exportReviewPackButton,
     snapshotEditor,
     snapshotEditButton,
+    telegramOpenButton,
     telegramPairButton,
     telegramCheckButton,
     telegramTestButton,
     telegramDueTestButton,
+    telegramPauseButton,
+    telegramDisconnectButton,
     resetButton,
   ].forEach((element) => {
     if (element) element.classList.toggle("read-only", disabled);
@@ -903,6 +928,8 @@ function setEditingAvailability() {
   if (telegramCheckButton) telegramCheckButton.disabled = disabled || telegramSetupState.busy || !telegramSetupState.pairingCode;
   if (telegramTestButton) telegramTestButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
   if (telegramDueTestButton) telegramDueTestButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
+  if (telegramPauseButton) telegramPauseButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
+  if (telegramDisconnectButton) telegramDisconnectButton.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
   if (resetButton) resetButton.disabled = disabled;
   if (!disabled && metricInput.value) {
     syncRangeDefaults();
@@ -1646,9 +1673,10 @@ function getScheduleAnchorDate(profileId, selectedMetric) {
 
 function getScheduleGroup(selectedMetric) {
   if (targetMetricNames.has(selectedMetric.name)) return { key: "body", label: "Body composition" };
+  if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness" };
   if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
   if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
-    return { key: "six-month-bloods", label: "Six-month bloods" };
+    return { key: "six-month-bloods", label: "Six-monthly bloods" };
   }
   if (selectedMetric.group === "One-off and infrequent") return { key: "infrequent", label: "Infrequent checks" };
   if (selectedMetric.intervalDays >= 365) return { key: "annual-bloods", label: "Annual bloods" };
@@ -2452,21 +2480,22 @@ function renderTelegramPanel() {
   const isConnected = Boolean(settings.chat_id);
   const isPairing = Boolean(telegramSetupState.pairingCode);
   const showConnected = isConnected && !isPairing;
+  const isPaused = showConnected && settings.enabled === false;
   const statusParts = [];
   if (telegramSetupState.busy) statusParts.push("Checking...");
   else if (telegramSetupState.error) statusParts.push(telegramSetupState.error);
   else if (telegramSetupState.status) statusParts.push(telegramSetupState.status);
-  else statusParts.push(showConnected ? "Connected" : "Not connected");
+  else statusParts.push(showConnected ? (isPaused ? "Paused" : "Connected") : "Not connected");
 
   telegramStatus.textContent = statusParts.join(" ");
-  telegramStatus.className = `privacy-note ${telegramSetupState.error ? "telegram-error" : showConnected ? "telegram-ok" : ""}`;
+  telegramStatus.className = `privacy-note ${telegramSetupState.error ? "telegram-error" : showConnected && !isPaused ? "telegram-ok" : isPaused ? "telegram-paused" : ""}`;
   telegramConnectionTitle.textContent = showConnected
     ? `Connected to ${settings.chat_label || "Telegram"}`
     : isPairing
       ? "Send this code to Health Tracker Bot"
     : "Connect Health Tracker Bot";
   telegramConnectionText.innerHTML = showConnected
-    ? `Reminders will use this private chat. Test messages contain no health values.`
+    ? `${isPaused ? "Reminders are paused." : "Reminders are ready."}${settings.test_sent_at ? ` Last test ${escapeHtml(formatRelativeTime(settings.test_sent_at))}.` : ""}${settings.due_test_sent_at ? ` Last due test ${escapeHtml(formatRelativeTime(settings.due_test_sent_at))}.` : ""}`
     : `Open <a href="https://t.me/${TELEGRAM_BOT_USERNAME}" target="_blank" rel="noopener">Health Tracker Bot</a>, send the pairing code, then check it here.`;
 
   telegramPairingCode.textContent = telegramSetupState.pairingCode;
@@ -2475,10 +2504,51 @@ function renderTelegramPanel() {
   telegramCheckButton.classList.toggle("hidden", !isPairing);
   telegramTestButton.classList.toggle("hidden", !showConnected);
   telegramDueTestButton.classList.toggle("hidden", !showConnected);
+  telegramPauseButton?.classList.toggle("hidden", !showConnected);
+  telegramDisconnectButton?.classList.toggle("hidden", !showConnected);
+  if (telegramPauseButton) telegramPauseButton.textContent = isPaused ? "Resume reminders" : "Pause reminders";
   telegramPairButton.disabled = telegramSetupState.busy || isReadOnlyMode();
   telegramCheckButton.disabled = telegramSetupState.busy || !telegramSetupState.pairingCode || isReadOnlyMode();
   telegramTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
   telegramDueTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  if (telegramPauseButton) telegramPauseButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  if (telegramDisconnectButton) telegramDisconnectButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  renderTelegramReminderGroups();
+}
+
+function renderTelegramReminderGroups() {
+  if (!telegramReminderGroups) return;
+  const settings = getTelegramSettings();
+  telegramReminderGroups.innerHTML = `
+    <div class="telegram-group-heading">
+      <strong>Reminder groups</strong>
+      <span>Next-cycle snooze options show the cycle length before you choose them.</span>
+    </div>
+    <div class="telegram-group-grid">
+      ${TELEGRAM_REMINDER_GROUPS.map(
+        (group) => `
+          <article>
+            <strong>${escapeHtml(group.label)}</strong>
+            <span>Snooze until next cycle (${escapeHtml(group.cycleLabel)})</span>
+            ${settings.snoozes?.[group.key]?.until ? `<em>Snoozed until ${escapeHtml(formatDate(settings.snoozes[group.key].until))}</em>` : ""}
+          </article>
+        `,
+      ).join("")}
+    </div>
+  `;
+}
+
+function openTelegramPanel() {
+  if (!telegramModal || !cloudState.user) return;
+  renderTelegramPanel();
+  telegramModal.classList.remove("hidden");
+  telegramModal.setAttribute("aria-hidden", "false");
+}
+
+function closeTelegramPanel() {
+  if (!telegramModal) return;
+  telegramModal.classList.add("hidden");
+  telegramModal.setAttribute("aria-hidden", "true");
 }
 
 function generateTelegramPairingCode() {
@@ -2532,6 +2602,12 @@ async function checkTelegramPairingCode() {
       chat_label: data.chat.label,
       linked_at: new Date().toISOString(),
       test_sent_at: "",
+      due_test_sent_at: "",
+      enabled: true,
+      paused_at: "",
+      last_reminder_sent_date: "",
+      last_reminder_signature: "",
+      snoozes: {},
     });
     telegramSetupState.pairingCode = "";
     telegramSetupState.status = "Telegram linked.";
@@ -2588,15 +2664,63 @@ async function sendTelegramDueTestMessage() {
 
   try {
     const data = await invokeTelegramFunction("send_due_summary");
+    state.settings.telegram = normaliseTelegramSettings({
+      ...settings,
+      due_test_sent_at: new Date().toISOString(),
+    });
     telegramSetupState.status = data.due_count
       ? `Due test sent with ${data.due_count} checks.`
       : "Due test sent. Nothing is due right now.";
+    saveSettings();
   } catch (error) {
     telegramSetupState.error = error.message;
   } finally {
     telegramSetupState.busy = false;
     render();
   }
+}
+
+function toggleTelegramReminders() {
+  if (!assertCanEdit()) return;
+  const settings = getTelegramSettings();
+  if (!settings.chat_id) {
+    startTelegramPairing();
+    return;
+  }
+  const nextEnabled = settings.enabled === false;
+  state.settings.telegram = normaliseTelegramSettings({
+    ...settings,
+    enabled: nextEnabled,
+    paused_at: nextEnabled ? "" : new Date().toISOString(),
+  });
+  telegramSetupState.error = "";
+  telegramSetupState.status = nextEnabled ? "Reminders resumed." : "Reminders paused.";
+  saveSettings();
+  render();
+}
+
+function disconnectTelegramReminders() {
+  if (!assertCanEdit()) return;
+  const settings = getTelegramSettings();
+  if (!settings.chat_id) return;
+  if (!window.confirm("Disconnect Telegram reminders for this account?")) return;
+  state.settings.telegram = normaliseTelegramSettings({
+    chat_id: "",
+    chat_label: "",
+    linked_at: "",
+    test_sent_at: "",
+    due_test_sent_at: "",
+    enabled: false,
+    paused_at: "",
+    last_reminder_sent_date: "",
+    last_reminder_signature: "",
+    snoozes: {},
+  });
+  telegramSetupState.pairingCode = "";
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Telegram disconnected.";
+  saveSettings();
+  render();
 }
 
 function renderMobileActions(dueCount) {
@@ -2645,7 +2769,6 @@ function renderMobileLayout() {
     snapshotSection,
     statusStrip,
     scheduleSection,
-    telegramPanel,
     contentGrid,
     entryPanel,
     resultsPanel,
@@ -2672,7 +2795,6 @@ function renderMobileLayout() {
   setMobileOnlyHidden(snapshotSection, !onHome);
   setMobileOnlyHidden(statusStrip, !onHome);
   setMobileOnlyHidden(scheduleSection, !onHome);
-  setMobileOnlyHidden(telegramPanel, !onMenu);
   setMobileOnlyHidden(contentGrid, !(onAdd || onTrends || onResults));
   setMobileOnlyHidden(entryPanel, !onAdd);
   setMobileOnlyHidden(resultsPanel, !(onTrends || onResults));
@@ -2838,7 +2960,11 @@ function handleMenuAction(action) {
     exportReviewPack();
     return;
   }
-  if (action === "csv") exportCsv();
+  if (action === "csv") {
+    exportCsv();
+    return;
+  }
+  if (action === "telegram") openTelegramPanel();
 }
 
 function activateSummaryFilter(card) {
@@ -3643,7 +3769,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.47").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.48").catch(() => {});
   });
 }
 
@@ -3753,10 +3879,19 @@ metricContextModal.addEventListener("click", (event) => {
   if (event.target === metricContextModal) closeMetricContext();
 });
 closeContextButton.addEventListener("click", closeMetricContext);
+if (telegramOpenButton) telegramOpenButton.addEventListener("click", openTelegramPanel);
+if (telegramCloseButton) telegramCloseButton.addEventListener("click", closeTelegramPanel);
 if (telegramPairButton) telegramPairButton.addEventListener("click", startTelegramPairing);
 if (telegramCheckButton) telegramCheckButton.addEventListener("click", checkTelegramPairingCode);
 if (telegramTestButton) telegramTestButton.addEventListener("click", sendTelegramTestMessage);
 if (telegramDueTestButton) telegramDueTestButton.addEventListener("click", sendTelegramDueTestMessage);
+if (telegramPauseButton) telegramPauseButton.addEventListener("click", toggleTelegramReminders);
+if (telegramDisconnectButton) telegramDisconnectButton.addEventListener("click", disconnectTelegramReminders);
+if (telegramModal) {
+  telegramModal.addEventListener("click", (event) => {
+    if (event.target === telegramModal) closeTelegramPanel();
+  });
+}
 if (resetButton) {
   resetButton.addEventListener("click", () => {
     if (!assertCanEdit()) return;

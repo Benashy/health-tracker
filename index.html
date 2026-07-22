@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.47" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.47" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.47" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.47" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.47" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.47" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.47" />
-    <link rel="stylesheet" href="styles.css?v=0.47" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.48" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.48" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.48" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.48" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.48" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.48" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.48" />
+    <link rel="stylesheet" href="styles.css?v=0.48" />
   </head>
   <body>
     <main class="app-shell">
@@ -31,6 +31,7 @@
             <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
             <button class="ghost-button" id="exportReviewPackButton" type="button">Prepare AI Review</button>
             <button class="ghost-button" id="exportCsvButton" type="button">Export CSV</button>
+            <button class="ghost-button" id="telegramOpenButton" type="button">Telegram</button>
           </div>
         </header>
 
@@ -171,28 +172,6 @@
             <h2>Due soon</h2>
           </div>
           <div class="schedule-grid" id="schedulePanel"></div>
-        </section>
-
-        <section class="telegram-section hidden" id="telegramPanel" data-private aria-hidden="true" aria-label="Telegram reminders">
-          <div class="panel-heading">
-            <div>
-              <h2>Telegram reminders</h2>
-              <span class="privacy-note" id="telegramStatus">Not connected</span>
-            </div>
-          </div>
-          <div class="telegram-setup">
-            <div class="telegram-card">
-              <strong id="telegramConnectionTitle">Connect Health Tracker Bot</strong>
-              <span id="telegramConnectionText">Pair this account with your private Telegram chat before reminders are enabled.</span>
-              <code class="telegram-code hidden" id="telegramPairingCode"></code>
-            </div>
-            <div class="telegram-actions">
-              <button class="ghost-button" id="telegramPairButton" type="button">Pair Telegram</button>
-              <button class="ghost-button hidden" id="telegramCheckButton" type="button">Check code</button>
-              <button class="ghost-button hidden" id="telegramTestButton" type="button">Send test</button>
-              <button class="ghost-button hidden" id="telegramDueTestButton" type="button">Send due test</button>
-            </div>
-          </div>
         </section>
 
         <section class="content-grid hidden" id="contentGrid" data-private aria-hidden="true">
@@ -359,13 +338,14 @@
             <button class="ghost-button" type="button" data-menu-action="import-gpt">Import from ChatGPT</button>
             <button class="ghost-button" type="button" data-menu-action="ai-review">Prepare AI Review</button>
             <button class="ghost-button" type="button" data-menu-action="csv">Export CSV</button>
+            <button class="ghost-button" type="button" data-menu-action="telegram">Telegram</button>
           </div>
         </section>
 
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.47</span>
+          <span class="version-chip" id="appVersion">v0.48</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -409,9 +389,37 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.47"></script>
+    <section class="modal hidden" id="telegramModal" role="dialog" aria-modal="true" aria-labelledby="telegramTitle" data-private aria-hidden="true">
+      <div class="modal-panel telegram-modal-panel" id="telegramPanel">
+        <div class="panel-heading">
+          <div>
+            <h2 id="telegramTitle">Telegram reminders</h2>
+            <span class="privacy-note" id="telegramStatus">Not connected</span>
+          </div>
+          <button class="mini-button" id="telegramCloseButton" type="button">Close</button>
+        </div>
+        <div class="telegram-setup">
+          <div class="telegram-card">
+            <strong id="telegramConnectionTitle">Connect Health Tracker Bot</strong>
+            <span id="telegramConnectionText">Pair this account with your private Telegram chat before reminders are enabled.</span>
+            <code class="telegram-code hidden" id="telegramPairingCode"></code>
+          </div>
+          <div class="telegram-actions">
+            <button class="ghost-button" id="telegramPairButton" type="button">Pair Telegram</button>
+            <button class="ghost-button hidden" id="telegramCheckButton" type="button">Check code</button>
+            <button class="ghost-button hidden" id="telegramTestButton" type="button">Send test</button>
+            <button class="ghost-button hidden" id="telegramDueTestButton" type="button">Send due test</button>
+            <button class="ghost-button hidden" id="telegramPauseButton" type="button">Pause reminders</button>
+            <button class="ghost-button danger hidden" id="telegramDisconnectButton" type="button">Disconnect</button>
+          </div>
+        </div>
+        <div class="telegram-reminder-groups" id="telegramReminderGroups"></div>
+      </div>
+    </section>
+
+    <script src="supabase-config.js?v=0.48"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.47"></script>
-    <script src="privacy-guard.js?v=0.47"></script>
+    <script src="app.js?v=0.48"></script>
+    <script src="privacy-guard.js?v=0.48"></script>
   </body>
 </html>

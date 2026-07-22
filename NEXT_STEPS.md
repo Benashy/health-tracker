@@ -10,9 +10,20 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.47`.
+- The app is now on `v0.48`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.48
+
+- Moved Telegram reminders out of the dashboard homepage and into a private Telegram management view.
+- Added desktop and mobile Menu entry points for Telegram settings.
+- Added connected/paused status, Send test, Send due test, Pause/Resume reminders, and Disconnect with confirmation.
+- Added private reminder-state fields for enabled/paused status, due-test timestamp, last-reminder metadata, and future snooze state.
+- Added visible next-cycle labels for future snooze choices, such as 14 days, 30 days, 3 months, 6 months, 12 months, and 5-10 years.
+- Removed redundant “no health values” wording from Telegram reminder messages.
+- Split VO2 max into its own fitness reminder group so it can follow a three-month cycle instead of the monthly vitals cycle.
+- Kept automatic Supabase Cron reminders disabled until the manual reminder state has been tested.
 
 ## Completed In v0.47
 
@@ -123,8 +134,8 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Limit medical reminders to one message per user per day by default.
    - Avoid sending health values, DOB, or sensitive clinical detail in Telegram by default.
    - Add duplicate prevention with `last_notified` or equivalent, so the same due item does not nag repeatedly.
-   - Use the v0.47 due-summary test mode for Ben and Angelika before enabling the daily scheduled reminder.
-   - Later add snooze actions such as 1 day, 3 days, and until the next reporting cycle.
+   - Use the v0.48 Telegram management screen and due-summary test mode for Ben and Angelika before enabling the daily scheduled reminder.
+   - Later add Telegram inline snooze actions such as 3 days, 7 days, and until the next reporting cycle, with the cycle length shown in the button label.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.

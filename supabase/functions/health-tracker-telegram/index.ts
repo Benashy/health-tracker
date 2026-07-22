@@ -289,7 +289,7 @@ async function handleSendTest(req: Request, body: Record<string, unknown>) {
 
   const result = await telegramApi("sendMessage", {
     chat_id: chatId,
-    text: "Health Tracker reminders are connected.\n\nThis test did not include any health values.",
+    text: "Health Tracker reminders are connected.",
     disable_web_page_preview: true,
   });
   if (!result.ok) return jsonResponse(req, { ok: false, error: result.description ?? "Telegram test message failed." }, 502);
@@ -344,6 +344,7 @@ function getScheduleState(data: Record<string, unknown>) {
 
 function getScheduleGroup(selectedMetric: DashboardMetric) {
   if (["Weight", "Waist circumference"].includes(selectedMetric.name)) return { key: "body", label: "Body composition" };
+  if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness" };
   if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
   if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
     return { key: "six-month-bloods", label: "Six-monthly bloods" };
@@ -477,8 +478,6 @@ function buildDueMessage(data: Record<string, unknown>) {
         "Health Tracker reminder",
         "",
         "No priority checks are due right now.",
-        "",
-        "No health values are included in Telegram reminders.",
       ].join("\n"),
     };
   }
@@ -500,8 +499,6 @@ function buildDueMessage(data: Record<string, unknown>) {
     ...lines,
     "",
     `Open dashboard: ${DASHBOARD_URL}`,
-    "",
-    "No health values are included in Telegram reminders.",
   ].join("\n");
   return { dueCount: dueItems.length, message };
 }
