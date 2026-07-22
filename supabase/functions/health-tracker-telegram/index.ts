@@ -172,6 +172,10 @@ const REMINDER_METRICS: DashboardMetric[] = [
     profileIds: ["angelika"],
     entryMode: "completion",
   }),
+  metric("Colonoscopy", "Health checks", 1825, "medium", "Every 5 years", {
+    intervalMonths: 60,
+    entryMode: "completion",
+  }),
 ];
 
 function metric(
@@ -622,6 +626,7 @@ function getScheduleGroup(selectedMetric: DashboardMetric) {
   if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology", cycleLabel: "12-month cycle" };
   if (selectedMetric.name === "Pap smear") return { key: "pap-smear", label: "Pap smear", cycleLabel: "3-year cycle" };
   if (selectedMetric.name === "Breast screening") return { key: "breast-screening", label: "Breast screening", cycleLabel: "2-year cycle" };
+  if (selectedMetric.name === "Colonoscopy") return { key: "colonoscopy", label: "Colonoscopy", cycleLabel: "5-year cycle" };
   if (selectedMetric.group === "Vitals and fitness") {
     return { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30-day cycle" };
   }

@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.58";
+const APP_VERSION = "v0.59";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -23,6 +23,7 @@ const TELEGRAM_REMINDER_GROUPS = [
   { key: "dermatology", label: "Dermatology", cycleLabel: "12 months" },
   { key: "pap-smear", label: "Pap smear", cycleLabel: "3 years" },
   { key: "breast-screening", label: "Breast screening", cycleLabel: "2 years" },
+  { key: "colonoscopy", label: "Colonoscopy", cycleLabel: "5 years" },
   { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 years" },
 ];
 const APPROVED_EMAILS = new Set([
@@ -70,6 +71,7 @@ const clinicianSourceMetrics = new Set([
   "Dermatology checkup",
   "Pap smear",
   "Breast screening",
+  "Colonoscopy",
 ]);
 const starterMetricNames = [
   "Weight",
@@ -79,7 +81,7 @@ const starterMetricNames = [
   "Resting heart rate",
 ];
 const targetMetricNames = new Set(["Weight", "Waist circumference"]);
-const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup", "Pap smear", "Breast screening"]);
+const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup", "Pap smear", "Breast screening", "Colonoscopy"]);
 const relaxedNearLimitMetrics = new Set([
   "Blood pressure systolic",
   "Blood pressure diastolic",
@@ -182,6 +184,7 @@ const metricContextNotes = {
   "Dermatology checkup": "A dermatology checkup is tracked as a yearly skin review, including moles and general skin condition. The main value is regular review and documentation of changes over time.",
   "Pap smear": "A Pap smear is tracked here as a recurring cervical screening health check for Angelika. The dashboard records completion and the next due date rather than interpreting clinical results.",
   "Breast screening": "Breast screening is tracked here as a recurring preventative health check for Angelika. The dashboard records completion and the next due date rather than interpreting clinical results.",
+  "Colonoscopy": "Colonoscopy is tracked here as a recurring preventative bowel health check. The dashboard records completion and the next due date rather than interpreting clinical results.",
 };
 
 const metrics = [
@@ -291,6 +294,11 @@ const metrics = [
     intervalMonths: 24,
     profileIds: ["angelika"],
     placeholder: "Completed",
+    entryMode: "completion",
+  }),
+  metric("Colonoscopy", "Health checks", "", null, null, "qualitative", "medium", 1825, "context", "Every 5 years", null, {
+    intervalMonths: 60,
+    placeholder: "Completed and OK",
     entryMode: "completion",
   }),
   metric("ECG", "One-off and infrequent", "", null, null, "qualitative", "lower", 1825, "context", "Every 5 years or as clinically indicated"),
@@ -1925,6 +1933,7 @@ function getScheduleGroup(selectedMetric) {
   if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology" };
   if (selectedMetric.name === "Pap smear") return { key: "pap-smear", label: "Pap smear" };
   if (selectedMetric.name === "Breast screening") return { key: "breast-screening", label: "Breast screening" };
+  if (selectedMetric.name === "Colonoscopy") return { key: "colonoscopy", label: "Colonoscopy" };
   if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
   if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
     return { key: "six-month-bloods", label: "Six-monthly bloods" };
@@ -4136,7 +4145,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.58").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.59").catch(() => {});
   });
 }
 
