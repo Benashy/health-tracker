@@ -213,7 +213,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Keep the reminder time fixed at 09:00 UK/Lisbon time for now.
    - Later consider letting each user choose reminder time and timezone.
    - Review whether the first snooze button wording feels right after Ben and Angelika use it in real reminders.
-   - Work through metric-specific warning periods together. Short-cycle home readings can be reminded close to the due date, but six-month bloods need earlier notice for booking, and multi-year checks such as colonoscopy need one to two months of planning time. Decide how each item should continue to display and remind after the due date has passed.
+   - Review and sign off metric-specific warning periods. Current app warning windows are: 14-day checks warn 2 days before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, 180-day checks warn 14 days before, annual checks warn 30 days before, and multi-year checks warn 90 days before. Pilot medical already has custom Telegram milestones at 6 weeks, 1 month, 2 weeks, 1 week, 1 day, and once expired.
+   - Proposed reminder logic to review together:
+     - Weight / waist, every 14 days: remind on the day or 1 day before, then keep overdue reminders calm.
+     - Blood pressure / resting heart rate, every 30 days: remind 3 days before and on the day.
+     - VO2 max, every 3 months: remind 7 days before and on the day.
+     - Six-month bloods: consider 30 days, 14 days, 7 days, and on the day because blood tests may need booking.
+     - Annual bloods / dermatology / routine annual checks: consider 45 or 30 days, 14 days, 7 days, and on the day.
+     - Eye test / Pap smear / breast screening, every 2-3 years: consider 90 days, 60 days, 30 days, 14 days, 7 days, and on the day.
+     - Colonoscopy, every 5 years: consider 120 days, 90 days, 60 days, 30 days, 14 days, 7 days, and on the day because booking may need more lead time.
+   - Decide separately how each category should continue after the due date has passed, for example daily for short-cycle home readings, weekly for bloods/checks, and monthly for multi-year screening if not yet completed.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.
