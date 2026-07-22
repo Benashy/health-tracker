@@ -167,6 +167,11 @@ const REMINDER_METRICS: DashboardMetric[] = [
     profileIds: ["angelika"],
     entryMode: "completion",
   }),
+  metric("Breast screening", "Health checks", 730, "medium", "Every 2 years", {
+    intervalMonths: 24,
+    profileIds: ["angelika"],
+    entryMode: "completion",
+  }),
 ];
 
 function metric(
@@ -616,6 +621,7 @@ function getScheduleGroup(selectedMetric: DashboardMetric) {
   if (selectedMetric.name === "Eye test") return { key: "eye-test", label: "Eye test", cycleLabel: "2-year cycle" };
   if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology", cycleLabel: "12-month cycle" };
   if (selectedMetric.name === "Pap smear") return { key: "pap-smear", label: "Pap smear", cycleLabel: "3-year cycle" };
+  if (selectedMetric.name === "Breast screening") return { key: "breast-screening", label: "Breast screening", cycleLabel: "2-year cycle" };
   if (selectedMetric.group === "Vitals and fitness") {
     return { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30-day cycle" };
   }
