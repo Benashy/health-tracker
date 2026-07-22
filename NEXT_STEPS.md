@@ -10,9 +10,18 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.51`.
+- The app is now on `v0.52`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.52
+
+- Added Ben-only annual UK CAA pilot medical tracking.
+- Set Ben's pilot medical first expiry/due date to 14 July 2027, with a six-week dashboard warning window.
+- Added custom Telegram milestone reminders for the pilot medical at six weeks, one month, two weeks, one week, one day, and once expired.
+- Added two-year eye test tracking for Ben and Angelika, first due on 1 June 2027.
+- Added annual dermatology checkup tracking for Ben and Angelika, first due on 1 July 2027.
+- Added fixed calendar recurrence support so annual/two-year health checks do not drift through leap years.
 
 ## Completed In v0.51
 

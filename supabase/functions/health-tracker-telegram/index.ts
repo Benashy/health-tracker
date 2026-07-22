@@ -55,6 +55,12 @@ type DashboardMetric = {
   intervalDays: number | null;
   priority: string;
   cadence: string;
+  firstDueDate?: string;
+  intervalMonths?: number;
+  profileIds?: string[];
+  warningDays?: number;
+  telegramReminderDays?: number[];
+  telegramOverdueReminderDay?: number;
 };
 
 type DashboardProfile = {
@@ -130,15 +136,39 @@ const REMINDER_METRICS: DashboardMetric[] = [
   metric("FT4", "Endocrine", 365, "medium"),
   metric("Total testosterone", "Hormone panel", 365, "highest", "If symptoms or clinically indicated"),
   metric("SHBG", "Hormone panel", 365, "highest", "If symptoms or clinically indicated"),
+  metric("Pilot medical", "Health checks", 365, "highest", "Annual UK CAA pilot medical", {
+    firstDueDate: "2027-07-14",
+    intervalMonths: 12,
+    profileIds: ["ben"],
+    warningDays: 42,
+    telegramReminderDays: [42, 30, 14, 7, 1],
+    telegramOverdueReminderDay: -1,
+  }),
+  metric("Eye test", "Health checks", 730, "medium", "Every 2 years", {
+    firstDueDate: "2027-06-01",
+    intervalMonths: 24,
+  }),
+  metric("Dermatology checkup", "Health checks", 365, "medium", "Every 12 months", {
+    firstDueDate: "2027-07-01",
+    intervalMonths: 12,
+  }),
 ];
 
-function metric(name: string, group: string, intervalDays: number | null, priority: string, cadence?: string): DashboardMetric {
+function metric(
+  name: string,
+  group: string,
+  intervalDays: number | null,
+  priority: string,
+  cadence?: string,
+  options: Partial<DashboardMetric> = {},
+): DashboardMetric {
   return {
     name,
     group,
     intervalDays,
     priority,
     cadence: cadence ?? formatInterval(intervalDays),
+    ...options,
   };
 }
 
@@ -148,6 +178,7 @@ function formatInterval(intervalDays: number | null) {
   if (intervalDays === 90) return "Every 3 months";
   if (intervalDays === 180) return "Every 6 months";
   if (intervalDays === 365) return "Every 12 months";
+  if (intervalDays === 730) return "Every 2 years";
   if (intervalDays === 1825) return "Every 5 years";
   if (intervalDays === 3650) return "Every 10 years";
   return `Every ${intervalDays} days`;
@@ -565,6 +596,9 @@ function getScheduleGroup(selectedMetric: DashboardMetric) {
     return { key: "body", label: "Body composition", cycleLabel: "14-day cycle" };
   }
   if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness", cycleLabel: "3-month cycle" };
+  if (selectedMetric.name === "Pilot medical") return { key: "pilot-medical", label: "Pilot medical", cycleLabel: "annual CAA cycle" };
+  if (selectedMetric.name === "Eye test") return { key: "eye-test", label: "Eye test", cycleLabel: "2-year cycle" };
+  if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology", cycleLabel: "12-month cycle" };
   if (selectedMetric.group === "Vitals and fitness") {
     return { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30-day cycle" };
   }
@@ -589,6 +623,8 @@ function getShortCycleLabel(cycleLabel: string) {
     .replace("3-month cycle", "3m")
     .replace("6-month cycle", "6m")
     .replace("12-month cycle", "12m")
+    .replace("2-year cycle", "2y")
+    .replace("annual CAA cycle", "12m")
     .replace("5-10 year cycle", "5-10y");
 }
 
@@ -628,6 +664,11 @@ function getSnoozeKey(profileId: string, metricName: string) {
   return `${profileId}:${metricName}`;
 }
 
+function isMetricAvailableForProfile(selectedMetric: DashboardMetric, profileId?: string) {
+  if (!profileId || !Array.isArray(selectedMetric.profileIds) || !selectedMetric.profileIds.length) return true;
+  return selectedMetric.profileIds.includes(profileId);
+}
+
 function getLatestResult(profileId: string, metricName: string, measurements: DashboardMeasurement[]) {
   return [...measurements]
     .filter((result) => result.profile_id === profileId && result.metric === metricName)
@@ -641,7 +682,12 @@ function getLatestResult(profileId: string, metricName: string, measurements: Da
 function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[]) {
   const group = getScheduleGroup(selectedMetric);
   const matchingMetrics = REMINDER_METRICS
-    .filter((item) => getScheduleGroup(item).key === group.key && item.intervalDays === selectedMetric.intervalDays)
+    .filter((item) =>
+      isMetricAvailableForProfile(item, profileId) &&
+      !item.firstDueDate &&
+      getScheduleGroup(item).key === group.key &&
+      item.intervalDays === selectedMetric.intervalDays
+    )
     .map((item) => item.name);
   const matchingResults = measurements
     .filter((result) => result.profile_id === profileId && matchingMetrics.includes(result.metric ?? ""))
@@ -651,6 +697,31 @@ function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetri
       return bDate.localeCompare(aDate);
     });
   return matchingResults[0]?.sample_date ?? matchingResults[0]?.test_date ?? null;
+}
+
+function getNextDueDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[], latest: DashboardMeasurement | null) {
+  if (selectedMetric.firstDueDate) {
+    const firstDueDate = parseDateString(selectedMetric.firstDueDate);
+    if (!firstDueDate) return null;
+    if (selectedMetric.intervalMonths) {
+      return getNextFixedDueDate(selectedMetric.firstDueDate, selectedMetric.intervalMonths, latest?.sample_date ?? latest?.test_date ?? null);
+    }
+    if (!latest) return firstDueDate;
+  }
+
+  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric, measurements);
+  return anchorDate ? addDays(anchorDate, selectedMetric.intervalDays ?? 0) : null;
+}
+
+function getNextFixedDueDate(firstDueDate: string, intervalMonths: number, latestDateString?: string | null) {
+  let dueDate = parseDateString(firstDueDate);
+  const latestDate = parseDateString(latestDateString ?? "");
+  if (!dueDate) return null;
+  if (!latestDate) return dueDate;
+  while (dueDate <= latestDate) {
+    dueDate = addMonths(dueDate, intervalMonths);
+  }
+  return dueDate;
 }
 
 function getDueStatus(
@@ -667,8 +738,7 @@ function getDueStatus(
       : { state: "due", label: selectedMetric.cadence, nextDate: null };
   }
 
-  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric, measurements);
-  let nextDate = anchorDate ? addDays(anchorDate, selectedMetric.intervalDays) : null;
+  let nextDate = getNextDueDate(profileId, selectedMetric, measurements, latest);
   if (!latest && !nextDate) return { state: "due", label: "No result yet", nextDate: null };
 
   const snoozedDate = snoozes[getSnoozeKey(profileId, selectedMetric.name)]?.due_date;
@@ -679,30 +749,46 @@ function getDueStatus(
   if (!nextDate) return { state: "due", label: "No result yet", nextDate: null };
 
   const daysRemaining = daysBetween(new Date(), nextDate);
-  const warningDays = getWarningDays(selectedMetric.intervalDays);
+  const warningDays = getWarningDays(selectedMetric);
   if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, nextDate };
   if (daysRemaining === 0) return { state: "due", label: "Due today", nextDate };
   if (daysRemaining <= warningDays) return { state: "soon", label: `Due in ${daysRemaining} days`, nextDate };
   return { state: "ok", label: `Due ${formatDate(nextDate)}`, nextDate };
 }
 
-function getDueItems(data: Record<string, unknown>) {
+function shouldIncludeScheduledReminder(
+  item: { metric: DashboardMetric; due: { state: string; nextDate: Date | null } },
+  localDate: string,
+) {
+  if (!item.metric.telegramReminderDays?.length) return true;
+  if (!item.due.nextDate) return true;
+  const daysRemaining = daysBetween(new Date(`${localDate}T00:00:00Z`), item.due.nextDate);
+  if (daysRemaining < 0) return daysRemaining === (item.metric.telegramOverdueReminderDay ?? -1);
+  return item.metric.telegramReminderDays.includes(daysRemaining);
+}
+
+function getDueItems(data: Record<string, unknown>, options: { scheduledOnly?: boolean; localDate?: string } = {}) {
   const profiles = getDashboardProfiles(data);
   const measurements = getDashboardMeasurements(data);
   const { snoozes } = getScheduleState(data);
   return profiles.flatMap((profile) =>
     REMINDER_METRICS
-      .filter((item) => ["highest", "medium"].includes(item.priority))
+      .filter((item) => isMetricAvailableForProfile(item, profile.id) && ["highest", "medium"].includes(item.priority))
       .map((selectedMetric) => ({
         profile,
         metric: selectedMetric,
         due: getDueStatus(profile, selectedMetric, measurements, snoozes),
       }))
-      .filter((item) => ["overdue", "due", "soon"].includes(item.due.state)),
+      .filter((item) => ["overdue", "due", "soon"].includes(item.due.state))
+      .filter((item) => !options.scheduledOnly || shouldIncludeScheduledReminder(item, options.localDate ?? getReminderLocalTime().date)),
   );
 }
 
-function getWarningDays(intervalDays: number) {
+function getWarningDays(metricOrIntervalDays: DashboardMetric | number) {
+  if (typeof metricOrIntervalDays === "object" && metricOrIntervalDays.warningDays !== undefined) {
+    return metricOrIntervalDays.warningDays;
+  }
+  const intervalDays = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays.intervalDays ?? 0 : metricOrIntervalDays;
   if (intervalDays <= 14) return 2;
   if (intervalDays <= 31) return 3;
   if (intervalDays <= 90) return 7;
@@ -715,6 +801,20 @@ function addDays(dateString: string, days: number) {
   const date = new Date(`${dateString}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date;
+}
+
+function addMonths(date: Date, months: number) {
+  const day = date.getUTCDate();
+  const next = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(day, lastDay));
+  return next;
+}
+
+function parseDateString(dateString: string) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function daysBetween(start: Date, end: Date) {
@@ -739,8 +839,8 @@ function getStatusHeadline(dueItems: ReturnType<typeof getDueItems>) {
   return "Some Health Tracker checks are due soon.";
 }
 
-function buildDueMessage(data: Record<string, unknown>) {
-  const dueItems = getDueItems(data);
+function buildDueMessage(data: Record<string, unknown>, options: { scheduledOnly?: boolean; localDate?: string } = {}) {
+  const dueItems = getDueItems(data, options);
   if (!dueItems.length) {
     return {
       dueCount: 0,
@@ -785,8 +885,8 @@ function getReminderLocalTime(now = new Date()) {
   };
 }
 
-function getDueSignature(data: Record<string, unknown>) {
-  return getDueItems(data)
+function getDueSignature(data: Record<string, unknown>, options: { scheduledOnly?: boolean; localDate?: string } = {}) {
+  return getDueItems(data, options)
     .map((item) => {
       const profileId = item.profile.id ?? "profile";
       const nextDate = item.due.nextDate ? formatDate(item.due.nextDate) : "none";
@@ -923,13 +1023,14 @@ async function handleSendScheduledReminders(req: Request, body: Record<string, u
       continue;
     }
 
-    const summary = buildDueMessage(row.data);
+    const reminderOptions = { scheduledOnly: true, localDate: localTime.date };
+    const summary = buildDueMessage(row.data, reminderOptions);
     if (!summary.dueCount) {
       skipped += 1;
       continue;
     }
 
-    const signature = getDueSignature(row.data);
+    const signature = getDueSignature(row.data, reminderOptions);
     const previous = reminderStateRows.get(row.user_id);
     if (previous?.last_sent_date === localTime.date) {
       skipped += 1;

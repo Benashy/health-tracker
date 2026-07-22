@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.51";
+const APP_VERSION = "v0.52";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -18,6 +18,9 @@ const TELEGRAM_REMINDER_GROUPS = [
   { key: "fitness", label: "Fitness", cycleLabel: "3 months" },
   { key: "six-month-bloods", label: "Six-monthly bloods", cycleLabel: "6 months" },
   { key: "annual-bloods", label: "Annual bloods and urine", cycleLabel: "12 months" },
+  { key: "pilot-medical", label: "Pilot medical", cycleLabel: "12 months" },
+  { key: "eye-test", label: "Eye test", cycleLabel: "2 years" },
+  { key: "dermatology", label: "Dermatology", cycleLabel: "12 months" },
   { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 years" },
 ];
 const APPROVED_EMAILS = new Set([
@@ -57,7 +60,13 @@ const manualSourceMetrics = new Set([
 ]);
 
 const wearableSourceMetrics = new Set(["Resting heart rate", "VO2 Max"]);
-const clinicianSourceMetrics = new Set(["ECG", "Coronary artery calcium score"]);
+const clinicianSourceMetrics = new Set([
+  "ECG",
+  "Coronary artery calcium score",
+  "Pilot medical",
+  "Eye test",
+  "Dermatology checkup",
+]);
 const starterMetricNames = [
   "Weight",
   "Waist circumference",
@@ -163,6 +172,9 @@ const metricContextNotes = {
   "Urinary leukocytes": "Microscopic urinary leukocytes can support infection or inflammation when elevated. Interpret with symptoms, nitrites, culture if done, epithelial cells, and whether the sample was clean-catch.",
   "ECG": "An ECG is a short snapshot of the heart's electrical activity. It can show rhythm, conduction, and signs of previous or current strain/injury, but a normal ECG does not exclude intermittent rhythm problems or all heart disease.",
   "Coronary artery calcium score": "CAC score measures calcified plaque in the coronary arteries. Higher scores generally mean higher future cardiovascular risk; a score of zero is reassuring but does not exclude non-calcified plaque or future risk.",
+  "Pilot medical": "Ben's annual UK CAA pilot medical is a standalone administrative/clinical fitness check. It is tracked mainly for expiry and reminder timing rather than trend interpretation.",
+  "Eye test": "A routine eye test is tracked as a recurring preventative check. In this dashboard it is aligned one month before the pilot medical date, so there is time to complete it before the annual medical.",
+  "Dermatology checkup": "A dermatology checkup is tracked as a yearly skin review, including moles and general skin condition. The main value is regular review and documentation of changes over time.",
 };
 
 const metrics = [
@@ -238,6 +250,25 @@ const metrics = [
   metric("Urine leukocytes", "Urinalysis", "", null, null, "qualitative", "lower", 365, "context", "Annual urine screen", "Negative"),
   metric("Urine epithelial cells", "Urinalysis", "/uL", null, 5, "qualitative", "lower", 365, "context", "Annual urine screen", "Rare"),
   metric("Urinary leukocytes", "Urinalysis", "/uL", null, 10, "qualitative", "lower", 365, "context", "Annual urine screen", "Rare"),
+  metric("Pilot medical", "Health checks", "", null, null, "qualitative", "highest", 365, "context", "Annual UK CAA pilot medical", null, {
+    firstDueDate: "2027-07-14",
+    intervalMonths: 12,
+    profileIds: ["ben"],
+    warningDays: 42,
+    telegramReminderDays: [42, 30, 14, 7, 1],
+    telegramOverdueReminderDay: -1,
+    placeholder: "Completed",
+  }),
+  metric("Eye test", "Health checks", "", null, null, "qualitative", "medium", 730, "context", "Every 2 years", null, {
+    firstDueDate: "2027-06-01",
+    intervalMonths: 24,
+    placeholder: "Completed",
+  }),
+  metric("Dermatology checkup", "Health checks", "", null, null, "qualitative", "medium", 365, "context", "Every 12 months", null, {
+    firstDueDate: "2027-07-01",
+    intervalMonths: 12,
+    placeholder: "Completed",
+  }),
   metric("ECG", "One-off and infrequent", "", null, null, "qualitative", "lower", 1825, "context", "Every 5 years or as clinically indicated"),
   metric("Coronary artery calcium score", "One-off and infrequent", "Agatston", null, null, "numeric", "lower", 3650, "lower", "Around age 45, then infrequent if useful"),
 ];
@@ -403,7 +434,7 @@ const appVersion = document.querySelector("#appVersion");
 const signOutButton = document.querySelector("#signOutButton");
 const resetButton = document.querySelector("#resetButton");
 
-function metric(name, group, unit, low, high, type, priority, intervalDays, goal, cadence, normal) {
+function metric(name, group, unit, low, high, type, priority, intervalDays, goal, cadence, normal, options = {}) {
   return {
     name,
     group,
@@ -416,6 +447,7 @@ function metric(name, group, unit, low, high, type, priority, intervalDays, goal
     goal,
     cadence: cadence ?? formatInterval(intervalDays),
     normal,
+    ...options,
   };
 }
 
@@ -425,6 +457,7 @@ function formatInterval(intervalDays) {
   if (intervalDays === 90) return "Every 3 months";
   if (intervalDays === 180) return "Every 6 months";
   if (intervalDays === 365) return "Every 12 months";
+  if (intervalDays === 730) return "Every 2 years";
   if (intervalDays === 1825) return "Every 5 years";
   if (intervalDays === 3650) return "Every 10 years";
   return `Every ${intervalDays} days`;
@@ -551,6 +584,16 @@ function normaliseSnapshotMetricNames(metricNames) {
     selected.push(name);
   });
   return selected.slice(0, 4);
+}
+
+function isMetricAvailableForProfile(selectedMetric, profileId) {
+  if (!selectedMetric) return false;
+  if (!profileId || !Array.isArray(selectedMetric.profileIds) || !selectedMetric.profileIds.length) return true;
+  return selectedMetric.profileIds.includes(profileId);
+}
+
+function getMetricsForProfile(profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null) {
+  return metrics.filter((item) => isMetricAvailableForProfile(item, profileId));
 }
 
 function saveSettings() {
@@ -1030,7 +1073,7 @@ function formatRelativeTime(isoDate) {
 function normaliseResult(result, profiles = state.profiles) {
   const profileId = result.profile_id === "angelica" ? "angelika" : result.profile_id;
   const profile = profiles.find((item) => item.id === profileId) ?? profiles[0];
-  const selectedMetric = getMetric(result.metric);
+  const selectedMetric = getMetric(result.metric, profile?.id);
   const metricMeta = getMetricMeta(result.metric);
   const sourceType = result.source_type ?? getDefaultSourceType(result.metric);
   const migratedTarget = isTargetMetric(result.metric) && result.target_value === undefined;
@@ -1070,10 +1113,11 @@ function populatePeople() {
 }
 
 function populateTrendMetrics() {
-  trendMetricInput.innerHTML = metrics
+  const availableMetrics = getMetricsForProfile();
+  trendMetricInput.innerHTML = availableMetrics
     .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
     .join("");
-  if (!state.activeTrendKey) state.activeTrendKey = metrics[0].name;
+  if (!availableMetrics.some((item) => item.name === state.activeTrendKey)) state.activeTrendKey = availableMetrics[0]?.name ?? "";
   trendMetricInput.value = state.activeTrendKey;
 }
 
@@ -1123,7 +1167,8 @@ function renderProfiles() {
 
 function populateMetrics() {
   const selectedValue = metricInput.value;
-  const filteredGroups = groupBy(metrics, "group");
+  const availableMetrics = getMetricsForProfile();
+  const filteredGroups = groupBy(availableMetrics, "group");
   metricInput.innerHTML = Object.entries(filteredGroups)
     .map(([group, groupMetrics]) => {
       const options = groupMetrics
@@ -1132,7 +1177,11 @@ function populateMetrics() {
       return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
     })
     .join("");
-  if (metrics.some((item) => item.name === selectedValue)) metricInput.value = selectedValue;
+  if (availableMetrics.some((item) => item.name === selectedValue)) {
+    metricInput.value = selectedValue;
+  } else if (availableMetrics.length) {
+    metricInput.value = availableMetrics[0].name;
+  }
   syncMetricDefaults();
   renderQuickMetrics();
 }
@@ -1148,11 +1197,13 @@ function renderQuickMetrics() {
 }
 
 function getQuickMetricNames() {
-  return starterMetricNames.filter((name) => getMetric(name));
+  const profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null;
+  return starterMetricNames.filter((name) => getMetric(name, profileId));
 }
 
 function selectMetric(name) {
-  if (!getMetric(name)) return;
+  const profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null;
+  if (!getMetric(name, profileId)) return;
   metricSearchInput.value = "";
   populateMetrics();
   metricInput.value = name;
@@ -1161,14 +1212,14 @@ function selectMetric(name) {
 }
 
 function syncMetricDefaults() {
-  const selectedMetric = getMetric(metricInput.value);
+  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (!selectedMetric) return;
   unitInput.value = selectedMetric.unit;
   valueInput.type = selectedMetric.type === "numeric" ? "number" : "text";
   valueInput.step = selectedMetric.type === "numeric" ? "0.01" : "";
   valueInput.inputMode = selectedMetric.type === "numeric" ? "decimal" : "text";
   valueInput.placeholder =
-    selectedMetric.type === "numeric" ? "Result value" : `e.g. ${selectedMetric.normal ?? "Normal"}`;
+    selectedMetric.type === "numeric" ? "Result value" : `e.g. ${selectedMetric.placeholder ?? selectedMetric.normal ?? "Normal"}`;
   syncRangeDefaults();
   syncSourceDefaults();
   renderEntryAssist();
@@ -1186,7 +1237,7 @@ function getSourceConfidence(sourceType) {
 }
 
 function syncSourceDefaults() {
-  const selectedMetric = getMetric(metricInput.value);
+  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (!selectedMetric) return;
   sourceTypeInput.value = getDefaultSourceType(selectedMetric.name);
   syncSourceConfidence();
@@ -1198,8 +1249,8 @@ function syncSourceConfidence() {
 
 function renderEntryAssist() {
   if (!entryAssist) return;
-  const selectedMetric = getMetric(metricInput.value);
   const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) {
     entryAssist.innerHTML = "";
     return;
@@ -1226,8 +1277,9 @@ function renderEntryAssist() {
   `;
 }
 
-function getMetric(name) {
-  return metrics.find((item) => item.name === name);
+function getMetric(name, profileId = null) {
+  const selectedMetric = metrics.find((item) => item.name === name);
+  return isMetricAvailableForProfile(selectedMetric, profileId) ? selectedMetric : null;
 }
 
 function getProfile(id) {
@@ -1313,8 +1365,8 @@ function getReferenceSetupLabel(fields) {
 }
 
 function syncRangeDefaults() {
-  const selectedMetric = getMetric(metricInput.value);
   const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
 
   const key = getRangeKey(profile.id, selectedMetric.name);
@@ -1656,8 +1708,7 @@ function getDueStatus(profile, selectedMetric) {
       : { state: "due", label: selectedMetric.cadence, latest: null, nextDate: null };
   }
 
-  const anchorDate = getScheduleAnchorDate(profile.id, selectedMetric);
-  let nextDate = anchorDate ? addDays(anchorDate, selectedMetric.intervalDays) : null;
+  let nextDate = getNextDueDate(profile.id, selectedMetric, latest);
 
   if (!latest && !nextDate) return { state: "due", label: "No result yet", latest: null, nextDate: null };
 
@@ -1667,16 +1718,47 @@ function getDueStatus(profile, selectedMetric) {
   }
 
   const daysRemaining = daysBetween(new Date(), nextDate);
-  const warningDays = getWarningDays(selectedMetric.intervalDays);
+  const warningDays = getWarningDays(selectedMetric);
   if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, latest, nextDate };
+  if (daysRemaining === 0) return { state: "due", label: "Due today", latest, nextDate };
   if (daysRemaining <= warningDays) return { state: "soon", label: `Due in ${daysRemaining} days`, latest, nextDate };
   return { state: "ok", label: `Due ${formatDate(toDateString(nextDate))}`, latest, nextDate };
+}
+
+function getNextDueDate(profileId, selectedMetric, latest) {
+  if (selectedMetric.firstDueDate) {
+    const firstDueDate = parseDateString(selectedMetric.firstDueDate);
+    if (!firstDueDate) return null;
+    if (selectedMetric.intervalMonths) {
+      return getNextFixedDueDate(selectedMetric.firstDueDate, selectedMetric.intervalMonths, latest?.sample_date);
+    }
+    if (!latest) return firstDueDate;
+  }
+
+  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric);
+  return anchorDate ? addDays(anchorDate, selectedMetric.intervalDays) : null;
+}
+
+function getNextFixedDueDate(firstDueDate, intervalMonths, latestDateString) {
+  let dueDate = parseDateString(firstDueDate);
+  const latestDate = parseDateString(latestDateString);
+  if (!dueDate) return null;
+  if (!latestDate) return dueDate;
+  while (dueDate <= latestDate) {
+    dueDate = addMonths(dueDate, intervalMonths);
+  }
+  return dueDate;
 }
 
 function getScheduleAnchorDate(profileId, selectedMetric) {
   const group = getScheduleGroup(selectedMetric);
   const matchingMetrics = metrics
-    .filter((item) => getScheduleGroup(item).key === group.key && item.intervalDays === selectedMetric.intervalDays)
+    .filter((item) =>
+      isMetricAvailableForProfile(item, profileId) &&
+      !item.firstDueDate &&
+      getScheduleGroup(item).key === group.key &&
+      item.intervalDays === selectedMetric.intervalDays
+    )
     .map((item) => item.name);
   const matchingResults = state.results
     .filter((result) => result.profile_id === profileId && matchingMetrics.includes(result.metric))
@@ -1687,6 +1769,9 @@ function getScheduleAnchorDate(profileId, selectedMetric) {
 function getScheduleGroup(selectedMetric) {
   if (targetMetricNames.has(selectedMetric.name)) return { key: "body", label: "Body composition" };
   if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness" };
+  if (selectedMetric.name === "Pilot medical") return { key: "pilot-medical", label: "Pilot medical" };
+  if (selectedMetric.name === "Eye test") return { key: "eye-test", label: "Eye test" };
+  if (selectedMetric.name === "Dermatology checkup") return { key: "dermatology", label: "Dermatology" };
   if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
   if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
     return { key: "six-month-bloods", label: "Six-monthly bloods" };
@@ -1718,12 +1803,22 @@ function snoozeScheduleItem(profileId, metricName) {
 }
 
 function getNextSnoozeDate(profileId, selectedMetric) {
+  if (selectedMetric.firstDueDate && selectedMetric.intervalMonths) {
+    const nextDate = getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], selectedMetric).nextDate;
+    const today = new Date();
+    return nextDate && daysBetween(today, nextDate) >= 0
+      ? addMonths(nextDate, selectedMetric.intervalMonths)
+      : addMonths(parseDateString(selectedMetric.firstDueDate), selectedMetric.intervalMonths);
+  }
+
   const group = getScheduleGroup(selectedMetric);
   const today = new Date();
   const peerDates = metrics
     .filter((item) =>
+      isMetricAvailableForProfile(item, profileId) &&
       item.name !== selectedMetric.name &&
       item.intervalDays === selectedMetric.intervalDays &&
+      !item.firstDueDate &&
       getScheduleGroup(item).key === group.key
     )
     .map((item) => getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], item).nextDate)
@@ -1738,7 +1833,11 @@ function getNextSnoozeDate(profileId, selectedMetric) {
   return fallback;
 }
 
-function getWarningDays(intervalDays) {
+function getWarningDays(metricOrIntervalDays) {
+  if (typeof metricOrIntervalDays === "object" && metricOrIntervalDays?.warningDays !== undefined) {
+    return metricOrIntervalDays.warningDays;
+  }
+  const intervalDays = typeof metricOrIntervalDays === "object" ? metricOrIntervalDays?.intervalDays : metricOrIntervalDays;
   if (intervalDays <= 14) return 2;
   if (intervalDays <= 31) return 3;
   if (intervalDays <= 90) return 7;
@@ -1751,6 +1850,22 @@ function addDays(dateString, days) {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date;
+}
+
+function addMonths(date, months) {
+  const source = date instanceof Date ? date : parseDateString(date);
+  if (!source) return null;
+  const day = source.getUTCDate();
+  const next = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + months, 1));
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(day, lastDay));
+  return next;
+}
+
+function parseDateString(dateString) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function daysBetween(start, end) {
@@ -1776,9 +1891,9 @@ function getScheduleItems(profileFilter = state.activeProfileId) {
   return state.profiles
     .filter((profile) => !profileFilter || profile.id === profileFilter)
     .flatMap((profile) =>
-    metrics
-      .filter((item) => ["highest", "medium"].includes(item.priority))
-      .map((item) => ({ profile, metric: item, due: getDueStatus(profile, item) })),
+      metrics
+        .filter((item) => isMetricAvailableForProfile(item, profile.id) && ["highest", "medium"].includes(item.priority))
+        .map((item) => ({ profile, metric: item, due: getDueStatus(profile, item) })),
   );
 }
 
@@ -2206,8 +2321,8 @@ function saveRangeForResult(result) {
 }
 
 function toggleRangeEditing() {
-  const selectedMetric = getMetric(metricInput.value);
   const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
 
   const key = getRangeKey(profile.id, selectedMetric.name);
@@ -2903,7 +3018,7 @@ function getDueCount() {
 
 function focusMetricEntry(profileId, metricName) {
   const profile = getProfile(profileId);
-  const selectedMetric = getMetric(metricName);
+  const selectedMetric = getMetric(metricName, profileId);
   if (!profile || !selectedMetric) return;
 
   state.activeProfileId = profile.id;
@@ -3079,8 +3194,8 @@ function addResult(event) {
   event.preventDefault();
   if (!assertCanEdit()) return;
 
-  const selectedMetric = getMetric(metricInput.value);
   const profile = getProfile(personInput.value);
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
 
   const resultValue = parseResultValue(valueInput.value, selectedMetric.type);
@@ -3523,7 +3638,7 @@ function prepareChatGptImport(payload) {
 
   incomingRanges.forEach((range) => {
     const profile = resolveImportProfile(range);
-    const selectedMetric = getMetric(range.metric);
+    const selectedMetric = getMetric(range.metric, profile?.id);
     if (!profile || !selectedMetric) {
       prepared.skipped.push({ reason: "Unknown profile or metric", item: range });
       return;
@@ -3547,7 +3662,7 @@ function prepareChatGptImport(payload) {
 
   incomingMeasurements.forEach((item) => {
     const profile = resolveImportProfile(item);
-    const selectedMetric = getMetric(item.metric);
+    const selectedMetric = getMetric(item.metric, profile?.id);
     if (!profile || !selectedMetric) {
       prepared.skipped.push({ reason: "Unknown profile or metric", item });
       return;
@@ -3790,7 +3905,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.51").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.52").catch(() => {});
   });
 }
 
@@ -3844,7 +3959,10 @@ async function signOut() {
 profileForm.addEventListener("submit", saveProfile);
 authForm.addEventListener("submit", signInWithPassword);
 magicLinkButton.addEventListener("click", sendMagicLink);
-personInput.addEventListener("change", syncMetricDefaults);
+personInput.addEventListener("change", () => {
+  populateMetrics();
+  populateTrendMetrics();
+});
 metricInput.addEventListener("change", () => {
   syncMetricDefaults();
   renderQuickMetrics();
