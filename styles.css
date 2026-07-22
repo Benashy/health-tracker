@@ -16,6 +16,8 @@
   --bad-bg: #ffe9e6;
   --ok: #2f7656;
   --ok-bg: #e7f3ec;
+  --info: #2f6fae;
+  --info-bg: #e8f2ff;
   --shadow: 0 18px 50px rgba(40, 52, 48, 0.1);
 }
 
@@ -256,8 +258,8 @@ h2 {
 .status-strip article:hover,
 .status-strip article:focus-visible,
 .status-strip article.active {
-  border-color: var(--accent);
-  background: var(--surface-soft);
+  border-color: var(--info);
+  background: var(--info-bg);
 }
 
 .status-strip article.summary-static:hover,
@@ -335,16 +337,16 @@ h2 {
 }
 
 .snapshot-card.neutral {
-  border-left-color: #6e9fc8;
-  background: #f2f7fc;
+  border-left-color: var(--info);
+  background: var(--info-bg);
 }
 
 .snapshot-card:hover,
 .snapshot-card:focus-visible,
 .snapshot-item:hover,
 .snapshot-item:focus-visible {
-  border-color: var(--accent);
-  background: var(--surface-soft);
+  border-color: var(--info);
+  background: var(--info-bg);
 }
 
 .snapshot-card strong,
@@ -1391,8 +1393,8 @@ button.status-pill:focus-visible {
 }
 
 .status-pill.recorded {
-  background: #e8f2ff;
-  color: #2f6fae;
+  background: var(--info-bg);
+  color: var(--info);
 }
 
 .status-pill.warn,

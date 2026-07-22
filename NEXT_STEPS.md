@@ -10,9 +10,14 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.62`.
+- The app is now on `v0.63`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.63
+
+- Changed dashboard card hover/selected states to use the recorded blue, keeping green reserved for genuinely in-range/on-target status.
+- Added a 2% near-limit buffer around reference limits so values just inside or just outside a lab range show as amber `Near limit`, while clearly abnormal values remain red `Outside range`.
 
 ## Completed In v0.62
 

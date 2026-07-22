@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.62";
+const APP_VERSION = "v0.63";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -34,6 +34,7 @@ const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
 const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
+const NEAR_LIMIT_RATIO = 0.02;
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -91,11 +92,8 @@ const starterMetricNames = [
 const targetMetricNames = new Set(["Weight", "Waist circumference"]);
 const completionMetricNames = new Set(["Pilot medical", "Eye test", "Dermatology checkup", "Pap smear", "Breast screening", "Colonoscopy"]);
 const relaxedNearLimitMetrics = new Set([
-  "Blood pressure systolic",
-  "Blood pressure diastolic",
   "Urine specific gravity",
   "Urine pH",
-  "CRP",
 ]);
 const defaultSnapshotMetricNames = ["Weight", "Waist circumference", "LDL", "Total cholesterol"];
 const riskContextMetricNames = new Set(["Lipoprotein(a)"]);
@@ -1674,11 +1672,10 @@ function getStatus(result) {
   const low = getResultReferenceLower(result);
   const target = getResultTarget(result);
   const high = getResultReferenceUpper(result);
-  if (low !== null && value < low) return "Outside range";
-  if (high !== null && value > high) return "Outside range";
+  const rangeStatus = getReferenceRangeStatus(result.metric, value, low, high);
+  if (rangeStatus === "Outside range" || rangeStatus === "Near limit") return rangeStatus;
   if (target !== null) return getTargetStatus(result, value, target);
-  if (isNearLimit(result.metric, value, low, high)) return "Near limit";
-  return low === null && high === null ? "Recorded" : "In range";
+  return rangeStatus ?? "Recorded";
 }
 
 function getResultReferenceLower(result) {
@@ -1721,18 +1718,25 @@ function isActionableWarning(result) {
   return result && isWarningStatus(result.status_vs_range) && !isRiskContextResult(result);
 }
 
+function getReferenceRangeStatus(metricName, value, low, high) {
+  if (low === null && high === null) return null;
+  if (low !== null && value < low) return isNearLimit(metricName, value, low, high) ? "Near limit" : "Outside range";
+  if (high !== null && value > high) return isNearLimit(metricName, value, low, high) ? "Near limit" : "Outside range";
+  return isNearLimit(metricName, value, low, high) ? "Near limit" : "In range";
+}
+
 function isNearLimit(metricName, value, low, high) {
   if (relaxedNearLimitMetrics.has(metricName)) return false;
   if (low === null && high === null) return false;
-  if (low !== null && high !== null) {
-    const range = high - low;
-    if (range <= 0) return false;
-    if (range < 2) return false;
-    return value <= low + range * 0.1 || value >= high - range * 0.1;
-  }
-  if (high !== null) return value >= high * 0.9;
-  if (low !== null) return value <= low * 1.1;
+  if (low !== null && isWithinNearLimitBuffer(value, low)) return true;
+  if (high !== null && isWithinNearLimitBuffer(value, high)) return true;
   return false;
+}
+
+function isWithinNearLimitBuffer(value, limit) {
+  const buffer = Math.abs(limit) * NEAR_LIMIT_RATIO;
+  if (buffer <= 0) return false;
+  return Math.abs(value - limit) <= buffer + Number.EPSILON;
 }
 
 function getTargetTolerance() {
@@ -4260,7 +4264,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.62").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.63").catch(() => {});
   });
 }
 
