@@ -66,23 +66,40 @@ body:not(.signed-in) .workspace {
   width: min(560px, 100%);
 }
 
+body.app-booting .workspace {
+  width: min(560px, 100%);
+}
+
 body:not(.signed-in) .eyebrow,
-body:not(.signed-in) .topbar-actions {
+body:not(.signed-in) .topbar-actions,
+body.app-booting .eyebrow,
+body.app-booting .topbar-actions {
   display: none;
 }
 
-body:not(.signed-in) .topbar {
+body:not(.signed-in) .topbar,
+body.app-booting .topbar {
   display: block;
   margin-bottom: 18px;
 }
 
 body:not(.signed-in) [data-private],
 body:not(.signed-in) .mobile-action-bar,
-body:not(.signed-in) .mobile-menu-panel {
+body:not(.signed-in) .mobile-menu-panel,
+body.app-booting [data-private],
+body.app-booting .auth-panel,
+body.app-booting .mobile-action-bar,
+body.app-booting .mobile-menu-panel,
+body.app-booting #importReviewModal,
+body.app-booting #metricContextModal,
+body.app-booting #syncStatus,
+body.app-booting #manualRefreshButton,
+body.app-booting #signOutButton {
   display: none !important;
 }
 
-body:not(.signed-in) h1 {
+body:not(.signed-in) h1,
+body.app-booting h1 {
   font-size: clamp(2.3rem, 9vw, 4.2rem);
 }
 
@@ -835,6 +852,20 @@ legend {
   width: auto;
   min-height: 0;
   transform: scale(1.15);
+}
+
+.save-feedback {
+  min-height: 20px;
+  margin: 2px 0 8px;
+  color: var(--ok);
+  font-size: 0.85rem;
+  font-weight: 750;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.save-feedback.visible {
+  opacity: 1;
 }
 
 .reference-panel {

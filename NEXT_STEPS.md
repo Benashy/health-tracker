@@ -10,9 +10,19 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.53`.
+- The app is now on `v0.54`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.54
+
+- Added a locked boot state so refresh/login loads cannot briefly show dashboard, Telegram, export, import, or health-result surfaces before auth resolution.
+- Changed the privacy guard so it can hide and clear unauthorised sessions, but only the main app can reveal private dashboard content after the correct user's cloud data has loaded.
+- Marked import-review and metric-context modals as private surfaces.
+- Made Pilot medical, Eye test, and Dermatology checkup use editable next-due/expiry fields with sensible defaults from the completed date.
+- Added clear `added to tracker` save feedback and a short submit lockout to reduce accidental duplicate entries.
+- Kept health checks grouped under `Health checks`, with Pilot medical displaying as an expiry and Eye/Dermatology as next-due items.
+- Added future roadmap note for age-based ECG and audiogram cycles as part of Ben's pilot medical reminders.
 
 ## Completed In v0.53
 
@@ -32,7 +42,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - Added custom Telegram milestone reminders for the pilot medical at six weeks, one month, two weeks, one week, one day, and once expired.
 - Added two-year eye test tracking for Ben and Angelika, first due on 1 June 2027.
 - Added annual dermatology checkup tracking for Ben and Angelika, first due on 1 July 2027.
-- Added initial fixed calendar recurrence support for annual/two-year health checks; revised in v0.53 for completion-date-based checks.
+- Added initial fixed calendar recurrence support for annual/two-year health checks; revised in v0.54 for completion-date-based checks.
 
 ## Completed In v0.51
 
@@ -197,9 +207,8 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 5. Add in-app reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
-   - Add a Ben-only annual pilot medical reminder as a due-date-only item, with no pass/fail tracking required.
-   - Add a two-yearly eye test reminder available to every user.
-   - For Ben, allow the eye test due date to be aligned roughly one month before the annual pilot medical once the pilot medical due date is known.
+   - Later add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
+   - Later consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
 
 6. Add backup scheduling.
    - Use the backup process below.

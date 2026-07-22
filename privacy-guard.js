@@ -15,19 +15,12 @@
     "health-dashboard-cloud-cache:v1",
   ];
 
-  function setPrivateVisibility(isVisible) {
+  function hidePrivateDashboard() {
     document.querySelectorAll("[data-private]").forEach((section) => {
-      if (section.classList.contains("modal")) {
-        if (!isVisible) {
-          section.classList.add("hidden");
-          section.setAttribute("aria-hidden", "true");
-        }
-        return;
-      }
-      section.classList.toggle("hidden", !isVisible);
-      section.setAttribute("aria-hidden", isVisible ? "false" : "true");
+      section.classList.add("hidden");
+      section.setAttribute("aria-hidden", "true");
     });
-    document.body.classList.toggle("signed-in", isVisible);
+    document.body.classList.remove("signed-in");
   }
 
   function clearPrivateLocalData() {
@@ -49,8 +42,10 @@
 
   function handleSession(session) {
     const isApproved = isApprovedSession(session);
-    setPrivateVisibility(isApproved);
-    if (!isApproved) clearPrivateLocalData();
+    if (isApproved) return;
+
+    hidePrivateDashboard();
+    clearPrivateLocalData();
 
     if (session?.user && !isApproved) {
       const authStatus = document.querySelector("#authStatus");
@@ -61,9 +56,9 @@
   }
 
   async function initPrivacyGuard() {
-    setPrivateVisibility(false);
     const client = getSupabaseClient();
     if (!client) {
+      hidePrivateDashboard();
       clearPrivateLocalData();
       return;
     }

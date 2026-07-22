@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.53";
+const APP_VERSION = "v0.54";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -299,6 +299,10 @@ const state = {
   trendRange: "all",
   mobileView: "home",
   telegramPanelOpen: false,
+  completionNextDueTouched: false,
+  entrySaveLocked: false,
+  entryUnlockTimer: null,
+  saveFeedbackTimer: null,
   pendingImport: null,
 };
 
@@ -448,6 +452,8 @@ const manualRefreshButton = document.querySelector("#manualRefreshButton");
 const appVersion = document.querySelector("#appVersion");
 const signOutButton = document.querySelector("#signOutButton");
 const resetButton = document.querySelector("#resetButton");
+const saveFeedback = document.querySelector("#saveFeedback");
+const entrySubmitButton = document.querySelector("#entrySubmitButton");
 
 function metric(name, group, unit, low, high, type, priority, intervalDays, goal, cadence, normal, options = {}) {
   return {
@@ -695,6 +701,7 @@ function initSupabase() {
     return handleSession(data.session);
   }).catch((error) => {
     cloudState.lastError = error.message;
+    setPrivateVisibility(false);
     renderAuthPanel();
     renderSyncFooter();
   });
@@ -830,7 +837,7 @@ function applyDashboardData(data) {
 async function loadCloudData() {
   if (!cloudState.client || !cloudState.user) return;
   if (!navigator.onLine) {
-    loadCachedCloudData();
+    if (!loadCachedCloudData()) setPrivateVisibility(false);
     renderAuthPanel();
     renderSyncFooter();
     setEditingAvailability();
@@ -861,7 +868,7 @@ async function loadCloudData() {
     render();
   } catch (error) {
     cloudState.lastError = error.message;
-    loadCachedCloudData();
+    if (!loadCachedCloudData()) setPrivateVisibility(false);
   } finally {
     cloudState.applyingCloudData = false;
     renderAuthPanel();
@@ -885,7 +892,7 @@ async function createCloudRow() {
 function loadCachedCloudData() {
   try {
     const cached = JSON.parse(localStorage.getItem(CLOUD_CACHE_KEY));
-    if (!cached) return;
+    if (!cached) return false;
     applyDashboardData(cached);
     hydrateProfileForm();
     populatePeople();
@@ -893,8 +900,9 @@ function loadCachedCloudData() {
     populateTrendMetrics();
     setPrivateVisibility(true);
     render();
+    return true;
   } catch {
-    return;
+    return false;
   }
 }
 
@@ -981,6 +989,7 @@ function setEditingAvailability() {
   document.querySelectorAll("#profileForm input, #profileForm button, #resultForm input, #resultForm select, #resultForm textarea, #resultForm button, #snapshotEditor select, #snapshotEditor button").forEach((element) => {
     element.disabled = disabled;
   });
+  if (entrySubmitButton) entrySubmitButton.disabled = disabled || state.entrySaveLocked;
   importChatGptButton.disabled = disabled;
   if (snapshotEditButton) snapshotEditButton.disabled = disabled;
   if (telegramPairButton) telegramPairButton.disabled = disabled || telegramSetupState.busy;
@@ -998,7 +1007,6 @@ function setEditingAvailability() {
 
 function renderAuthPanel() {
   const signedIn = Boolean(cloudState.user);
-  document.body.classList.toggle("signed-in", signedIn);
   authPanel.classList.toggle("hidden", signedIn);
   authForm.classList.toggle("hidden", signedIn || !cloudState.enabled);
   if (!cloudState.enabled) {
@@ -1020,6 +1028,7 @@ function renderProfileScope() {
 }
 
 function setPrivateVisibility(isVisible) {
+  document.body.classList.remove("app-booting");
   document.querySelectorAll("[data-private]").forEach((section) => {
     if (section.id === "telegramModal") {
       if (!isVisible) state.telegramPanelOpen = false;
@@ -1230,6 +1239,7 @@ function syncMetricDefaults() {
   const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (!selectedMetric) return;
   const isCompletion = isCompletionMetric(selectedMetric);
+  state.completionNextDueTouched = false;
   unitInput.value = selectedMetric.unit;
   valueInput.type = selectedMetric.type === "numeric" ? "number" : "text";
   valueInput.step = selectedMetric.type === "numeric" ? "0.01" : "";
@@ -1246,11 +1256,11 @@ function syncMetricDefaults() {
   }
   if (nextDueLabel) nextDueLabel.textContent = selectedMetric.nextDueLabel ?? "Next due date";
   if (nextDueInput) {
-    nextDueInput.required = Boolean(isCompletion && selectedMetric.manualNextDueDate);
-    nextDueInput.disabled = Boolean(isCompletion && !selectedMetric.manualNextDueDate);
+    nextDueInput.required = Boolean(isCompletion);
+    nextDueInput.disabled = !isCompletion;
     nextDueInput.value = isCompletion ? getCompletionNextDueInputValue(selectedMetric, testDateInput.value) : "";
   }
-  if (nextDueField) nextDueField.classList.toggle("hidden", !isCompletion || !selectedMetric.manualNextDueDate);
+  if (nextDueField) nextDueField.classList.toggle("hidden", !isCompletion);
   if (completionHint) completionHint.textContent = getCompletionHint(selectedMetric, testDateInput.value);
   syncRangeDefaults();
   syncSourceDefaults();
@@ -1289,9 +1299,7 @@ function renderEntryAssist() {
   }
 
   if (isCompletionMetric(selectedMetric)) {
-    const nextDueText = selectedMetric.manualNextDueDate
-      ? "Enter the certificate expiry date as the next due date"
-      : `Next due is calculated from the completed date (${selectedMetric.cadence})`;
+    const nextDueText = `${selectedMetric.nextDueLabel ?? "Next due date"} defaults to ${getCompletionIntervalLabel(selectedMetric)} after completion; edit if needed`;
     entryAssist.innerHTML = `
       <div>
         <strong>${escapeHtml(getDisplayGroupForMetric(selectedMetric.name))}</strong>
@@ -1329,7 +1337,6 @@ function isCompletionMetric(metricOrName) {
 
 function getCompletionNextDueInputValue(selectedMetric, completedDate) {
   if (!isCompletionMetric(selectedMetric)) return "";
-  if (selectedMetric.manualNextDueDate) return nextDueInput?.value ?? "";
   const nextDueDate = getAutoCompletionNextDueDate(selectedMetric, completedDate);
   return nextDueDate ?? "";
 }
@@ -1340,19 +1347,26 @@ function getAutoCompletionNextDueDate(selectedMetric, completedDate) {
   return date ? toDateString(addMonths(date, selectedMetric.intervalMonths)) : "";
 }
 
+function getCompletionIntervalLabel(selectedMetric) {
+  if (!selectedMetric?.intervalMonths) return selectedMetric?.cadence ?? "the next cycle";
+  if (selectedMetric.intervalMonths === 12) return "one year";
+  if (selectedMetric.intervalMonths === 24) return "two years";
+  if (selectedMetric.intervalMonths % 12 === 0) return `${selectedMetric.intervalMonths / 12} years`;
+  return `${selectedMetric.intervalMonths} months`;
+}
+
 function getCompletionHint(selectedMetric, completedDate) {
   if (!isCompletionMetric(selectedMetric)) return "";
-  if (selectedMetric.manualNextDueDate) {
-    return "Record the completion date and the certificate expiry date.";
-  }
   const nextDueDate = getAutoCompletionNextDueDate(selectedMetric, completedDate);
-  return nextDueDate ? `Next due will be ${formatDate(nextDueDate)}.` : "Record the date completed.";
+  const label = selectedMetric.nextDueLabel ?? "Next due date";
+  return nextDueDate
+    ? `${label} defaults to ${formatDate(nextDueDate)}; edit if the actual date differs.`
+    : `Record the completion date; ${label.toLowerCase()} will default from it.`;
 }
 
 function getCompletionResultNextDueDate(selectedMetric, completedDate) {
   if (!isCompletionMetric(selectedMetric)) return "";
-  if (selectedMetric.manualNextDueDate) return nextDueInput?.value ?? "";
-  return getAutoCompletionNextDueDate(selectedMetric, completedDate);
+  return nextDueInput?.value || getAutoCompletionNextDueDate(selectedMetric, completedDate);
 }
 
 function getResultStoredNextDueDate(result) {
@@ -1362,8 +1376,8 @@ function getResultStoredNextDueDate(result) {
 function syncCompletionDueFields() {
   const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (!isCompletionMetric(selectedMetric)) return;
-  if (nextDueInput && !selectedMetric.manualNextDueDate) {
-    nextDueInput.value = getAutoCompletionNextDueDate(selectedMetric, testDateInput.value);
+  if (nextDueInput && !state.completionNextDueTouched) {
+    nextDueInput.value = getCompletionNextDueInputValue(selectedMetric, testDateInput.value);
   }
   if (completionHint) completionHint.textContent = getCompletionHint(selectedMetric, testDateInput.value);
 }
@@ -2412,7 +2426,7 @@ function formatRangeOrTarget(result) {
   if (isCompletionMetric(result.metric)) {
     const nextDueDate = getResultStoredNextDueDate(result);
     if (!nextDueDate) return "-";
-    const label = getMetric(result.metric)?.manualNextDueDate ? "Expiry" : "Next due";
+    const label = getMetric(result.metric)?.manualNextDueDate ? "Expires" : "Next due";
     return `${label} ${formatDate(nextDueDate)}`;
   }
   const low = getResultReferenceLower(result);
@@ -3169,8 +3183,7 @@ function focusEntryPanel() {
 function focusCurrentEntryControl() {
   const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
   if (isCompletionMetric(selectedMetric)) {
-    if (selectedMetric.manualNextDueDate) nextDueInput?.focus();
-    else completionInput?.focus();
+    nextDueInput?.focus();
     return;
   }
   valueInput.focus();
@@ -3302,11 +3315,13 @@ function showMetricContext(metricName) {
     <p class="privacy-note">General prevention context only. Use persistent, marked, symptomatic, or concerning changes as prompts for clinician discussion.</p>
   `;
   metricContextModal.classList.remove("hidden");
+  metricContextModal.setAttribute("aria-hidden", "false");
 }
 
 function closeMetricContext() {
   if (!metricContextModal) return;
   metricContextModal.classList.add("hidden");
+  metricContextModal.setAttribute("aria-hidden", "true");
 }
 
 function getStatusClass(status) {
@@ -3326,8 +3341,38 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function showSaveFeedback(metricName) {
+  if (saveFeedback) {
+    saveFeedback.textContent = `${metricName} added to tracker.`;
+    saveFeedback.classList.add("visible");
+    if (typeof clearTimeout === "function") clearTimeout(state.saveFeedbackTimer);
+    if (typeof setTimeout === "function") {
+      state.saveFeedbackTimer = setTimeout(() => saveFeedback.classList.remove("visible"), 4500);
+    }
+  }
+
+  if (!entrySubmitButton) return;
+  state.entrySaveLocked = true;
+  entrySubmitButton.disabled = true;
+  entrySubmitButton.textContent = "Added";
+  if (typeof clearTimeout === "function") clearTimeout(state.entryUnlockTimer);
+  if (typeof setTimeout === "function") {
+    state.entryUnlockTimer = setTimeout(unlockEntrySubmit, 1200);
+  } else {
+    unlockEntrySubmit();
+  }
+}
+
+function unlockEntrySubmit() {
+  state.entrySaveLocked = false;
+  if (!entrySubmitButton) return;
+  entrySubmitButton.textContent = "Add to tracker";
+  entrySubmitButton.disabled = isReadOnlyMode();
+}
+
 function addResult(event) {
   event.preventDefault();
+  if (state.entrySaveLocked) return;
   if (!assertCanEdit()) return;
 
   const profile = getProfile(personInput.value);
@@ -3344,7 +3389,7 @@ function addResult(event) {
 
   const measurementDate = testDateInput.value;
   const completionNextDueDate = getCompletionResultNextDueDate(selectedMetric, measurementDate);
-  if (isCompletion && selectedMetric.manualNextDueDate && !completionNextDueDate) {
+  if (isCompletion && !completionNextDueDate) {
     window.alert("Enter the next due or expiry date before saving this health check.");
     return;
   }
@@ -3396,6 +3441,7 @@ function addResult(event) {
   syncSourceDefaults();
   renderQuickMetrics();
   render();
+  showSaveFeedback(selectedMetric.name);
 }
 
 function saveProfile(event) {
@@ -3968,6 +4014,7 @@ function renderImportReview(review) {
     ${review.skipped.length ? `<div class="import-skipped"><strong>Skipped items</strong><ul>${skippedRows}</ul></div>` : ""}
   `;
   importReviewModal.classList.remove("hidden");
+  importReviewModal.setAttribute("aria-hidden", "false");
 }
 
 function countSkippedReasons(skippedItems) {
@@ -3991,6 +4038,7 @@ function closeImportReview() {
   importReviewContent.innerHTML = "";
   confirmImportButton.disabled = false;
   importReviewModal.classList.add("hidden");
+  importReviewModal.setAttribute("aria-hidden", "true");
 }
 
 function confirmReviewedImport() {
@@ -4067,7 +4115,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.53").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.54").catch(() => {});
   });
 }
 
@@ -4130,6 +4178,20 @@ metricInput.addEventListener("change", () => {
   renderQuickMetrics();
 });
 testDateInput.addEventListener("change", syncCompletionDueFields);
+function markCompletionNextDueEdited() {
+  state.completionNextDueTouched = true;
+  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
+  if (completionHint && isCompletionMetric(selectedMetric)) {
+    completionHint.textContent = nextDueInput.value
+      ? `${selectedMetric.nextDueLabel ?? "Next due date"} set to ${formatDate(nextDueInput.value)}.`
+      : getCompletionHint(selectedMetric, testDateInput.value);
+  }
+}
+
+if (nextDueInput) {
+  nextDueInput.addEventListener("input", markCompletionNextDueEdited);
+  nextDueInput.addEventListener("change", markCompletionNextDueEdited);
+}
 metricSearchInput.addEventListener("input", populateMetrics);
 quickMetricPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-metric-name]");

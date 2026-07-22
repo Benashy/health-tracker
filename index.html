@@ -8,16 +8,16 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.53" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.53" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.53" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.53" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.53" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.53" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.53" />
-    <link rel="stylesheet" href="styles.css?v=0.53" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.54" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.54" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.54" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.54" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.54" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.54" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.54" />
+    <link rel="stylesheet" href="styles.css?v=0.54" />
   </head>
-  <body>
+  <body class="app-booting">
     <main class="app-shell">
       <section class="workspace">
         <header class="topbar">
@@ -285,7 +285,8 @@
             <input class="hidden" id="sourceNotesInput" type="hidden" value="" />
             <input class="hidden" id="sourceDocumentInput" type="hidden" value="" />
 
-            <button class="primary-button entry-submit-button" type="submit">Add to tracker</button>
+            <div class="save-feedback" id="saveFeedback" role="status" aria-live="polite"></div>
+            <button class="primary-button entry-submit-button" id="entrySubmitButton" type="submit">Add to tracker</button>
           </form>
 
           <section class="results-panel" aria-live="polite">
@@ -357,7 +358,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.53</span>
+          <span class="version-chip" id="appVersion">v0.54</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -371,7 +372,7 @@
       </section>
     </main>
 
-    <section class="modal hidden" id="importReviewModal" role="dialog" aria-modal="true" aria-labelledby="importReviewTitle">
+    <section class="modal hidden" id="importReviewModal" role="dialog" aria-modal="true" aria-labelledby="importReviewTitle" data-private aria-hidden="true">
       <div class="modal-panel">
         <div class="panel-heading">
           <div>
@@ -388,7 +389,7 @@
       </div>
     </section>
 
-    <section class="modal hidden" id="metricContextModal" role="dialog" aria-modal="true" aria-labelledby="metricContextTitle">
+    <section class="modal hidden" id="metricContextModal" role="dialog" aria-modal="true" aria-labelledby="metricContextTitle" data-private aria-hidden="true">
       <div class="modal-panel context-panel">
         <div class="panel-heading">
           <div>
@@ -429,9 +430,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.53"></script>
+    <script src="supabase-config.js?v=0.54"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.53"></script>
-    <script src="privacy-guard.js?v=0.53"></script>
+    <script src="app.js?v=0.54"></script>
+    <script src="privacy-guard.js?v=0.54"></script>
   </body>
 </html>
