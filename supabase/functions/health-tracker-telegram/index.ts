@@ -1,5 +1,8 @@
 const TELEGRAM_BOT_TOKEN = Deno.env.get("HEALTH_TRACKER_TELEGRAM_BOT_TOKEN") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const REMINDER_TIME_ZONE = "Europe/Lisbon";
+const REMINDER_HOUR = 9;
+const CRON_SECRET_RPC = "health_tracker_cron_secret_matches";
 const APPROVED_EMAILS = new Set(["ben_ashurst@me.com", "angelika_kleczka@hotmail.com"]);
 const ALLOWED_ORIGINS = new Set([
   "https://benashy.github.io",
@@ -54,6 +57,18 @@ type DashboardMeasurement = {
   metric?: string;
   sample_date?: string;
   test_date?: string;
+};
+
+type DashboardRow = {
+  user_id: string;
+  data: Record<string, unknown>;
+};
+
+type ReminderStateRow = {
+  user_id: string;
+  last_sent_date?: string | null;
+  last_signature?: string | null;
+  last_sent_at?: string | null;
 };
 
 const DASHBOARD_URL = "https://benashy.github.io/health-tracker/";
@@ -132,7 +147,7 @@ function corsHeaders(req: Request) {
     : "https://benashy.github.io";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-health-tracker-cron-secret",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
@@ -156,6 +171,35 @@ function getPublishableKey() {
     }
   }
   return Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
+
+function getSecretKey() {
+  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (secretKeys) {
+    try {
+      const parsed = JSON.parse(secretKeys);
+      if (typeof parsed.default === "string") return parsed.default;
+      const firstKey = Object.values(parsed).find((value) => typeof value === "string");
+      if (typeof firstKey === "string") return firstKey;
+    } catch {
+      // Fall back to the legacy service-role key below.
+    }
+  }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+}
+
+function getAdminHeaders() {
+  const secretKey = getSecretKey();
+  if (!SUPABASE_URL || !secretKey) {
+    throw new Error("Supabase server credentials are not configured.");
+  }
+  const headers: Record<string, string> = {
+    apikey: secretKey,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (secretKey.split(".").length === 3) headers.Authorization = `Bearer ${secretKey}`;
+  return headers;
 }
 
 async function requireApprovedUser(req: Request): Promise<DashboardUser> {
@@ -191,6 +235,29 @@ async function requireApprovedUser(req: Request): Promise<DashboardUser> {
   }
 
   return { id: String(user.id ?? ""), email, token, publishableKey };
+}
+
+async function requireCronRequest(req: Request) {
+  const providedSecret = req.headers.get("x-health-tracker-cron-secret")?.trim() ?? "";
+  if (!providedSecret) {
+    throw new Response(JSON.stringify({ ok: false, error: "Missing reminder scheduler credential." }), {
+      status: 401,
+      headers: corsHeaders(req),
+    });
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${CRON_SECRET_RPC}`, {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ provided_secret: providedSecret }),
+  });
+  const isValid = response.ok ? await response.json().catch(() => false) : false;
+  if (isValid !== true) {
+    throw new Response(JSON.stringify({ ok: false, error: "Invalid reminder scheduler credential." }), {
+      status: 403,
+      headers: corsHeaders(req),
+    });
+  }
 }
 
 async function telegramApi(method: string, payload: Record<string, unknown> = {}) {
@@ -313,12 +380,55 @@ async function getDashboardData(user: DashboardUser) {
   return Array.isArray(rows) ? rows[0]?.data ?? null : null;
 }
 
+async function getAllDashboardRows() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?select=user_id,data`, {
+    headers: getAdminHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Could not load dashboard data for scheduled reminders.");
+  }
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows as DashboardRow[] : [];
+}
+
+async function getReminderStateRows() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_telegram_reminder_state?select=user_id,last_sent_date,last_signature,last_sent_at`, {
+    headers: getAdminHeaders(),
+  });
+  if (!response.ok) return new Map<string, ReminderStateRow>();
+  const rows = await response.json().catch(() => []);
+  if (!Array.isArray(rows)) return new Map<string, ReminderStateRow>();
+  return new Map(rows.map((row: ReminderStateRow) => [row.user_id, row]));
+}
+
+async function upsertReminderState(userId: string, reminderDate: string, signature: string, sentAt: string) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_telegram_reminder_state?on_conflict=user_id`, {
+    method: "POST",
+    headers: {
+      ...getAdminHeaders(),
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      last_sent_date: reminderDate,
+      last_signature: signature,
+      last_sent_at: sentAt,
+      updated_at: sentAt,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Could not save scheduled reminder state.");
+  }
+}
+
 function getTelegramSettings(data: Record<string, unknown>) {
   const settings = data?.settings as Record<string, unknown> | undefined;
   const telegram = settings?.telegram as Record<string, unknown> | undefined;
   return {
     chatId: String(telegram?.chat_id ?? telegram?.chatId ?? "").trim(),
     chatLabel: String(telegram?.chat_label ?? telegram?.chatLabel ?? "").trim(),
+    enabled: telegram?.enabled !== false,
+    pausedAt: String(telegram?.paused_at ?? telegram?.pausedAt ?? "").trim(),
   };
 }
 
@@ -343,15 +453,25 @@ function getScheduleState(data: Record<string, unknown>) {
 }
 
 function getScheduleGroup(selectedMetric: DashboardMetric) {
-  if (["Weight", "Waist circumference"].includes(selectedMetric.name)) return { key: "body", label: "Body composition" };
-  if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness" };
-  if (selectedMetric.group === "Vitals and fitness") return { key: "vitals-fitness", label: "Vitals and fitness" };
-  if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
-    return { key: "six-month-bloods", label: "Six-monthly bloods" };
+  if (["Weight", "Waist circumference"].includes(selectedMetric.name)) {
+    return { key: "body", label: "Body composition", cycleLabel: "14-day cycle" };
   }
-  if (selectedMetric.group === "One-off and infrequent") return { key: "infrequent", label: "Infrequent checks" };
-  if ((selectedMetric.intervalDays ?? 0) >= 365) return { key: "annual-bloods", label: "Annual bloods" };
-  return { key: selectedMetric.group.toLowerCase().replaceAll(" ", "-"), label: selectedMetric.group };
+  if (selectedMetric.name === "VO2 Max") return { key: "fitness", label: "Fitness", cycleLabel: "3-month cycle" };
+  if (selectedMetric.group === "Vitals and fitness") {
+    return { key: "vitals-fitness", label: "Vitals and fitness", cycleLabel: "30-day cycle" };
+  }
+  if (["Metabolic", "Lipids", "Cardiovascular markers"].includes(selectedMetric.group)) {
+    return { key: "six-month-bloods", label: "Six-monthly bloods", cycleLabel: "6-month cycle" };
+  }
+  if (selectedMetric.group === "One-off and infrequent") {
+    return { key: "infrequent", label: "Infrequent checks", cycleLabel: "5-10 year cycle" };
+  }
+  if ((selectedMetric.intervalDays ?? 0) >= 365) return { key: "annual-bloods", label: "Annual bloods", cycleLabel: "12-month cycle" };
+  return {
+    key: selectedMetric.group.toLowerCase().replaceAll(" ", "-"),
+    label: selectedMetric.group,
+    cycleLabel: selectedMetric.cadence,
+  };
 }
 
 function getSnoozeKey(profileId: string, metricName: string) {
@@ -482,15 +602,15 @@ function buildDueMessage(data: Record<string, unknown>) {
     };
   }
 
-  const groups = new Map<string, { label: string; names: string[] }>();
+  const groups = new Map<string, { label: string; cycleLabel: string; names: string[] }>();
   dueItems.forEach((item) => {
     const group = getScheduleGroup(item.metric);
-    const existing = groups.get(group.key) ?? { label: group.label, names: [] };
+    const existing = groups.get(group.key) ?? { label: group.label, cycleLabel: group.cycleLabel, names: [] };
     existing.names.push(item.metric.name);
     groups.set(group.key, existing);
   });
 
-  const lines = [...groups.values()].map((group) => `- ${group.label}: ${summariseMetricNames(group.names)}`);
+  const lines = [...groups.values()].map((group) => `- ${group.label} (${group.cycleLabel}): ${summariseMetricNames(group.names)}`);
   const message = [
     "Health Tracker reminder",
     "",
@@ -501,6 +621,35 @@ function buildDueMessage(data: Record<string, unknown>) {
     `Open dashboard: ${DASHBOARD_URL}`,
   ].join("\n");
   return { dueCount: dueItems.length, message };
+}
+
+function getReminderLocalTime(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: REMINDER_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hour12: false,
+    }).formatToParts(now).map((part) => [part.type, part.value]),
+  );
+  const hour = Number(parts.hour === "24" ? "0" : parts.hour);
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour,
+  };
+}
+
+function getDueSignature(data: Record<string, unknown>) {
+  return getDueItems(data)
+    .map((item) => {
+      const profileId = item.profile.id ?? "profile";
+      const nextDate = item.due.nextDate ? formatDate(item.due.nextDate) : "none";
+      return `${profileId}:${item.metric.name}:${item.due.state}:${nextDate}`;
+    })
+    .sort()
+    .join("|");
 }
 
 async function handleSendDueSummary(req: Request, user: DashboardUser) {
@@ -527,15 +676,93 @@ async function handleSendDueSummary(req: Request, user: DashboardUser) {
   });
 }
 
+async function handleSendScheduledReminders(req: Request, body: Record<string, unknown>) {
+  await requireCronRequest(req);
+
+  const localTime = getReminderLocalTime();
+  const force = body.force === true;
+  if (!force && localTime.hour !== REMINDER_HOUR) {
+    return jsonResponse(req, {
+      ok: true,
+      skipped: true,
+      reason: `Not ${String(REMINDER_HOUR).padStart(2, "0")}:00 in ${REMINDER_TIME_ZONE}.`,
+      local_date: localTime.date,
+      local_hour: localTime.hour,
+    });
+  }
+
+  const rows = await getAllDashboardRows();
+  const reminderStateRows = await getReminderStateRows();
+  const sentAt = new Date().toISOString();
+  const dryRun = body.dry_run === true;
+  let sent = 0;
+  let wouldSend = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    const settings = getTelegramSettings(row.data);
+    if (!settings.chatId || !settings.enabled || settings.pausedAt) {
+      skipped += 1;
+      continue;
+    }
+
+    const summary = buildDueMessage(row.data);
+    if (!summary.dueCount) {
+      skipped += 1;
+      continue;
+    }
+
+    const signature = getDueSignature(row.data);
+    const previous = reminderStateRows.get(row.user_id);
+    if (previous?.last_sent_date === localTime.date) {
+      skipped += 1;
+      continue;
+    }
+
+    if (dryRun) {
+      wouldSend += 1;
+      continue;
+    }
+
+    const result = await telegramApi("sendMessage", {
+      chat_id: settings.chatId,
+      text: summary.message,
+      disable_web_page_preview: true,
+    });
+
+    if (!result.ok) {
+      failed += 1;
+      continue;
+    }
+
+    await upsertReminderState(row.user_id, localTime.date, signature, sentAt);
+    sent += 1;
+  }
+
+  return jsonResponse(req, {
+    ok: failed === 0,
+    dry_run: dryRun,
+    sent,
+    would_send: wouldSend,
+    skipped,
+    failed,
+    local_date: localTime.date,
+    local_hour: localTime.hour,
+  }, failed ? 502 : 200);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return jsonResponse(req, { ok: false, error: "POST required." }, 405);
 
   try {
-    const user = await requireApprovedUser(req);
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "probe");
 
+    if (action === "send_scheduled_reminders") return await handleSendScheduledReminders(req, body);
+
+    const user = await requireApprovedUser(req);
     if (action === "probe") return await handleProbe(req);
     if (action === "resolve_chat") return await handleResolveChat(req, body);
     if (action === "send_test") return await handleSendTest(req, body);

@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.48";
+const APP_VERSION = "v0.49";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -962,6 +962,13 @@ function renderProfileScope() {
 
 function setPrivateVisibility(isVisible) {
   document.querySelectorAll("[data-private]").forEach((section) => {
+    if (section.classList.contains("modal")) {
+      if (!isVisible) {
+        section.classList.add("hidden");
+        section.setAttribute("aria-hidden", "true");
+      }
+      return;
+    }
     section.classList.toggle("hidden", !isVisible);
     section.setAttribute("aria-hidden", isVisible ? "false" : "true");
   });
@@ -2732,10 +2739,10 @@ function renderMobileActions(dueCount) {
   }
   const actions = [
     { key: "home", label: "Home", count: dueCount },
+    { key: "menu", label: "Menu" },
     { key: "add", label: "Add", primary: true },
     { key: "trends", label: "Trends" },
     { key: "results", label: "Results" },
-    { key: "menu", label: "Menu" },
   ];
   mobileActionBar.classList.toggle("has-due", dueCount > 0);
   mobileActionBar.innerHTML = actions
@@ -3769,7 +3776,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.48").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.49").catch(() => {});
   });
 }
 

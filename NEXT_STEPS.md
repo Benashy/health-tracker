@@ -10,9 +10,22 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.48`.
+- The app is now on `v0.49`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.49
+
+- Fixed the Telegram reminder modal so it no longer opens automatically after sign-in or refresh.
+- Reordered the mobile bottom navigation to `Home`, `Menu`, `Add`, `Trends`, `Results`.
+- Improved the iPhone account/sync footer so sync status sits above the refresh, version, and sign-out controls.
+- Deployed Telegram Edge Function version 5 with a protected scheduled-reminder action.
+- Added a private server-side `health_dashboard_telegram_reminder_state` table so daily reminder bookkeeping does not modify the main dashboard JSON or trigger avoidable cloud conflicts.
+- Added a Vault-backed scheduler credential and a restricted `health_tracker_cron_secret_matches` function so the scheduled reminder endpoint is not publicly triggerable.
+- Enabled Supabase Cron and pg_net for the Health Tracker project.
+- Scheduled `health-tracker-telegram-reminders` at `0 8,9 * * *`, with the Edge Function only sending when the local Europe/Lisbon hour is 09:00.
+- Added protected scheduled-reminder dry-run support and verified the path without sending actual Telegram messages.
+- Updated Telegram reminder summaries to include cycle labels such as `14-day cycle`, `30-day cycle`, `3-month cycle`, `6-month cycle`, and `12-month cycle`.
 
 ## Completed In v0.48
 
@@ -122,20 +135,14 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Current Outstanding Work
 
-1. Finish Telegram due reminders.
-   - Treat this as the next highest-priority feature.
+1. Polish Telegram due reminders after real-world testing.
    - Health Tracker now has a dedicated Telegram bot created through BotFather, so reminders stay in their own Telegram chat.
    - Use one Telegram bot/chat per project going forward, but keep the underlying reminder architecture reusable so other personal apps can adopt the same pattern quickly.
    - Do not put the Telegram bot token in GitHub Pages, browser JavaScript, or any public file.
-   - Store the bot token securely in Supabase secrets/Vault. The first secret is `HEALTH_TRACKER_TELEGRAM_BOT_TOKEN`.
-   - Use Supabase Cron to call a Supabase Edge Function on a daily schedule.
-   - The Edge Function should inspect each user's due/overdue metrics and send a low-detail privacy-safe Telegram message.
-   - Group related due items into calm reminder summaries, for example "Your six-monthly bloods are due" rather than separate messages for each blood marker.
-   - Limit medical reminders to one message per user per day by default.
-   - Avoid sending health values, DOB, or sensitive clinical detail in Telegram by default.
-   - Add duplicate prevention with `last_notified` or equivalent, so the same due item does not nag repeatedly.
-   - Use the v0.48 Telegram management screen and due-summary test mode for Ben and Angelika before enabling the daily scheduled reminder.
-   - Later add Telegram inline snooze actions such as 3 days, 7 days, and until the next reporting cycle, with the cycle length shown in the button label.
+   - Monitor the first few 09:00 scheduled reminders to confirm the message timing and grouping feel calm.
+   - Add Telegram inline snooze actions such as 3 days, 7 days, and until the next reporting cycle, with the cycle length shown in the button label.
+   - Consider whether inline snooze should be implemented with Telegram webhooks or a low-frequency callback polling job.
+   - Consider whether users should be able to choose reminder time and timezone later.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.

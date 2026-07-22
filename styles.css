@@ -2041,12 +2041,25 @@ button.status-pill:focus-visible {
 
   .account-sync-footer {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: repeat(3, auto);
     align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
   }
 
   .sync-status {
+    grid-column: 1 / -1;
     min-width: 0;
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  #manualRefreshButton,
+  #signOutButton,
+  .account-sync-footer .version-chip {
+    justify-self: center;
   }
 
   .mobile-action-bar {
