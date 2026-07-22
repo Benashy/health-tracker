@@ -199,6 +199,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Keep the reminder time fixed at 09:00 UK/Lisbon time for now.
    - Later consider letting each user choose reminder time and timezone.
    - Review whether the first snooze button wording feels right after Ben and Angelika use it in real reminders.
+   - Work through metric-specific warning periods together. Short-cycle home readings can be reminded close to the due date, but six-month bloods need earlier notice for booking, and multi-year checks such as colonoscopy need one to two months of planning time. Decide how each item should continue to display and remind after the due date has passed.
 
 2. Continue tablet and post-use mobile refinement.
    - Test on Ben's real iPhone/iPad after a few data-entry sessions.
@@ -217,6 +218,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 5. Add in-app reminders and review scheduling.
    - Keep reminders cautious and not excessive.
    - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
+   - Design warning windows based on how practical each item is to arrange, not only on its recurrence interval. For example, same-day reminders may work for weight, but blood tests, pilot medicals, eye tests, dermatology checks, and colonoscopy-style screening need earlier staged reminders.
    - Later add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
    - Later consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
 
