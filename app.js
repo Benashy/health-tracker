@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.50";
+const APP_VERSION = "v0.51";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -261,6 +261,7 @@ const state = {
   activeTrendKey: "",
   trendRange: "all",
   mobileView: "home",
+  telegramPanelOpen: false,
   pendingImport: null,
 };
 
@@ -962,6 +963,11 @@ function renderProfileScope() {
 
 function setPrivateVisibility(isVisible) {
   document.querySelectorAll("[data-private]").forEach((section) => {
+    if (section.id === "telegramModal") {
+      if (!isVisible) state.telegramPanelOpen = false;
+      syncTelegramPanelVisibility(isVisible);
+      return;
+    }
     if (section.classList.contains("modal")) {
       if (!isVisible) {
         section.classList.add("hidden");
@@ -1833,6 +1839,7 @@ function render() {
   renderProfiles();
   renderSchedule();
   renderTelegramPanel();
+  syncTelegramPanelVisibility();
   renderSummary();
   renderTrends();
 
@@ -2481,6 +2488,13 @@ function getTelegramSettings() {
   return state.settings.telegram;
 }
 
+function syncTelegramPanelVisibility(isPrivateVisible = Boolean(cloudState.user)) {
+  if (!telegramModal) return;
+  const shouldShow = Boolean(isPrivateVisible && cloudState.user && state.telegramPanelOpen);
+  telegramModal.classList.toggle("hidden", !shouldShow);
+  telegramModal.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+}
+
 function renderTelegramPanel() {
   if (!telegramPanel) return;
   const settings = getTelegramSettings();
@@ -2547,15 +2561,15 @@ function renderTelegramReminderGroups() {
 
 function openTelegramPanel() {
   if (!telegramModal || !cloudState.user) return;
+  state.telegramPanelOpen = true;
   renderTelegramPanel();
-  telegramModal.classList.remove("hidden");
-  telegramModal.setAttribute("aria-hidden", "false");
+  syncTelegramPanelVisibility(true);
 }
 
 function closeTelegramPanel() {
   if (!telegramModal) return;
-  telegramModal.classList.add("hidden");
-  telegramModal.setAttribute("aria-hidden", "true");
+  state.telegramPanelOpen = false;
+  syncTelegramPanelVisibility();
 }
 
 function generateTelegramPairingCode() {
@@ -2676,7 +2690,7 @@ async function sendTelegramDueTestMessage() {
       due_test_sent_at: new Date().toISOString(),
     });
     telegramSetupState.status = data.due_count
-      ? `Due test sent with ${data.due_count} checks.`
+      ? `Due test sent with ${data.due_count} checks and snooze buttons.`
       : "Due test sent. Nothing is due right now.";
     saveSettings();
   } catch (error) {
@@ -3776,7 +3790,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.50").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.51").catch(() => {});
   });
 }
 
