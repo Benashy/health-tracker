@@ -7,3 +7,4 @@ supabase-service-role*
 service-role*
 backup-tool/secrets*
 outputs/
+private-imports/
