@@ -824,6 +824,20 @@ legend {
   margin-bottom: 14px;
 }
 
+.vitamins-dose-feedback {
+  min-height: 22px;
+  margin: -4px 0 14px;
+  color: var(--info);
+  font-size: 0.86rem;
+  font-weight: 850;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.vitamins-dose-feedback.visible {
+  opacity: 1;
+}
+
 .vitamins-empty {
   display: grid;
   gap: 5px;
@@ -925,14 +939,26 @@ legend {
 }
 
 .vitamin-cell-item {
+  appearance: none;
   display: block;
+  width: 100%;
   margin-bottom: 6px;
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 6px 7px;
+  font-family: inherit;
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.vitamin-cell-item:hover,
+button.vitamin-cell-item:focus-visible {
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px rgba(47, 111, 174, 0.12);
+  outline: none;
 }
 
 .vitamin-cell-item:last-child {
@@ -1023,6 +1049,10 @@ legend {
 .entry-panel {
   position: sticky;
   top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .inline-fields label {
@@ -1981,6 +2011,8 @@ button.status-pill:focus-visible {
 
   .entry-panel {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .marker-summary,

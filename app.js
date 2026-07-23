@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.68";
+const APP_VERSION = "v0.69";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -66,7 +66,7 @@ const VITAMIN_TIMINGS = ["Upon waking", "Breakfast", "After lunch", "After dinne
 const VITAMIN_ITEMS_BY_PROFILE = {
   ben: [
     vitaminItem("fexofenadine", "Upon waking", "Fexofenadine", "1 tablet", "Daily", "Empty stomach. Take with plain water only. Wait 30-60 minutes before breakfast.", "daily"),
-    vitaminItem("lions-mane", "Breakfast", "Lion's Mane (Zenement)", "1 tablet", "Daily", "Taken with breakfast.", "daily"),
+    vitaminItem("lions-mane", "Breakfast", "Lion's Mane", "1 tablet", "Daily", "Taken with breakfast.", "daily"),
     vitaminItem("omega-3-lunch", "After lunch", "Omega-3 Fish Oil", "1 softgel", "Daily", "First of two daily softgels.", "daily"),
     vitaminItem("vitamin-d3-k2", "After lunch", "Vitamin D3 + K2", "1 capsule", "Monday & Friday", "Twice weekly.", "fixed", ["monday", "friday"]),
     vitaminItem("zinc", "After lunch", "Zinc", "1 tablet", "Monday & Friday", "Maximum twice weekly.", "fixed", ["monday", "friday"]),
@@ -526,6 +526,7 @@ const vitaminsSubtitle = document.querySelector("#vitaminsSubtitle");
 const vitaminsOpenButton = document.querySelector("#vitaminsOpenButton");
 const vitaminsCloseButton = document.querySelector("#vitaminsCloseButton");
 const vitaminsPrintButton = document.querySelector("#vitaminsPrintButton");
+const vitaminsDoseFeedback = document.querySelector("#vitaminsDoseFeedback");
 const vitaminsEmptyState = document.querySelector("#vitaminsEmptyState");
 const vitaminsMainSection = document.querySelector("#vitaminsMainSection");
 const vitaminsWeeklySection = document.querySelector("#vitaminsWeeklySection");
@@ -3492,18 +3493,23 @@ function renderVitaminWeeklyRows(profileId, items) {
 }
 
 function renderVitaminCellItem(profileId, item, dayKey) {
-  if (item.schedule === "optional") {
-    return `
-      <span class="vitamin-cell-item optional">
-        ${escapeHtml(item.item)} optional
-      </span>
-    `;
-  }
+  const label = item.schedule === "optional" ? `${item.item} optional` : item.item;
+  const doseText = getVitaminDoseText(item);
   return `
-    <span class="vitamin-cell-item ${escapeHtml(item.schedule)}">
-      ${escapeHtml(item.item)}
-    </span>
+    <button class="vitamin-cell-item ${escapeHtml(item.schedule)}" type="button" data-vitamin-dose="${escapeHtml(doseText)}" title="${escapeHtml(doseText)}" aria-label="${escapeHtml(`${label}. ${doseText}`)}">
+      ${escapeHtml(label)}
+    </button>
   `;
+}
+
+function getVitaminDoseText(item) {
+  return `${item.item}: ${item.quantity}`;
+}
+
+function showVitaminDoseFeedback(message) {
+  if (!vitaminsDoseFeedback) return;
+  vitaminsDoseFeedback.textContent = message;
+  vitaminsDoseFeedback.classList.add("visible");
 }
 
 function shouldShowVitaminItemOnDate(profileId, item, dayKey) {
@@ -4742,7 +4748,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.68").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.69").catch(() => {});
   });
 }
 
@@ -4890,6 +4896,13 @@ if (telegramModal) {
 if (vitaminsOpenButton) vitaminsOpenButton.addEventListener("click", openVitaminsPanel);
 if (vitaminsCloseButton) vitaminsCloseButton.addEventListener("click", closeVitaminsPanel);
 if (vitaminsPrintButton) vitaminsPrintButton.addEventListener("click", printVitaminsPanel);
+if (vitaminsWeeklyBody) {
+  vitaminsWeeklyBody.addEventListener("click", (event) => {
+    const doseButton = event.target.closest("[data-vitamin-dose]");
+    if (!doseButton) return;
+    showVitaminDoseFeedback(doseButton.dataset.vitaminDose);
+  });
+}
 if (vitaminsModal) {
   vitaminsModal.addEventListener("click", (event) => {
     if (event.target === vitaminsModal) closeVitaminsPanel();

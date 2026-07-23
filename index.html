@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.68" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.68" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.68" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.68" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.68" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.68" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.68" />
-    <link rel="stylesheet" href="styles.css?v=0.68" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.69" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.69" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.69" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.69" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.69" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.69" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.69" />
+    <link rel="stylesheet" href="styles.css?v=0.69" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -370,7 +370,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.68</span>
+          <span class="version-chip" id="appVersion">v0.69</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -455,6 +455,7 @@
         <div class="vitamins-actions">
           <button class="ghost-button" id="vitaminsPrintButton" type="button">Print</button>
         </div>
+        <div class="vitamins-dose-feedback" id="vitaminsDoseFeedback" role="status" aria-live="polite"></div>
 
         <div class="vitamins-empty hidden" id="vitaminsEmptyState">
           <strong>No vitamin organiser set yet</strong>
@@ -463,7 +464,7 @@
 
         <section class="vitamins-section" id="vitaminsWeeklySection">
           <div class="panel-heading">
-            <h3>Weekly Pill Case Guide</h3>
+            <h3>Weekly timetable</h3>
           </div>
           <div class="vitamins-table-wrap">
             <table class="vitamins-table weekly-guide-table">
@@ -486,7 +487,7 @@
 
         <section class="vitamins-section" id="vitaminsMainSection">
           <div class="panel-heading">
-            <h3>Main schedule</h3>
+            <h3>Expanded schedule</h3>
           </div>
           <div class="vitamins-table-wrap">
             <table class="vitamins-table">
@@ -506,9 +507,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.68"></script>
+    <script src="supabase-config.js?v=0.69"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.68"></script>
-    <script src="privacy-guard.js?v=0.68"></script>
+    <script src="app.js?v=0.69"></script>
+    <script src="privacy-guard.js?v=0.69"></script>
   </body>
 </html>
