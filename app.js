@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.63";
+const APP_VERSION = "v0.64";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -448,6 +448,7 @@ const totalResults = document.querySelector("#totalResults");
 const flaggedResults = document.querySelector("#flaggedResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
 const nextDueDate = document.querySelector("#nextDueDate");
+const nextDueRelative = document.querySelector("#nextDueRelative");
 const nextDueCard = document.querySelector("#nextDueCard");
 const snapshotSection = document.querySelector("#snapshotSection");
 const snapshotUpdated = document.querySelector("#snapshotUpdated");
@@ -2176,6 +2177,7 @@ function render() {
   dueSoonResults.textContent = dueCount;
   const nextDueSummary = getNextDueSummary();
   nextDueDate.textContent = nextDueSummary.label;
+  if (nextDueRelative) nextDueRelative.textContent = nextDueSummary.relative;
   nextDueCard.classList.toggle("due-now", nextDueSummary.state === "due");
   nextDueCard.classList.toggle("overdue", nextDueSummary.state === "overdue");
 
@@ -3243,13 +3245,37 @@ function renderSummarySelection() {
 
 function getNextDueSummary() {
   const scheduleItems = getScheduleItems();
-  if (scheduleItems.some((item) => item.due.state === "overdue")) return { label: "Now", state: "overdue" };
-  if (scheduleItems.some((item) => item.due.state === "due")) return { label: "Now", state: "due" };
+  const overdueItems = scheduleItems.filter((item) => item.due.state === "overdue");
+  if (overdueItems.length) {
+    const nextDate = overdueItems
+      .map((item) => item.due.nextDate)
+      .filter(Boolean)
+      .sort((a, b) => a - b)[0];
+    return {
+      label: nextDate ? formatDate(toDateString(nextDate)) : "Overdue",
+      relative: nextDate ? formatRelativeDueLabel(nextDate) : "overdue now",
+      state: "overdue",
+    };
+  }
+  if (scheduleItems.some((item) => item.due.state === "due")) return { label: "Today", relative: "due today", state: "due" };
   const next = scheduleItems
     .map((item) => item.due.nextDate)
     .filter(Boolean)
     .sort((a, b) => a - b)[0];
-  return next ? { label: formatDate(toDateString(next)), state: "future" } : { label: "-", state: "none" };
+  return next
+    ? { label: formatDate(toDateString(next)), relative: formatRelativeDueLabel(next), state: "future" }
+    : { label: "-", relative: "nothing scheduled", state: "none" };
+}
+
+function formatRelativeDueLabel(date) {
+  const days = daysBetween(new Date(), date);
+  if (days < 0) {
+    const overdueDays = Math.abs(days);
+    return `overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}`;
+  }
+  if (days === 0) return "due today";
+  if (days === 1) return "tomorrow";
+  return `in ${days} days`;
 }
 
 function getDueCount() {
@@ -3332,10 +3358,6 @@ function handleActionShortcut(action) {
 
 function handleMenuAction(action) {
   if (!cloudState.user) return;
-  if (action === "export-gpt") {
-    exportForChatGpt();
-    return;
-  }
   if (action === "import-gpt") {
     if (importChatGptButton.disabled) return;
     importChatGptInput.click();
@@ -3626,7 +3648,7 @@ function exportCsv() {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = getExportFilename("data", "csv");
+  link.download = getExportFilename("results", "csv");
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -4264,7 +4286,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.63").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.64").catch(() => {});
   });
 }
 
@@ -4363,7 +4385,7 @@ rangeEditButton.addEventListener("click", toggleRangeEditing);
 });
 form.addEventListener("submit", addResult);
 exportCsvButton.addEventListener("click", exportCsv);
-exportChatGptButton.addEventListener("click", exportForChatGpt);
+if (exportChatGptButton) exportChatGptButton.addEventListener("click", exportForChatGpt);
 exportReviewPackButton.addEventListener("click", exportReviewPack);
 importChatGptButton.addEventListener("click", () => importChatGptInput.click());
 importChatGptInput.addEventListener("change", () => importFromChatGptFile(importChatGptInput.files[0]));

@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.63" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.63" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.63" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.63" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.63" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.63" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.63" />
-    <link rel="stylesheet" href="styles.css?v=0.63" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.64" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.64" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.64" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.64" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.64" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.64" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.64" />
+    <link rel="stylesheet" href="styles.css?v=0.64" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -26,11 +26,10 @@
             <h1>Health Dashboard</h1>
           </div>
           <div class="topbar-actions hidden" data-private aria-hidden="true">
-            <button class="ghost-button" id="exportChatGptButton" type="button">Export for ChatGPT</button>
             <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
             <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
             <button class="ghost-button" id="exportReviewPackButton" type="button">Prepare AI Review</button>
-            <button class="ghost-button" id="exportCsvButton" type="button">Export CSV</button>
+            <button class="ghost-button" id="exportCsvButton" type="button">Export results</button>
             <button class="ghost-button" id="telegramOpenButton" type="button">Telegram</button>
           </div>
         </header>
@@ -163,6 +162,7 @@
           </article>
           <article class="summary-static" id="nextDueCard">
             <span class="metric" id="nextDueDate">-</span>
+            <small class="metric-meta" id="nextDueRelative">-</small>
             <span class="label">next due</span>
           </article>
         </section>
@@ -347,10 +347,9 @@
             <h2>Menu</h2>
           </div>
           <div class="mobile-menu-actions">
-            <button class="ghost-button" type="button" data-menu-action="export-gpt">Export for ChatGPT</button>
             <button class="ghost-button" type="button" data-menu-action="import-gpt">Import from ChatGPT</button>
             <button class="ghost-button" type="button" data-menu-action="ai-review">Prepare AI Review</button>
-            <button class="ghost-button" type="button" data-menu-action="csv">Export CSV</button>
+            <button class="ghost-button" type="button" data-menu-action="csv">Export results</button>
             <button class="ghost-button" type="button" data-menu-action="telegram">Telegram</button>
           </div>
         </section>
@@ -358,7 +357,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.63</span>
+          <span class="version-chip" id="appVersion">v0.64</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -430,9 +429,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.63"></script>
+    <script src="supabase-config.js?v=0.64"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.63"></script>
-    <script src="privacy-guard.js?v=0.63"></script>
+    <script src="app.js?v=0.64"></script>
+    <script src="privacy-guard.js?v=0.64"></script>
   </body>
 </html>

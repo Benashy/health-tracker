@@ -517,6 +517,15 @@ body:not(.signed-in) .auth-actions .ghost-button {
   line-height: 1;
 }
 
+.metric-meta {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .metric.attention {
   color: var(--warn);
 }
