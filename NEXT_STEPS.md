@@ -19,6 +19,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - Added per-user metric tracking controls so a metric can be stopped or restarted without deleting history.
 - Active metrics with no first entry now show as `Baseline due`.
 - Not-tracked metrics are hidden from active results, trends, due lists, and Telegram reminder calculations while remaining available in the metric dropdown for re-tracking.
+- Deployed Telegram Edge Function version 14 so scheduled and test reminders use the same not-tracked metric rules as the dashboard.
 
 ## Completed In v0.64
 
