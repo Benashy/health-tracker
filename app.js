@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.65";
+const APP_VERSION = "v0.66";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -34,6 +34,7 @@ const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
 const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
+const SCHEDULE_PAGE_SIZE = 8;
 const NEAR_LIMIT_RATIO = 0.02;
 const TRACKING_ACTIVE = "active";
 const TRACKING_NOT_TRACKED = "not_tracked";
@@ -359,6 +360,7 @@ const state = {
   saveFeedbackTimer: null,
   pendingImport: null,
   pendingImportPage: 1,
+  schedulePage: 1,
 };
 
 const telegramSetupState = {
@@ -471,6 +473,10 @@ const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
 const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
+const schedulePagination = document.querySelector("#schedulePagination");
+const schedulePrevButton = document.querySelector("#schedulePrevButton");
+const scheduleNextButton = document.querySelector("#scheduleNextButton");
+const schedulePageText = document.querySelector("#schedulePageText");
 const telegramModal = document.querySelector("#telegramModal");
 const telegramPanel = document.querySelector("#telegramPanel");
 const telegramStatus = document.querySelector("#telegramStatus");
@@ -2139,6 +2145,7 @@ function snoozeScheduleItem(profileId, metricName) {
     due_date: toDateString(nextDate),
     updated_at: new Date().toISOString(),
   };
+  state.schedulePage = 1;
   saveScheduleState();
   render();
 }
@@ -2937,11 +2944,15 @@ function renderSchedule() {
   const priorityOrder = { overdue: 0, due: 1, soon: 2, ok: 3, complete: 4 };
   const items = getScheduleItems()
     .filter((item) => ["overdue", "due", "soon"].includes(item.due.state))
-    .sort((a, b) => priorityOrder[a.due.state] - priorityOrder[b.due.state])
-    .slice(0, 8);
+    .sort((a, b) => priorityOrder[a.due.state] - priorityOrder[b.due.state] || a.metric.name.localeCompare(b.metric.name));
+  const totalPages = Math.max(1, Math.ceil(items.length / SCHEDULE_PAGE_SIZE));
+  state.schedulePage = Math.min(Math.max(1, state.schedulePage), totalPages);
+  const startIndex = (state.schedulePage - 1) * SCHEDULE_PAGE_SIZE;
+  const visibleItems = items.slice(startIndex, startIndex + SCHEDULE_PAGE_SIZE);
+  renderSchedulePagination(items.length, startIndex, visibleItems.length, totalPages);
 
-  schedulePanel.innerHTML = items.length
-    ? items
+  schedulePanel.innerHTML = visibleItems.length
+    ? visibleItems
         .map((item) => `
           <article class="schedule-card ${item.due.state}" role="button" tabindex="0" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">
             <strong>${escapeHtml(item.metric.name)}</strong>
@@ -2953,6 +2964,25 @@ function renderSchedule() {
         `)
         .join("")
     : renderCalmScheduleCard();
+}
+
+function renderSchedulePagination(totalItems, startIndex, visibleCount, totalPages) {
+  if (!schedulePagination || !schedulePrevButton || !scheduleNextButton || !schedulePageText) return;
+  const showPagination = totalItems > SCHEDULE_PAGE_SIZE;
+  schedulePagination.classList.toggle("hidden", !showPagination);
+  if (!showPagination) {
+    schedulePageText.textContent = "";
+    return;
+  }
+  const endIndex = startIndex + visibleCount;
+  schedulePageText.textContent = `${startIndex + 1}-${endIndex} of ${totalItems}`;
+  schedulePrevButton.disabled = state.schedulePage <= 1;
+  scheduleNextButton.disabled = state.schedulePage >= totalPages;
+}
+
+function changeSchedulePage(direction) {
+  state.schedulePage += direction;
+  renderSchedule();
 }
 
 function renderCalmScheduleCard() {
@@ -3684,6 +3714,7 @@ function addResult(event) {
   state.results.push(result);
   delete state.scheduleState.snoozes[getSnoozeKey(profile.id, selectedMetric.name)];
   if (!isCompletion) saveRangeForResult(result);
+  state.schedulePage = 1;
   saveScheduleState();
   saveResults();
   form.reset();
@@ -4417,7 +4448,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.65").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.66").catch(() => {});
   });
 }
 
@@ -4480,6 +4511,8 @@ metricInput.addEventListener("change", () => {
   renderQuickMetrics();
 });
 if (trackingToggleButton) trackingToggleButton.addEventListener("click", toggleSelectedMetricTracking);
+if (schedulePrevButton) schedulePrevButton.addEventListener("click", () => changeSchedulePage(-1));
+if (scheduleNextButton) scheduleNextButton.addEventListener("click", () => changeSchedulePage(1));
 testDateInput.addEventListener("change", syncCompletionDueFields);
 function markCompletionNextDueEdited() {
   state.completionNextDueTouched = true;

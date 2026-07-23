@@ -789,6 +789,25 @@ legend {
   gap: 10px;
 }
 
+.schedule-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.schedule-pagination .mini-button {
+  min-width: 34px;
+  padding: 0 10px;
+}
+
+.schedule-pagination .mini-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .schedule-card.soon {
   border-color: #e3b437;
   background: var(--amber-bg);
