@@ -998,6 +998,45 @@ legend {
   color: var(--accent-dark);
 }
 
+.tracking-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -4px 0 14px;
+  border: 1px solid rgba(35, 111, 98, 0.22);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 9px 10px;
+  color: var(--accent-dark);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.tracking-control.not-tracked {
+  border-color: var(--line);
+  background: #f2f4f2;
+  color: var(--muted);
+}
+
+.tracking-control .mini-button {
+  flex: 0 0 auto;
+}
+
+.metric-not-tracked #dateField,
+.metric-not-tracked .completion-panel,
+.metric-not-tracked .value-fields,
+.metric-not-tracked .reference-panel,
+.metric-not-tracked .notes-field {
+  display: none;
+}
+
+.metric-not-tracked .entry-submit-button {
+  background: #d7ddd8;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .entry-assist {
   display: flex;
   align-items: center;

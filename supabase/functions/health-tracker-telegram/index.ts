@@ -623,6 +623,21 @@ function getScheduleState(data: Record<string, unknown>) {
   return { snoozes };
 }
 
+function getMetricTrackingByProfile(data: Record<string, unknown>) {
+  const settings = data?.settings as Record<string, unknown> | undefined;
+  const rawTracking = (settings?.metric_tracking_by_profile ?? settings?.metricTrackingByProfile ?? {}) as Record<string, unknown>;
+  const tracking: Record<string, Record<string, string>> = {};
+  Object.entries(rawTracking).forEach(([profileId, profileTracking]) => {
+    if (!profileTracking || typeof profileTracking !== "object") return;
+    Object.entries(profileTracking as Record<string, unknown>).forEach(([metricName, status]) => {
+      if (status !== "not_tracked") return;
+      tracking[profileId] ??= {};
+      tracking[profileId][metricName] = "not_tracked";
+    });
+  });
+  return tracking;
+}
+
 function getScheduleGroup(selectedMetric: DashboardMetric) {
   if (["Weight", "Waist circumference"].includes(selectedMetric.name)) {
     return { key: "body", label: "Body composition", cycleLabel: "14-day cycle" };
@@ -704,6 +719,16 @@ function isMetricAvailableForProfile(selectedMetric: DashboardMetric, profileId?
   return selectedMetric.profileIds.includes(profileId);
 }
 
+function isMetricTrackedForProfile(
+  selectedMetric: DashboardMetric,
+  profileId: string | undefined,
+  metricTrackingByProfile: Record<string, Record<string, string>>,
+) {
+  if (!isMetricAvailableForProfile(selectedMetric, profileId)) return false;
+  if (!profileId) return true;
+  return metricTrackingByProfile[profileId]?.[selectedMetric.name] !== "not_tracked";
+}
+
 function isCompletionMetric(selectedMetric: DashboardMetric) {
   return selectedMetric.entryMode === "completion";
 }
@@ -722,11 +747,16 @@ function getLatestResult(profileId: string, metricName: string, measurements: Da
     })[0] ?? null;
 }
 
-function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[]) {
+function getScheduleAnchorDate(
+  profileId: string,
+  selectedMetric: DashboardMetric,
+  measurements: DashboardMeasurement[],
+  metricTrackingByProfile: Record<string, Record<string, string>>,
+) {
   const group = getScheduleGroup(selectedMetric);
   const matchingMetrics = REMINDER_METRICS
     .filter((item) =>
-      isMetricAvailableForProfile(item, profileId) &&
+      isMetricTrackedForProfile(item, profileId, metricTrackingByProfile) &&
       !item.firstDueDate &&
       getScheduleGroup(item).key === group.key &&
       item.intervalDays === selectedMetric.intervalDays
@@ -742,7 +772,13 @@ function getScheduleAnchorDate(profileId: string, selectedMetric: DashboardMetri
   return matchingResults[0]?.sample_date ?? matchingResults[0]?.test_date ?? null;
 }
 
-function getNextDueDate(profileId: string, selectedMetric: DashboardMetric, measurements: DashboardMeasurement[], latest: DashboardMeasurement | null) {
+function getNextDueDate(
+  profileId: string,
+  selectedMetric: DashboardMetric,
+  measurements: DashboardMeasurement[],
+  latest: DashboardMeasurement | null,
+  metricTrackingByProfile: Record<string, Record<string, string>>,
+) {
   if (isCompletionMetric(selectedMetric)) {
     const storedNextDueDate = getStoredNextDueDate(latest);
     if (storedNextDueDate) return parseDateString(storedNextDueDate);
@@ -763,7 +799,7 @@ function getNextDueDate(profileId: string, selectedMetric: DashboardMetric, meas
     if (!latest) return firstDueDate;
   }
 
-  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric, measurements);
+  const anchorDate = getScheduleAnchorDate(profileId, selectedMetric, measurements, metricTrackingByProfile);
   return anchorDate ? addDays(anchorDate, selectedMetric.intervalDays ?? 0) : null;
 }
 
@@ -783,24 +819,25 @@ function getDueStatus(
   selectedMetric: DashboardMetric,
   measurements: DashboardMeasurement[],
   snoozes: Record<string, { due_date?: string }>,
+  metricTrackingByProfile: Record<string, Record<string, string>>,
 ) {
   const profileId = profile.id ?? "profile";
   const latest = getLatestResult(profileId, selectedMetric.name, measurements);
   if (!selectedMetric.intervalDays) {
     return latest
       ? { state: "complete", label: "Recorded", nextDate: null }
-      : { state: "due", label: selectedMetric.cadence, nextDate: null };
+      : { state: "due", label: "Baseline due", nextDate: null };
   }
 
-  let nextDate = getNextDueDate(profileId, selectedMetric, measurements, latest);
-  if (!latest && !nextDate) return { state: "due", label: "No result yet", nextDate: null };
+  let nextDate = getNextDueDate(profileId, selectedMetric, measurements, latest, metricTrackingByProfile);
+  if (!latest && !nextDate) return { state: "due", label: "Baseline due", nextDate: null };
 
   const snoozedDate = snoozes[getSnoozeKey(profileId, selectedMetric.name)]?.due_date;
   if (snoozedDate && (!nextDate || new Date(`${snoozedDate}T00:00:00Z`) > nextDate)) {
     nextDate = new Date(`${snoozedDate}T00:00:00Z`);
   }
 
-  if (!nextDate) return { state: "due", label: "No result yet", nextDate: null };
+  if (!nextDate) return { state: "due", label: "Baseline due", nextDate: null };
 
   const daysRemaining = daysBetween(new Date(), nextDate);
   const warningDays = getWarningDays(selectedMetric);
@@ -831,13 +868,14 @@ function getDueItems(data: Record<string, unknown>, options: { scheduledOnly?: b
   const profiles = getDashboardProfiles(data);
   const measurements = getDashboardMeasurements(data);
   const { snoozes } = getScheduleState(data);
+  const metricTrackingByProfile = getMetricTrackingByProfile(data);
   return profiles.flatMap((profile) =>
     REMINDER_METRICS
-      .filter((item) => isMetricAvailableForProfile(item, profile.id) && ["highest", "medium"].includes(item.priority))
+      .filter((item) => isMetricTrackedForProfile(item, profile.id, metricTrackingByProfile) && ["highest", "medium"].includes(item.priority))
       .map((selectedMetric) => ({
         profile,
         metric: selectedMetric,
-        due: getDueStatus(profile, selectedMetric, measurements, snoozes),
+        due: getDueStatus(profile, selectedMetric, measurements, snoozes, metricTrackingByProfile),
       }))
       .filter((item) => ["overdue", "due", "soon"].includes(item.due.state))
       .filter((item) => !options.scheduledOnly || shouldIncludeScheduledReminder(item, options.localDate ?? getReminderLocalTime().date)),

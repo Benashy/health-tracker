@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.64" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.64" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.64" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.64" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.64" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.64" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.64" />
-    <link rel="stylesheet" href="styles.css?v=0.64" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.65" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.65" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.65" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.65" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.65" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.65" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.65" />
+    <link rel="stylesheet" href="styles.css?v=0.65" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -200,6 +200,11 @@
               <select id="markerInput" required></select>
             </label>
 
+            <div class="tracking-control" id="trackingControl">
+              <span id="trackingStatusText">Tracked</span>
+              <button class="mini-button" id="trackingToggleButton" type="button">Stop tracking</button>
+            </div>
+
             <div class="entry-assist" id="entryAssist"></div>
 
             <div class="completion-panel hidden" id="completionPanel">
@@ -263,7 +268,7 @@
               </div>
             </div>
 
-            <label>
+            <label class="notes-field">
               Notes
               <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
             </label>
@@ -357,7 +362,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.64</span>
+          <span class="version-chip" id="appVersion">v0.65</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -429,9 +434,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.64"></script>
+    <script src="supabase-config.js?v=0.65"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.64"></script>
-    <script src="privacy-guard.js?v=0.64"></script>
+    <script src="app.js?v=0.65"></script>
+    <script src="privacy-guard.js?v=0.65"></script>
   </body>
 </html>

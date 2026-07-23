@@ -10,9 +10,15 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.64`.
+- The app is now on `v0.65`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.65
+
+- Added per-user metric tracking controls so a metric can be stopped or restarted without deleting history.
+- Active metrics with no first entry now show as `Baseline due`.
+- Not-tracked metrics are hidden from active results, trends, due lists, and Telegram reminder calculations while remaining available in the metric dropdown for re-tracking.
 
 ## Completed In v0.64
 

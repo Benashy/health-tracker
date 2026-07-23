@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.64";
+const APP_VERSION = "v0.65";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -35,6 +35,8 @@ const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
 const NEAR_LIMIT_RATIO = 0.02;
+const TRACKING_ACTIVE = "active";
+const TRACKING_NOT_TRACKED = "not_tracked";
 const APPROVED_EMAILS = new Set([
   "ben_ashurst@me.com",
   "angelika_kleczka@hotmail.com",
@@ -404,6 +406,9 @@ const entryPanel = document.querySelector(".entry-panel");
 const metricInput = document.querySelector("#markerInput");
 const metricSearchInput = document.querySelector("#metricSearchInput");
 const quickMetricPanel = document.querySelector("#quickMetricPanel");
+const trackingControl = document.querySelector("#trackingControl");
+const trackingStatusText = document.querySelector("#trackingStatusText");
+const trackingToggleButton = document.querySelector("#trackingToggleButton");
 const trendMetricInput = document.querySelector("#trendMetricInput");
 const trendPanel = document.querySelector("#trendPanel");
 const dateLabelText = document.querySelector("#dateLabelText");
@@ -621,6 +626,7 @@ function loadSettings() {
 
 function normaliseSettings(settings = {}) {
   const snapshotMetricsByProfile = settings?.snapshot_metrics_by_profile ?? settings?.snapshotMetricsByProfile ?? {};
+  const metricTrackingByProfile = settings?.metric_tracking_by_profile ?? settings?.metricTrackingByProfile ?? {};
   const normalisedSnapshotMetrics = {};
   const profileIds = new Set([...defaultProfiles.map((profile) => profile.id), ...Object.keys(snapshotMetricsByProfile)]);
   profileIds.forEach((profileId) => {
@@ -629,8 +635,23 @@ function normaliseSettings(settings = {}) {
   return {
     ...settings,
     snapshot_metrics_by_profile: normalisedSnapshotMetrics,
+    metric_tracking_by_profile: normaliseMetricTrackingByProfile(metricTrackingByProfile),
     telegram: normaliseTelegramSettings(settings?.telegram),
   };
+}
+
+function normaliseMetricTrackingByProfile(metricTrackingByProfile = {}) {
+  const normalised = {};
+  const validNames = new Set(metrics.map((item) => item.name));
+  Object.entries(metricTrackingByProfile ?? {}).forEach(([profileId, profileTracking]) => {
+    if (!profileTracking || typeof profileTracking !== "object") return;
+    Object.entries(profileTracking).forEach(([metricName, status]) => {
+      if (!validNames.has(metricName) || status !== TRACKING_NOT_TRACKED) return;
+      normalised[profileId] ??= {};
+      normalised[profileId][metricName] = TRACKING_NOT_TRACKED;
+    });
+  });
+  return normalised;
 }
 
 function normaliseTelegramSettings(settings = {}) {
@@ -651,11 +672,12 @@ function normaliseTelegramSettings(settings = {}) {
   };
 }
 
-function normaliseSnapshotMetricNames(metricNames) {
+function normaliseSnapshotMetricNames(metricNames, profileId = null) {
   const requested = Array.isArray(metricNames) ? metricNames : [];
-  const validNames = new Set(metrics.map((item) => item.name));
+  const availableMetrics = profileId ? getTrackedMetricsForProfile(profileId) : metrics;
+  const validNames = new Set(availableMetrics.map((item) => item.name));
   const selected = [];
-  [...requested, ...defaultSnapshotMetricNames].forEach((name) => {
+  [...requested, ...defaultSnapshotMetricNames, ...availableMetrics.map((item) => item.name)].forEach((name) => {
     if (!validNames.has(name) || selected.includes(name)) return;
     selected.push(name);
   });
@@ -668,8 +690,40 @@ function isMetricAvailableForProfile(selectedMetric, profileId) {
   return selectedMetric.profileIds.includes(profileId);
 }
 
+function getMetricTrackingStatus(profileId, metricName) {
+  if (!profileId || !metricName) return TRACKING_ACTIVE;
+  return state.settings?.metric_tracking_by_profile?.[profileId]?.[metricName] === TRACKING_NOT_TRACKED
+    ? TRACKING_NOT_TRACKED
+    : TRACKING_ACTIVE;
+}
+
+function isMetricTrackedForProfile(selectedMetric, profileId) {
+  if (!isMetricAvailableForProfile(selectedMetric, profileId)) return false;
+  return getMetricTrackingStatus(profileId, selectedMetric.name) !== TRACKING_NOT_TRACKED;
+}
+
+function setMetricTrackingStatus(profileId, metricName, status) {
+  state.settings.metric_tracking_by_profile ??= {};
+  state.settings.metric_tracking_by_profile[profileId] ??= {};
+  if (status === TRACKING_NOT_TRACKED) {
+    state.settings.metric_tracking_by_profile[profileId][metricName] = TRACKING_NOT_TRACKED;
+    delete state.scheduleState.snoozes[getSnoozeKey(profileId, metricName)];
+  } else {
+    delete state.settings.metric_tracking_by_profile[profileId][metricName];
+    if (!Object.keys(state.settings.metric_tracking_by_profile[profileId]).length) {
+      delete state.settings.metric_tracking_by_profile[profileId];
+    }
+  }
+  saveSettings();
+  saveScheduleState();
+}
+
 function getMetricsForProfile(profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null) {
   return metrics.filter((item) => isMetricAvailableForProfile(item, profileId));
+}
+
+function getTrackedMetricsForProfile(profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null) {
+  return metrics.filter((item) => isMetricTrackedForProfile(item, profileId));
 }
 
 function saveSettings() {
@@ -1037,6 +1091,7 @@ function setEditingAvailability() {
     exportCsvButton,
     exportChatGptButton,
     exportReviewPackButton,
+    trackingToggleButton,
     snapshotEditor,
     snapshotEditButton,
     telegramOpenButton,
@@ -1054,6 +1109,7 @@ function setEditingAvailability() {
     element.disabled = disabled;
   });
   if (entrySubmitButton) entrySubmitButton.disabled = disabled || state.entrySaveLocked;
+  if (trackingToggleButton) trackingToggleButton.disabled = disabled;
   importChatGptButton.disabled = disabled;
   if (snapshotEditButton) snapshotEditButton.disabled = disabled;
   if (telegramPairButton) telegramPairButton.disabled = disabled || telegramSetupState.busy;
@@ -1201,7 +1257,7 @@ function populatePeople() {
 }
 
 function populateTrendMetrics() {
-  const availableMetrics = getMetricsForProfile();
+  const availableMetrics = getTrackedMetricsForProfile();
   trendMetricInput.innerHTML = availableMetrics
     .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
     .join("");
@@ -1261,7 +1317,11 @@ function populateMetrics() {
     .sort(([groupA], [groupB]) => compareMetricInputGroups(groupA, groupB))
     .map(([group, groupMetrics]) => {
       const options = groupMetrics
-        .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
+        .map((item) => {
+          const isTracked = isMetricTrackedForProfile(item, getSelectedProfile()?.id);
+          const label = isTracked ? item.name : `${item.name} (not tracked)`;
+          return `<option value="${escapeHtml(item.name)}">${escapeHtml(label)}</option>`;
+        })
         .join("");
       return `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`;
     })
@@ -1298,7 +1358,10 @@ function renderQuickMetrics() {
 
 function getQuickMetricNames() {
   const profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null;
-  return starterMetricNames.filter((name) => getMetric(name, profileId));
+  return starterMetricNames.filter((name) => {
+    const selectedMetric = getMetric(name, profileId);
+    return selectedMetric && isMetricTrackedForProfile(selectedMetric, profileId);
+  });
 }
 
 function selectMetric(name) {
@@ -1311,9 +1374,29 @@ function selectMetric(name) {
   renderQuickMetrics();
 }
 
+function renderTrackingControl(selectedMetric, profile) {
+  if (!trackingControl || !trackingStatusText || !trackingToggleButton) return;
+  if (!selectedMetric || !profile) {
+    trackingControl.classList.add("hidden");
+    return;
+  }
+  const isTracked = isMetricTrackedForProfile(selectedMetric, profile.id);
+  trackingControl.classList.remove("hidden");
+  trackingControl.classList.toggle("not-tracked", !isTracked);
+  trackingStatusText.textContent = isTracked
+    ? `Tracked for ${profile.name}`
+    : `Not tracked for ${profile.name}`;
+  trackingToggleButton.textContent = isTracked ? "Stop tracking" : "Track again";
+  trackingToggleButton.disabled = isReadOnlyMode();
+  form.classList.toggle("metric-not-tracked", !isTracked);
+}
+
 function syncMetricDefaults() {
-  const selectedMetric = getMetric(metricInput.value, getSelectedProfile()?.id);
-  if (!selectedMetric) return;
+  const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
+  if (!selectedMetric || !profile) return;
+  const isTracked = isMetricTrackedForProfile(selectedMetric, profile.id);
+  renderTrackingControl(selectedMetric, profile);
   const isCompletion = isCompletionMetric(selectedMetric);
   state.completionNextDueTouched = false;
   unitInput.value = selectedMetric.unit;
@@ -1341,6 +1424,10 @@ function syncMetricDefaults() {
   syncRangeDefaults();
   syncSourceDefaults();
   renderEntryAssist();
+  if (entrySubmitButton) {
+    entrySubmitButton.textContent = isTracked ? "Add to tracker" : "Not tracked";
+    entrySubmitButton.disabled = !isTracked || isReadOnlyMode() || state.entrySaveLocked;
+  }
 }
 
 function getDefaultSourceType(metricName) {
@@ -1371,6 +1458,16 @@ function renderEntryAssist() {
   const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) {
     entryAssist.innerHTML = "";
+    return;
+  }
+
+  if (!isMetricTrackedForProfile(selectedMetric, profile.id)) {
+    entryAssist.innerHTML = `
+      <div>
+        <strong>${escapeHtml(selectedMetric.name)} is not tracked</strong>
+        <span>Use Track again to include it in results, trends, due checks, and reminders.</span>
+      </div>
+    `;
     return;
   }
 
@@ -1443,6 +1540,29 @@ function getCompletionHint(selectedMetric, completedDate) {
 function getCompletionResultNextDueDate(selectedMetric, completedDate) {
   if (!isCompletionMetric(selectedMetric)) return "";
   return nextDueInput?.value || getAutoCompletionNextDueDate(selectedMetric, completedDate);
+}
+
+function toggleSelectedMetricTracking() {
+  if (!assertCanEdit()) return;
+  const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
+  if (!profile || !selectedMetric) return;
+  const isTracked = isMetricTrackedForProfile(selectedMetric, profile.id);
+  if (isTracked) {
+    const confirmed = window.confirm(
+      `Stop tracking ${selectedMetric.name} for ${profile.name}? Existing entries stay saved, but this metric will be hidden from active results, trends, due lists, and Telegram reminders until you track it again.`,
+    );
+    if (!confirmed) return;
+  }
+
+  setMetricTrackingStatus(profile.id, selectedMetric.name, isTracked ? TRACKING_NOT_TRACKED : TRACKING_ACTIVE);
+  if (isTracked && state.activeTrendKey === selectedMetric.name) state.activeTrendKey = "";
+  populateMetrics();
+  metricInput.value = selectedMetric.name;
+  populateTrendMetrics();
+  syncMetricDefaults();
+  renderQuickMetrics();
+  render();
 }
 
 function getResultStoredNextDueDate(result) {
@@ -1620,8 +1740,11 @@ function isTargetMetric(metricName) {
 }
 
 function visibleResults(results = state.results) {
-  if (!state.activeProfileId) return results;
-  return results.filter((result) => result.profile_id === state.activeProfileId);
+  return results.filter((result) => {
+    if (state.activeProfileId && result.profile_id !== state.activeProfileId) return false;
+    const selectedMetric = getMetric(result.metric, result.profile_id);
+    return selectedMetric ? isMetricTrackedForProfile(selectedMetric, result.profile_id) : true;
+  });
 }
 
 function getMetricMeta(name) {
@@ -1910,12 +2033,12 @@ function getDueStatus(profile, selectedMetric) {
   if (!selectedMetric.intervalDays) {
     return latest
       ? { state: "complete", label: "Recorded", latest, nextDate: null }
-      : { state: "due", label: selectedMetric.cadence, latest: null, nextDate: null };
+      : { state: "due", label: "Baseline due", latest: null, nextDate: null };
   }
 
   let nextDate = getNextDueDate(profile.id, selectedMetric, latest);
 
-  if (!latest && !nextDate) return { state: "due", label: "No result yet", latest: null, nextDate: null };
+  if (!latest && !nextDate) return { state: "due", label: "Baseline due", latest: null, nextDate: null };
 
   const snoozedDate = getSnoozedDueDate(profile.id, selectedMetric.name);
   if (snoozedDate && (!nextDate || new Date(`${snoozedDate}T00:00:00`) > nextDate)) {
@@ -1969,6 +2092,7 @@ function getScheduleAnchorDate(profileId, selectedMetric) {
   const matchingMetrics = metrics
     .filter((item) =>
       isMetricAvailableForProfile(item, profileId) &&
+      isMetricTrackedForProfile(item, profileId) &&
       !item.firstDueDate &&
       getScheduleGroup(item).key === group.key &&
       item.intervalDays === selectedMetric.intervalDays
@@ -2032,6 +2156,7 @@ function getNextSnoozeDate(profileId, selectedMetric) {
   const peerDates = metrics
     .filter((item) =>
       isMetricAvailableForProfile(item, profileId) &&
+      isMetricTrackedForProfile(item, profileId) &&
       item.name !== selectedMetric.name &&
       item.intervalDays === selectedMetric.intervalDays &&
       !item.firstDueDate &&
@@ -2124,7 +2249,7 @@ function getScheduleItems(profileFilter = state.activeProfileId) {
     .filter((profile) => !profileFilter || profile.id === profileFilter)
     .flatMap((profile) =>
       metrics
-        .filter((item) => isMetricAvailableForProfile(item, profile.id) && ["highest", "medium"].includes(item.priority))
+        .filter((item) => isMetricTrackedForProfile(item, profile.id) && ["highest", "medium"].includes(item.priority))
         .map((item) => ({ profile, metric: item, due: getDueStatus(profile, item) })),
   );
 }
@@ -2229,18 +2354,20 @@ function getSnapshotProfileId() {
 
 function getSnapshotMetricNames(profileId = getSnapshotProfileId()) {
   const configured = state.settings?.snapshot_metrics_by_profile?.[profileId];
-  return normaliseSnapshotMetricNames(configured);
+  return normaliseSnapshotMetricNames(configured, profileId);
 }
 
 function renderSnapshotEditor(metricNames = getSnapshotMetricNames()) {
   if (!snapshotEditor) return;
   snapshotEditor.classList.toggle("hidden", !state.editingSnapshot);
   snapshotEditButton.textContent = state.editingSnapshot ? "Editing snapshot" : "Edit snapshot";
-  const options = metrics.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("");
+  const profileId = getSnapshotProfileId();
+  const availableMetrics = getTrackedMetricsForProfile(profileId);
+  const options = availableMetrics.map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`).join("");
   snapshotMetricInputs.forEach((input, index) => {
     if (!input) return;
     input.innerHTML = options;
-    input.value = metricNames[index] ?? defaultSnapshotMetricNames[index] ?? metrics[index]?.name ?? "";
+    input.value = metricNames[index] ?? defaultSnapshotMetricNames[index] ?? availableMetrics[index]?.name ?? "";
   });
 }
 
@@ -2254,7 +2381,7 @@ function saveSnapshotMetrics(event) {
   }
   const profileId = getSnapshotProfileId();
   state.settings.snapshot_metrics_by_profile ??= {};
-  state.settings.snapshot_metrics_by_profile[profileId] = normaliseSnapshotMetricNames(selected);
+  state.settings.snapshot_metrics_by_profile[profileId] = normaliseSnapshotMetricNames(selected, profileId);
   state.editingSnapshot = false;
   saveSettings();
   render();
@@ -3500,6 +3627,10 @@ function addResult(event) {
   const profile = getProfile(personInput.value);
   const selectedMetric = getMetric(metricInput.value, profile?.id);
   if (!selectedMetric || !profile) return;
+  if (!isMetricTrackedForProfile(selectedMetric, profile.id)) {
+    window.alert("Track this metric again before adding a measurement.");
+    return;
+  }
   const isCompletion = isCompletionMetric(selectedMetric);
 
   const resultValue = isCompletion ? "Completed" : parseResultValue(valueInput.value, selectedMetric.type);
@@ -4286,7 +4417,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.64").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.65").catch(() => {});
   });
 }
 
@@ -4348,6 +4479,7 @@ metricInput.addEventListener("change", () => {
   syncMetricDefaults();
   renderQuickMetrics();
 });
+if (trackingToggleButton) trackingToggleButton.addEventListener("click", toggleSelectedMetricTracking);
 testDateInput.addEventListener("change", syncCompletionDueFields);
 function markCompletionNextDueEdited() {
   state.completionNextDueTouched = true;
