@@ -773,6 +773,177 @@ legend {
   padding: 12px;
 }
 
+.vitamins-modal-panel {
+  width: min(1180px, 100%);
+}
+
+.vitamins-toolbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(170px, 1fr) minmax(190px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.vitamins-toolbar label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.vitamins-finished-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 10px 12px;
+}
+
+.vitamins-finished-check input,
+.vitamin-cell-item input {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.vitamins-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.vitamins-empty {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 16px;
+}
+
+.vitamins-empty span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.vitamins-section + .vitamins-section {
+  margin-top: 20px;
+}
+
+.vitamins-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.vitamins-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.vitamins-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+
+.vitamins-table th,
+.vitamins-table td {
+  vertical-align: top;
+}
+
+.vitamins-table tbody tr:last-child th,
+.vitamins-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.vitamins-table td strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.vitamin-type {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfcfb;
+  color: var(--muted);
+  padding: 4px 7px;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.vitamin-type.daily,
+.vitamin-cell-item.daily {
+  border-color: #9fcbb3;
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.vitamin-type.fixed,
+.vitamin-cell-item.fixed {
+  border-color: #e3b437;
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.vitamin-type.every_other_day,
+.vitamin-cell-item.every_other_day {
+  border-color: rgba(47, 111, 174, 0.32);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.vitamin-type.optional,
+.vitamin-cell-item.optional {
+  border-color: #d9dfe0;
+  background: #f4f6f5;
+  color: var(--muted);
+}
+
+.weekly-guide-table th:first-child,
+.weekly-guide-table td:first-child {
+  width: 130px;
+}
+
+.weekly-guide-table td {
+  min-width: 118px;
+}
+
+.vitamin-cell-item {
+  display: block;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+label.vitamin-cell-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.vitamin-cell-item:last-child {
+  margin-bottom: 0;
+}
+
+.vitamin-empty-cell {
+  color: #a1aaa5;
+}
+
 .mobile-menu-panel {
   display: none;
 }
@@ -1790,7 +1961,7 @@ button.status-pill:focus-visible {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1940,6 +2111,7 @@ button.status-pill:focus-visible {
 
   .telegram-setup,
   .telegram-actions,
+  .vitamins-toolbar,
   .telegram-group-heading,
   .telegram-group-grid {
     grid-template-columns: 1fr;
@@ -1947,6 +2119,19 @@ button.status-pill:focus-visible {
 
   .telegram-group-heading {
     align-items: stretch;
+  }
+
+  .vitamins-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vitamins-actions .privacy-note {
+    grid-column: 1 / -1;
+  }
+
+  .vitamins-table {
+    min-width: 780px;
   }
 
   .mobile-menu-panel.hidden,
@@ -2375,5 +2560,59 @@ button.status-pill:focus-visible {
 
   .entry-submit-button {
     bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #vitaminsModal,
+  #vitaminsPanel,
+  #vitaminsPanel * {
+    visibility: visible;
+  }
+
+  #vitaminsModal {
+    position: static;
+    display: block !important;
+    padding: 0;
+    background: transparent;
+  }
+
+  #vitaminsPanel {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  #vitaminsCloseButton,
+  .vitamins-actions {
+    display: none !important;
+  }
+
+  .vitamins-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .vitamins-table {
+    min-width: 0;
+    font-size: 0.72rem;
+  }
+
+  th,
+  td {
+    padding: 7px 6px;
   }
 }

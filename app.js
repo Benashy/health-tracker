@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.66";
+const APP_VERSION = "v0.67";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -52,6 +52,33 @@ const PRIVATE_STORAGE_KEYS = [
   LAST_LOCAL_UPDATE_KEY,
   CLOUD_CACHE_KEY,
 ];
+
+const VITAMIN_WEEK_DAYS = [
+  { key: "monday", label: "Monday" },
+  { key: "tuesday", label: "Tuesday" },
+  { key: "wednesday", label: "Wednesday" },
+  { key: "thursday", label: "Thursday" },
+  { key: "friday", label: "Friday" },
+  { key: "saturday", label: "Saturday" },
+  { key: "sunday", label: "Sunday" },
+];
+const VITAMIN_TIMINGS = ["Upon waking", "Breakfast", "After lunch", "After dinner", "Before bed"];
+const VITAMIN_ITEMS_BY_PROFILE = {
+  ben: [
+    vitaminItem("fexofenadine", "Upon waking", "Fexofenadine", "1 tablet", "Daily", "Empty stomach. Take with plain water only. Wait 30-60 minutes before breakfast.", "daily"),
+    vitaminItem("lions-mane", "Breakfast", "Lion's Mane (Zenement)", "1 tablet", "Daily", "Taken with breakfast.", "daily"),
+    vitaminItem("omega-3-lunch", "After lunch", "Omega-3 Fish Oil", "1 softgel", "Daily", "First of two daily softgels.", "daily"),
+    vitaminItem("vitamin-d3-k2", "After lunch", "Vitamin D3 + K2", "1 capsule", "Monday & Thursday", "Twice weekly.", "fixed", ["monday", "thursday"]),
+    vitaminItem("zinc", "After lunch", "Zinc", "1 tablet", "Monday & Thursday", "Maximum twice weekly.", "fixed", ["monday", "thursday"]),
+    vitaminItem("lutein-complex", "After lunch", "Lutein Complex", "1 capsule", "Monday", "Once weekly.", "fixed", ["monday"]),
+    vitaminItem("coq10", "After lunch", "CoQ10", "1 capsule", "Post-flying recovery days only", "Temporary. Remove once the current bottle has been finished.", "optional"),
+    vitaminItem("omega-3-dinner", "After dinner", "Omega-3 Fish Oil", "1 softgel", "Daily", "Second of two daily softgels.", "daily"),
+    vitaminItem("fibre", "After dinner", "Fibre", "2 capsules", "Daily", "Take with a large glass of water.", "daily"),
+    vitaminItem("red-yeast-rice", "Before bed", "Red Yeast Rice", "1 capsule", "Every other day", "Uses an alternating-day schedule.", "every_other_day"),
+    vitaminItem("magnesium", "Before bed", "Magnesium", "1 tablet", "Daily", "Normally taken at least two hours after dinner.", "daily"),
+  ],
+  angelika: [],
+};
 
 const defaultProfiles = [
   { id: "ben", name: "Ben", date_of_birth: "", height_cm: "" },
@@ -354,6 +381,7 @@ const state = {
   trendRange: "all",
   mobileView: "home",
   telegramPanelOpen: false,
+  vitaminsPanelOpen: false,
   completionNextDueTouched: false,
   entrySaveLocked: false,
   entryUnlockTimer: null,
@@ -492,6 +520,26 @@ const telegramDueTestButton = document.querySelector("#telegramDueTestButton");
 const telegramPauseButton = document.querySelector("#telegramPauseButton");
 const telegramDisconnectButton = document.querySelector("#telegramDisconnectButton");
 const telegramReminderGroups = document.querySelector("#telegramReminderGroups");
+const vitaminsModal = document.querySelector("#vitaminsModal");
+const vitaminsPanel = document.querySelector("#vitaminsPanel");
+const vitaminsSubtitle = document.querySelector("#vitaminsSubtitle");
+const vitaminsOpenButton = document.querySelector("#vitaminsOpenButton");
+const vitaminsCloseButton = document.querySelector("#vitaminsCloseButton");
+const vitaminsProfileField = document.querySelector("#vitaminsProfileField");
+const vitaminsProfileInput = document.querySelector("#vitaminsProfileInput");
+const vitaminsWeekStartInput = document.querySelector("#vitaminsWeekStartInput");
+const vitaminsRedYeastField = document.querySelector("#vitaminsRedYeastField");
+const vitaminsRedYeastDateInput = document.querySelector("#vitaminsRedYeastDateInput");
+const vitaminsCoq10FinishedField = document.querySelector("#vitaminsCoq10FinishedField");
+const vitaminsCoq10FinishedInput = document.querySelector("#vitaminsCoq10FinishedInput");
+const vitaminsCopyButton = document.querySelector("#vitaminsCopyButton");
+const vitaminsPrintButton = document.querySelector("#vitaminsPrintButton");
+const vitaminsCopyStatus = document.querySelector("#vitaminsCopyStatus");
+const vitaminsEmptyState = document.querySelector("#vitaminsEmptyState");
+const vitaminsMainSection = document.querySelector("#vitaminsMainSection");
+const vitaminsWeeklySection = document.querySelector("#vitaminsWeeklySection");
+const vitaminsMainBody = document.querySelector("#vitaminsMainBody");
+const vitaminsWeeklyBody = document.querySelector("#vitaminsWeeklyBody");
 const statusStrip = document.querySelector(".status-strip");
 const trendViewPanel = document.querySelector("#trendViewPanel");
 const resultsViewPanel = document.querySelector("#resultsViewPanel");
@@ -534,6 +582,19 @@ function metric(name, group, unit, low, high, type, priority, intervalDays, goal
     cadence: cadence ?? formatInterval(intervalDays),
     normal,
     ...options,
+  };
+}
+
+function vitaminItem(id, timing, item, quantity, frequency, notes, schedule, days = []) {
+  return {
+    id,
+    timing,
+    item,
+    quantity,
+    frequency,
+    notes,
+    schedule,
+    days,
   };
 }
 
@@ -633,6 +694,7 @@ function loadSettings() {
 function normaliseSettings(settings = {}) {
   const snapshotMetricsByProfile = settings?.snapshot_metrics_by_profile ?? settings?.snapshotMetricsByProfile ?? {};
   const metricTrackingByProfile = settings?.metric_tracking_by_profile ?? settings?.metricTrackingByProfile ?? {};
+  const vitaminsByProfile = settings?.vitamins_by_profile ?? settings?.vitaminsByProfile ?? {};
   const normalisedSnapshotMetrics = {};
   const profileIds = new Set([...defaultProfiles.map((profile) => profile.id), ...Object.keys(snapshotMetricsByProfile)]);
   profileIds.forEach((profileId) => {
@@ -643,7 +705,41 @@ function normaliseSettings(settings = {}) {
     snapshot_metrics_by_profile: normalisedSnapshotMetrics,
     metric_tracking_by_profile: normaliseMetricTrackingByProfile(metricTrackingByProfile),
     telegram: normaliseTelegramSettings(settings?.telegram),
+    vitamins_by_profile: normaliseVitaminsByProfile(vitaminsByProfile),
   };
+}
+
+function normaliseVitaminsByProfile(vitaminsByProfile = {}) {
+  const profileIds = new Set([...defaultProfiles.map((profile) => profile.id), ...Object.keys(vitaminsByProfile ?? {})]);
+  const normalised = {};
+  profileIds.forEach((profileId) => {
+    normalised[profileId] = normaliseVitaminProfileSettings(profileId, vitaminsByProfile?.[profileId]);
+  });
+  return normalised;
+}
+
+function normaliseVitaminProfileSettings(profileId, settings = {}) {
+  const weekStartDate = normaliseDateString(settings?.week_start_date ?? settings?.weekStartDate) || getMondayDateString(new Date());
+  const redYeastDate = normaliseDateString(settings?.next_red_yeast_rice_dose_date ?? settings?.nextRedYeastRiceDoseDate);
+  const coq10DaysByWeek = settings?.coq10_days_by_week ?? settings?.coq10DaysByWeek ?? {};
+  return {
+    week_start_date: weekStartDate,
+    next_red_yeast_rice_dose_date: redYeastDate || (profileId === "ben" ? toDateString(new Date()) : ""),
+    coq10_days_by_week: normaliseVitaminDayMap(coq10DaysByWeek),
+    coq10_finished: Boolean(settings?.coq10_finished ?? settings?.coq10Finished ?? false),
+  };
+}
+
+function normaliseVitaminDayMap(daysByWeek = {}) {
+  const allowedDays = new Set(VITAMIN_WEEK_DAYS.map((day) => day.key));
+  const normalised = {};
+  Object.entries(daysByWeek ?? {}).forEach(([weekStart, days]) => {
+    const dateKey = normaliseDateString(weekStart);
+    if (!dateKey || !Array.isArray(days)) return;
+    const selectedDays = [...new Set(days.filter((day) => allowedDays.has(day)))];
+    if (selectedDays.length) normalised[dateKey] = selectedDays;
+  });
+  return normalised;
 }
 
 function normaliseMetricTrackingByProfile(metricTrackingByProfile = {}) {
@@ -887,6 +983,7 @@ function resetPrivateStateForSignedOut() {
   state.editingRangeKey = null;
   state.referenceDraftKey = null;
   state.mobileView = "home";
+  state.vitaminsPanelOpen = false;
   state.pendingImport = null;
   hydrateProfileForm();
   populatePeople();
@@ -1107,11 +1204,15 @@ function setEditingAvailability() {
     telegramDueTestButton,
     telegramPauseButton,
     telegramDisconnectButton,
+    vitaminsOpenButton,
     resetButton,
   ].forEach((element) => {
     if (element) element.classList.toggle("read-only", disabled);
   });
   document.querySelectorAll("#profileForm input, #profileForm button, #resultForm input, #resultForm select, #resultForm textarea, #resultForm button, #snapshotEditor select, #snapshotEditor button").forEach((element) => {
+    element.disabled = disabled;
+  });
+  document.querySelectorAll("#vitaminsPanel input, #vitaminsPanel select").forEach((element) => {
     element.disabled = disabled;
   });
   if (entrySubmitButton) entrySubmitButton.disabled = disabled || state.entrySaveLocked;
@@ -1159,6 +1260,11 @@ function setPrivateVisibility(isVisible) {
     if (section.id === "telegramModal") {
       if (!isVisible) state.telegramPanelOpen = false;
       syncTelegramPanelVisibility(isVisible);
+      return;
+    }
+    if (section.id === "vitaminsModal") {
+      if (!isVisible) state.vitaminsPanelOpen = false;
+      syncVitaminsPanelVisibility(isVisible);
       return;
     }
     if (section.classList.contains("modal")) {
@@ -2242,6 +2348,21 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function normaliseDateString(value) {
+  const parsed = parseDateString(value);
+  return parsed ? toDateString(parsed) : "";
+}
+
+function getMondayDateString(date = new Date()) {
+  const source = date instanceof Date ? date : parseDateString(date);
+  if (!source) return "";
+  const local = new Date(source.getFullYear(), source.getMonth(), source.getDate());
+  const day = local.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  local.setDate(local.getDate() + offset);
+  return toDateString(new Date(Date.UTC(local.getFullYear(), local.getMonth(), local.getDate())));
+}
+
 function getLatestResult(profileId, metricName) {
   return [...state.results]
     .filter((result) => result.profile_id === profileId && result.metric === metricName)
@@ -2320,6 +2441,8 @@ function render() {
   renderSchedule();
   renderTelegramPanel();
   syncTelegramPanelVisibility();
+  renderVitaminsPanel();
+  syncVitaminsPanelVisibility();
   renderSummary();
   renderTrends();
 
@@ -3258,6 +3381,246 @@ function disconnectTelegramReminders() {
   render();
 }
 
+function getVitaminProfileId() {
+  return cloudState.profileId || vitaminsProfileInput?.value || state.activeProfileId || state.profiles[0]?.id || "ben";
+}
+
+function getVitaminProfileSettings(profileId = getVitaminProfileId()) {
+  state.settings.vitamins_by_profile = normaliseVitaminsByProfile(state.settings.vitamins_by_profile);
+  state.settings.vitamins_by_profile[profileId] = normaliseVitaminProfileSettings(
+    profileId,
+    state.settings.vitamins_by_profile[profileId],
+  );
+  return state.settings.vitamins_by_profile[profileId];
+}
+
+function getVitaminItems(profileId = getVitaminProfileId()) {
+  const defaultItems = VITAMIN_ITEMS_BY_PROFILE[profileId] ?? [];
+  return defaultItems.filter((item) => item.schedule !== "optional" || !getVitaminProfileSettings(profileId).coq10_finished);
+}
+
+function syncVitaminsPanelVisibility(isPrivateVisible = Boolean(cloudState.user)) {
+  if (!vitaminsModal) return;
+  const shouldShow = Boolean(isPrivateVisible && cloudState.user && state.vitaminsPanelOpen);
+  vitaminsModal.classList.toggle("hidden", !shouldShow);
+  vitaminsModal.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+}
+
+function openVitaminsPanel() {
+  if (!vitaminsModal || !cloudState.user) return;
+  state.vitaminsPanelOpen = true;
+  renderVitaminsPanel();
+  syncVitaminsPanelVisibility(true);
+}
+
+function closeVitaminsPanel() {
+  if (!vitaminsModal) return;
+  state.vitaminsPanelOpen = false;
+  syncVitaminsPanelVisibility();
+}
+
+function renderVitaminsPanel() {
+  if (!vitaminsPanel) return;
+  const profileId = getVitaminProfileId();
+  const profile = getProfile(profileId) ?? getDefaultProfile(profileId);
+  const settings = getVitaminProfileSettings(profileId);
+  const items = getVitaminItems(profileId);
+  const hasRedYeastRice = items.some((item) => item.schedule === "every_other_day");
+  const hasCoq10 = (VITAMIN_ITEMS_BY_PROFILE[profileId] ?? []).some((item) => item.id === "coq10");
+
+  if (vitaminsSubtitle) vitaminsSubtitle.textContent = `${profile.name}: weekly tablet organiser`;
+  if (vitaminsProfileInput) {
+    vitaminsProfileInput.innerHTML = state.profiles
+      .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`)
+      .join("");
+    vitaminsProfileInput.value = profile.id;
+  }
+  vitaminsProfileField?.classList.toggle("hidden", state.profiles.length <= 1);
+  if (vitaminsWeekStartInput) vitaminsWeekStartInput.value = settings.week_start_date;
+  if (vitaminsRedYeastDateInput) vitaminsRedYeastDateInput.value = settings.next_red_yeast_rice_dose_date;
+  vitaminsRedYeastField?.classList.toggle("hidden", !hasRedYeastRice);
+  vitaminsCoq10FinishedField?.classList.toggle("hidden", !hasCoq10);
+  if (vitaminsCoq10FinishedInput) vitaminsCoq10FinishedInput.checked = Boolean(settings.coq10_finished);
+
+  vitaminsEmptyState?.classList.toggle("hidden", items.length > 0);
+  vitaminsMainSection?.classList.toggle("hidden", items.length === 0);
+  vitaminsWeeklySection?.classList.toggle("hidden", items.length === 0);
+  if (vitaminsMainBody) vitaminsMainBody.innerHTML = renderVitaminMainRows(items);
+  if (vitaminsWeeklyBody) vitaminsWeeklyBody.innerHTML = renderVitaminWeeklyRows(profileId, items);
+  setEditingAvailability();
+}
+
+function renderVitaminMainRows(items) {
+  return items
+    .map(
+      (item) => `
+        <tr>
+          <td data-label="Timing">${escapeHtml(item.timing)}</td>
+          <td data-label="Item">
+            <strong>${escapeHtml(item.item)}</strong>
+            <span class="vitamin-type ${escapeHtml(item.schedule)}">${escapeHtml(getVitaminScheduleLabel(item))}</span>
+          </td>
+          <td data-label="Quantity">${escapeHtml(item.quantity)}</td>
+          <td data-label="Frequency / Days">${escapeHtml(item.frequency)}</td>
+          <td data-label="Notes">${escapeHtml(item.notes)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+}
+
+function renderVitaminWeeklyRows(profileId, items) {
+  const weekStart = getVitaminProfileSettings(profileId).week_start_date;
+  return VITAMIN_TIMINGS.map((timing) => {
+    const timingItems = items.filter((item) => item.timing === timing);
+    return `
+      <tr>
+        <th data-label="Timing">${escapeHtml(timing)}</th>
+        ${VITAMIN_WEEK_DAYS.map((day, index) => {
+          const date = addDays(weekStart, index);
+          const dayItems = timingItems.filter((item) => shouldShowVitaminItemOnDate(profileId, item, day.key, date));
+          const cellContent = dayItems.length
+            ? dayItems.map((item) => renderVitaminCellItem(profileId, item, day.key)).join("")
+            : "<span class=\"vitamin-empty-cell\">-</span>";
+          return `<td data-label="${escapeHtml(day.label)}">${cellContent}</td>`;
+        }).join("")}
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderVitaminCellItem(profileId, item, dayKey) {
+  if (item.schedule === "optional") {
+    const checked = getVitaminCoq10Days(profileId).includes(dayKey) ? " checked" : "";
+    return `
+      <label class="vitamin-cell-item optional">
+        <input type="checkbox" data-vitamin-optional-day="${escapeHtml(dayKey)}"${checked} />
+        <span>${escapeHtml(item.item)}</span>
+      </label>
+    `;
+  }
+  return `
+    <span class="vitamin-cell-item ${escapeHtml(item.schedule)}">
+      ${escapeHtml(item.item)}
+    </span>
+  `;
+}
+
+function shouldShowVitaminItemOnDate(profileId, item, dayKey, date) {
+  if (item.schedule === "daily") return true;
+  if (item.schedule === "fixed") return item.days.includes(dayKey);
+  if (item.schedule === "every_other_day") return isEveryOtherDayDose(profileId, date);
+  if (item.schedule === "optional") return true;
+  return false;
+}
+
+function isEveryOtherDayDose(profileId, date) {
+  const nextDose = parseDateString(getVitaminProfileSettings(profileId).next_red_yeast_rice_dose_date);
+  if (!nextDose || !date) return false;
+  const days = daysBetween(nextDose, date);
+  return days >= 0 && days % 2 === 0;
+}
+
+function getVitaminScheduleLabel(item) {
+  if (item.schedule === "daily") return "Daily";
+  if (item.schedule === "fixed" && item.days.length === 1) return "Weekly";
+  if (item.schedule === "fixed") return "Twice weekly";
+  if (item.schedule === "every_other_day") return "Every other day";
+  if (item.schedule === "optional") return "Optional";
+  return "Scheduled";
+}
+
+function getVitaminCoq10Days(profileId = getVitaminProfileId()) {
+  const settings = getVitaminProfileSettings(profileId);
+  const weekStart = settings.week_start_date;
+  return settings.coq10_days_by_week?.[weekStart] ?? [];
+}
+
+function setVitaminCoq10Day(profileId, dayKey, isSelected) {
+  if (!assertCanEdit()) return;
+  const settings = getVitaminProfileSettings(profileId);
+  const days = new Set(getVitaminCoq10Days(profileId));
+  if (isSelected) days.add(dayKey);
+  else days.delete(dayKey);
+  if (days.size) settings.coq10_days_by_week[settings.week_start_date] = [...days];
+  else delete settings.coq10_days_by_week[settings.week_start_date];
+  saveSettings();
+  renderVitaminsPanel();
+}
+
+function updateVitaminWeekStart() {
+  if (!assertCanEdit()) return;
+  const profileId = getVitaminProfileId();
+  const settings = getVitaminProfileSettings(profileId);
+  const nextWeekStart = getMondayDateString(vitaminsWeekStartInput.value ? parseDateString(vitaminsWeekStartInput.value) : new Date());
+  settings.week_start_date = nextWeekStart;
+  saveSettings();
+  renderVitaminsPanel();
+}
+
+function updateVitaminRedYeastDate() {
+  if (!assertCanEdit()) return;
+  const profileId = getVitaminProfileId();
+  const settings = getVitaminProfileSettings(profileId);
+  settings.next_red_yeast_rice_dose_date = normaliseDateString(vitaminsRedYeastDateInput.value) || toDateString(new Date());
+  saveSettings();
+  renderVitaminsPanel();
+}
+
+function updateVitaminCoq10Finished() {
+  if (!assertCanEdit()) return;
+  const profileId = getVitaminProfileId();
+  const settings = getVitaminProfileSettings(profileId);
+  settings.coq10_finished = Boolean(vitaminsCoq10FinishedInput?.checked);
+  saveSettings();
+  renderVitaminsPanel();
+}
+
+function copyVitaminWeeklyList() {
+  const text = getVitaminWeeklyListText(getVitaminProfileId());
+  if (!text) return;
+  const setStatus = (message) => {
+    if (vitaminsCopyStatus) vitaminsCopyStatus.textContent = message;
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => setStatus("Copied.")).catch(() => setStatus("Copy failed."));
+    return;
+  }
+  setStatus("Copy not available in this browser.");
+}
+
+function printVitaminsPanel() {
+  if (typeof window.print === "function") window.print();
+}
+
+function getVitaminWeeklyListText(profileId = getVitaminProfileId()) {
+  const profile = getProfile(profileId) ?? getDefaultProfile(profileId);
+  const settings = getVitaminProfileSettings(profileId);
+  const items = getVitaminItems(profileId);
+  if (!items.length) return "";
+  const lines = [
+    `Health Dashboard Vitamins - ${profile.name}`,
+    `Week starting ${formatDate(settings.week_start_date)}`,
+    "",
+  ];
+
+  VITAMIN_TIMINGS.forEach((timing) => {
+    lines.push(timing);
+    VITAMIN_WEEK_DAYS.forEach((day, index) => {
+      const date = addDays(settings.week_start_date, index);
+      const dayItems = items
+        .filter((item) => item.timing === timing)
+        .filter((item) => shouldShowVitaminItemOnDate(profileId, item, day.key, date))
+        .filter((item) => item.schedule !== "optional" || getVitaminCoq10Days(profileId).includes(day.key))
+        .map((item) => `${item.item} (${item.quantity})`);
+      if (dayItems.length) lines.push(`- ${day.label}: ${dayItems.join("; ")}`);
+    });
+    lines.push("");
+  });
+
+  return lines.join("\n").trim();
+}
+
 function renderMobileActions(dueCount) {
   if (!mobileActionBar) return;
   if (!cloudState.user) {
@@ -3485,7 +3848,7 @@ function focusCurrentResults() {
 }
 
 function handleActionShortcut(action) {
-  if (!cloudState.user && ["home", "add", "trends", "results", "menu", "due", "current", "import", "review"].includes(action)) {
+  if (!cloudState.user && ["home", "add", "trends", "results", "menu", "due", "current", "import", "review", "vitamins"].includes(action)) {
     return;
   }
   if (action === "add") {
@@ -3510,6 +3873,10 @@ function handleActionShortcut(action) {
   }
   if (action === "review") {
     exportReviewPackButton.click();
+    return;
+  }
+  if (action === "vitamins") {
+    openVitaminsPanel();
   }
 }
 
@@ -3529,6 +3896,7 @@ function handleMenuAction(action) {
     return;
   }
   if (action === "telegram") openTelegramPanel();
+  if (action === "vitamins") openVitaminsPanel();
 }
 
 function activateSummaryFilter(card) {
@@ -4448,7 +4816,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.66").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.67").catch(() => {});
   });
 }
 
@@ -4591,6 +4959,30 @@ if (telegramDisconnectButton) telegramDisconnectButton.addEventListener("click",
 if (telegramModal) {
   telegramModal.addEventListener("click", (event) => {
     if (event.target === telegramModal) closeTelegramPanel();
+  });
+}
+if (vitaminsOpenButton) vitaminsOpenButton.addEventListener("click", openVitaminsPanel);
+if (vitaminsCloseButton) vitaminsCloseButton.addEventListener("click", closeVitaminsPanel);
+if (vitaminsProfileInput) {
+  vitaminsProfileInput.addEventListener("change", () => {
+    renderVitaminsPanel();
+  });
+}
+if (vitaminsWeekStartInput) vitaminsWeekStartInput.addEventListener("change", updateVitaminWeekStart);
+if (vitaminsRedYeastDateInput) vitaminsRedYeastDateInput.addEventListener("change", updateVitaminRedYeastDate);
+if (vitaminsCoq10FinishedInput) vitaminsCoq10FinishedInput.addEventListener("change", updateVitaminCoq10Finished);
+if (vitaminsCopyButton) vitaminsCopyButton.addEventListener("click", copyVitaminWeeklyList);
+if (vitaminsPrintButton) vitaminsPrintButton.addEventListener("click", printVitaminsPanel);
+if (vitaminsWeeklyBody) {
+  vitaminsWeeklyBody.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-vitamin-optional-day]");
+    if (!checkbox) return;
+    setVitaminCoq10Day(getVitaminProfileId(), checkbox.dataset.vitaminOptionalDay, checkbox.checked);
+  });
+}
+if (vitaminsModal) {
+  vitaminsModal.addEventListener("click", (event) => {
+    if (event.target === vitaminsModal) closeVitaminsPanel();
   });
 }
 if (resetButton) {

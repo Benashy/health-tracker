@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.66" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.66" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.66" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.66" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.66" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.66" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.66" />
-    <link rel="stylesheet" href="styles.css?v=0.66" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.67" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.67" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.67" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.67" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.67" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.67" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.67" />
+    <link rel="stylesheet" href="styles.css?v=0.67" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -31,6 +31,7 @@
             <button class="ghost-button" id="exportReviewPackButton" type="button">Prepare AI Review</button>
             <button class="ghost-button" id="exportCsvButton" type="button">Export results</button>
             <button class="ghost-button" id="telegramOpenButton" type="button">Telegram</button>
+            <button class="ghost-button" id="vitaminsOpenButton" type="button">Vitamins</button>
           </div>
         </header>
 
@@ -361,13 +362,14 @@
             <button class="ghost-button" type="button" data-menu-action="ai-review">Prepare AI Review</button>
             <button class="ghost-button" type="button" data-menu-action="csv">Export results</button>
             <button class="ghost-button" type="button" data-menu-action="telegram">Telegram</button>
+            <button class="ghost-button" type="button" data-menu-action="vitamins">Vitamins</button>
           </div>
         </section>
 
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.66</span>
+          <span class="version-chip" id="appVersion">v0.67</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -439,9 +441,94 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.66"></script>
+    <section class="modal hidden" id="vitaminsModal" role="dialog" aria-modal="true" aria-labelledby="vitaminsTitle" data-private aria-hidden="true">
+      <div class="modal-panel vitamins-modal-panel" id="vitaminsPanel">
+        <div class="panel-heading">
+          <div>
+            <h2 id="vitaminsTitle">Vitamins</h2>
+            <span class="privacy-note" id="vitaminsSubtitle">Weekly tablet organiser</span>
+          </div>
+          <button class="mini-button" id="vitaminsCloseButton" type="button">Close</button>
+        </div>
+
+        <div class="vitamins-toolbar">
+          <label class="compact-select hidden" id="vitaminsProfileField">
+            Person
+            <select id="vitaminsProfileInput"></select>
+          </label>
+          <label>
+            Week starting
+            <input id="vitaminsWeekStartInput" type="date" />
+          </label>
+          <label id="vitaminsRedYeastField">
+            Next Red Yeast Rice dose
+            <input id="vitaminsRedYeastDateInput" type="date" />
+          </label>
+          <label class="vitamins-finished-check hidden" id="vitaminsCoq10FinishedField">
+            <input id="vitaminsCoq10FinishedInput" type="checkbox" />
+            CoQ10 bottle finished
+          </label>
+        </div>
+
+        <div class="vitamins-actions">
+          <button class="ghost-button" id="vitaminsCopyButton" type="button">Copy Weekly List</button>
+          <button class="ghost-button" id="vitaminsPrintButton" type="button">Print</button>
+          <span class="privacy-note" id="vitaminsCopyStatus"></span>
+        </div>
+
+        <div class="vitamins-empty hidden" id="vitaminsEmptyState">
+          <strong>No vitamin organiser set yet</strong>
+          <span>This profile is ready for a vitamin schedule when one is added.</span>
+        </div>
+
+        <section class="vitamins-section" id="vitaminsMainSection">
+          <div class="panel-heading">
+            <h3>Main schedule</h3>
+          </div>
+          <div class="vitamins-table-wrap">
+            <table class="vitamins-table">
+              <thead>
+                <tr>
+                  <th>Timing</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Frequency / Days</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="vitaminsMainBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="vitamins-section" id="vitaminsWeeklySection">
+          <div class="panel-heading">
+            <h3>Weekly Pill Case Guide</h3>
+          </div>
+          <div class="vitamins-table-wrap">
+            <table class="vitamins-table weekly-guide-table">
+              <thead>
+                <tr>
+                  <th>Timing</th>
+                  <th>Monday</th>
+                  <th>Tuesday</th>
+                  <th>Wednesday</th>
+                  <th>Thursday</th>
+                  <th>Friday</th>
+                  <th>Saturday</th>
+                  <th>Sunday</th>
+                </tr>
+              </thead>
+              <tbody id="vitaminsWeeklyBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <script src="supabase-config.js?v=0.67"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.66"></script>
-    <script src="privacy-guard.js?v=0.66"></script>
+    <script src="app.js?v=0.67"></script>
+    <script src="privacy-guard.js?v=0.67"></script>
   </body>
 </html>
