@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.67";
+const APP_VERSION = "v0.68";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -68,13 +68,13 @@ const VITAMIN_ITEMS_BY_PROFILE = {
     vitaminItem("fexofenadine", "Upon waking", "Fexofenadine", "1 tablet", "Daily", "Empty stomach. Take with plain water only. Wait 30-60 minutes before breakfast.", "daily"),
     vitaminItem("lions-mane", "Breakfast", "Lion's Mane (Zenement)", "1 tablet", "Daily", "Taken with breakfast.", "daily"),
     vitaminItem("omega-3-lunch", "After lunch", "Omega-3 Fish Oil", "1 softgel", "Daily", "First of two daily softgels.", "daily"),
-    vitaminItem("vitamin-d3-k2", "After lunch", "Vitamin D3 + K2", "1 capsule", "Monday & Thursday", "Twice weekly.", "fixed", ["monday", "thursday"]),
-    vitaminItem("zinc", "After lunch", "Zinc", "1 tablet", "Monday & Thursday", "Maximum twice weekly.", "fixed", ["monday", "thursday"]),
+    vitaminItem("vitamin-d3-k2", "After lunch", "Vitamin D3 + K2", "1 capsule", "Monday & Friday", "Twice weekly.", "fixed", ["monday", "friday"]),
+    vitaminItem("zinc", "After lunch", "Zinc", "1 tablet", "Monday & Friday", "Maximum twice weekly.", "fixed", ["monday", "friday"]),
     vitaminItem("lutein-complex", "After lunch", "Lutein Complex", "1 capsule", "Monday", "Once weekly.", "fixed", ["monday"]),
     vitaminItem("coq10", "After lunch", "CoQ10", "1 capsule", "Post-flying recovery days only", "Temporary. Remove once the current bottle has been finished.", "optional"),
     vitaminItem("omega-3-dinner", "After dinner", "Omega-3 Fish Oil", "1 softgel", "Daily", "Second of two daily softgels.", "daily"),
     vitaminItem("fibre", "After dinner", "Fibre", "2 capsules", "Daily", "Take with a large glass of water.", "daily"),
-    vitaminItem("red-yeast-rice", "Before bed", "Red Yeast Rice", "1 capsule", "Every other day", "Uses an alternating-day schedule.", "every_other_day"),
+    vitaminItem("red-yeast-rice", "Before bed", "Red Yeast Rice", "1 capsule", "Tuesday, Thursday & Saturday", "Every-other-day pattern for the weekly organiser.", "every_other_day", ["tuesday", "thursday", "saturday"]),
     vitaminItem("magnesium", "Before bed", "Magnesium", "1 tablet", "Daily", "Normally taken at least two hours after dinner.", "daily"),
   ],
   angelika: [],
@@ -372,7 +372,7 @@ const state = {
   settings: hasPrivateCloudConfig ? normaliseSettings({}) : loadSettings(),
   filter: "latest",
   activeProfileId: null,
-  activeSummaryFilter: "measurements",
+  activeSummaryFilter: "",
   editingProfiles: !profilesAreComplete(initialProfiles),
   editingSnapshot: false,
   editingRangeKey: null,
@@ -479,8 +479,8 @@ const resultsBody = document.querySelector("#resultsBody");
 const emptyState = document.querySelector("#emptyState");
 const tableWrap = document.querySelector(".results-table-wrap");
 const resultsPanel = document.querySelector(".results-panel");
-const totalResults = document.querySelector("#totalResults");
-const flaggedResults = document.querySelector("#flaggedResults");
+const cautionResults = document.querySelector("#cautionResults");
+const warningResults = document.querySelector("#warningResults");
 const dueSoonResults = document.querySelector("#dueSoonResults");
 const nextDueDate = document.querySelector("#nextDueDate");
 const nextDueRelative = document.querySelector("#nextDueRelative");
@@ -525,16 +525,7 @@ const vitaminsPanel = document.querySelector("#vitaminsPanel");
 const vitaminsSubtitle = document.querySelector("#vitaminsSubtitle");
 const vitaminsOpenButton = document.querySelector("#vitaminsOpenButton");
 const vitaminsCloseButton = document.querySelector("#vitaminsCloseButton");
-const vitaminsProfileField = document.querySelector("#vitaminsProfileField");
-const vitaminsProfileInput = document.querySelector("#vitaminsProfileInput");
-const vitaminsWeekStartInput = document.querySelector("#vitaminsWeekStartInput");
-const vitaminsRedYeastField = document.querySelector("#vitaminsRedYeastField");
-const vitaminsRedYeastDateInput = document.querySelector("#vitaminsRedYeastDateInput");
-const vitaminsCoq10FinishedField = document.querySelector("#vitaminsCoq10FinishedField");
-const vitaminsCoq10FinishedInput = document.querySelector("#vitaminsCoq10FinishedInput");
-const vitaminsCopyButton = document.querySelector("#vitaminsCopyButton");
 const vitaminsPrintButton = document.querySelector("#vitaminsPrintButton");
-const vitaminsCopyStatus = document.querySelector("#vitaminsCopyStatus");
 const vitaminsEmptyState = document.querySelector("#vitaminsEmptyState");
 const vitaminsMainSection = document.querySelector("#vitaminsMainSection");
 const vitaminsWeeklySection = document.querySelector("#vitaminsWeeklySection");
@@ -976,7 +967,7 @@ function resetPrivateStateForSignedOut() {
   state.scheduleState = { snoozes: {} };
   state.settings = normaliseSettings({});
   state.activeProfileId = null;
-  state.activeSummaryFilter = "measurements";
+  state.activeSummaryFilter = "";
   state.filter = "latest";
   state.editingProfiles = false;
   state.editingSnapshot = false;
@@ -1942,6 +1933,10 @@ function isWarningStatus(status) {
   return ["Outside range", "Near limit", "Above target", "Below target"].includes(status);
 }
 
+function isCautionStatus(status) {
+  return ["Near limit", "Above target", "Below target"].includes(status);
+}
+
 function isRiskContextMetric(metricName) {
   return riskContextMetricNames.has(metricName);
 }
@@ -1951,7 +1946,15 @@ function isRiskContextResult(result) {
 }
 
 function isActionableWarning(result) {
-  return result && isWarningStatus(result.status_vs_range) && !isRiskContextResult(result);
+  return result && result.status_vs_range === "Outside range" && !isRiskContextResult(result);
+}
+
+function isActionableCaution(result) {
+  return result && isCautionStatus(result.status_vs_range) && !isRiskContextResult(result);
+}
+
+function isActionableFlag(result) {
+  return isActionableWarning(result) || isActionableCaution(result);
 }
 
 function getReferenceRangeStatus(metricName, value, low, high) {
@@ -2388,8 +2391,12 @@ function filteredResults() {
     return sampleSort || b.test_date.localeCompare(a.test_date) || a.metric.localeCompare(b.metric);
   });
 
-  if (state.filter === "flagged") {
+  if (state.filter === "warnings") {
     return getLatestByMetric(sorted).filter(isActionableWarning);
+  }
+
+  if (state.filter === "cautions" || state.filter === "flagged") {
+    return getLatestByMetric(sorted).filter(isActionableCaution);
   }
 
   if (state.filter === "due") {
@@ -2422,11 +2429,12 @@ function render() {
   const results = filteredResults();
   const scopedResults = visibleResults();
   const latestScopedResults = getLatestByMetric([...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date)));
-  const flaggedCount = latestScopedResults.filter(isActionableWarning).length;
+  const cautionCount = latestScopedResults.filter(isActionableCaution).length;
+  const warningCount = latestScopedResults.filter(isActionableWarning).length;
   const dueCount = getDueCount();
 
-  totalResults.textContent = scopedResults.length;
-  flaggedResults.textContent = flaggedCount;
+  cautionResults.textContent = cautionCount;
+  warningResults.textContent = warningCount;
   dueSoonResults.textContent = dueCount;
   const nextDueSummary = getNextDueSummary();
   nextDueDate.textContent = nextDueSummary.label;
@@ -2435,8 +2443,8 @@ function render() {
   nextDueCard.classList.toggle("overdue", nextDueSummary.state === "overdue");
 
   renderQuickMetrics();
-  renderOnboarding(scopedResults, flaggedCount, dueCount);
-  renderHealthSnapshot(scopedResults, flaggedCount, dueCount);
+  renderOnboarding(scopedResults, cautionCount, warningCount, dueCount);
+  renderHealthSnapshot(scopedResults, cautionCount, warningCount, dueCount);
   renderProfiles();
   renderSchedule();
   renderTelegramPanel();
@@ -2456,7 +2464,7 @@ function render() {
   renderMobileLayout();
 }
 
-function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
+function renderHealthSnapshot(scopedResults, cautionCount, warningCount, dueCount) {
   if (!snapshotSection || !snapshotGrid || !snapshotList) return;
   const latestResults = getLatestByMetric([...scopedResults].sort((a, b) => b.sample_date.localeCompare(a.sample_date)));
   const latestDate = scopedResults
@@ -2469,7 +2477,7 @@ function renderHealthSnapshot(scopedResults, flaggedCount, dueCount) {
 
   snapshotSection.classList.toggle("hidden", !cloudState.user || (!scopedResults.length && !dueItems.length));
   snapshotUpdated.textContent = latestDate
-    ? `${flaggedCount} active warnings · ${dueCount} due or overdue`
+    ? `${warningCount} warnings · ${cautionCount} cautions · ${dueCount} due or overdue`
     : "No measurements yet";
   snapshotGrid.innerHTML = snapshotMetricNames
     .map((metricName) => renderSnapshotFocusCard(metricName, latestResults))
@@ -2548,9 +2556,8 @@ function getSnapshotResult(metricName, latestResults) {
 }
 
 function getSnapshotStatusClass(result) {
-  if (isActionableWarning(result)) {
-    return result.status_vs_range === "Outside range" ? "bad" : "warning";
-  }
+  if (isActionableWarning(result)) return "bad";
+  if (isActionableCaution(result)) return "warning";
   if (result.status_vs_range === "In range" || result.status_vs_range === "On target") return "ok";
   return "neutral";
 }
@@ -2618,7 +2625,9 @@ function handleSnapshotAction(target) {
 
   const card = target.closest("[data-snapshot-filter]");
   if (!card) return;
-  if (card.dataset.snapshotFilter === "flagged") setFilter("flagged");
+  if (card.dataset.snapshotFilter === "warnings") setFilter("warnings");
+  else if (card.dataset.snapshotFilter === "cautions") setFilter("cautions");
+  else if (card.dataset.snapshotFilter === "flagged") setFilter("cautions");
   else if (card.dataset.snapshotFilter === "due") setFilter("due");
   else if (card.dataset.snapshotFilter === "changes") {
     state.filter = "all";
@@ -2742,10 +2751,20 @@ function renderEmptyState(resultCount, dueCount) {
         `;
     return;
   }
-  if (state.filter === "flagged") {
+  if (state.filter === "warnings") {
     emptyState.innerHTML = `
       <strong>No range warnings</strong>
-      <span>Current measurements have no active range or target warnings.</span>
+      <span>Current measurements have no clearly outside-range warnings.</span>
+      <div class="empty-actions">
+        <button class="mini-button" type="button" data-empty-action="current">View current results</button>
+      </div>
+    `;
+    return;
+  }
+  if (state.filter === "cautions" || state.filter === "flagged") {
+    emptyState.innerHTML = `
+      <strong>No range cautions</strong>
+      <span>Current measurements have no near-limit or target cautions.</span>
       <div class="empty-actions">
         <button class="mini-button" type="button" data-empty-action="current">View current results</button>
       </div>
@@ -2762,7 +2781,7 @@ function renderEmptyState(resultCount, dueCount) {
   `;
 }
 
-function renderOnboarding(scopedResults, flaggedCount, dueCount) {
+function renderOnboarding(scopedResults, cautionCount, warningCount, dueCount) {
   if (!cloudState.user) return;
   const profileName = state.profiles[0]?.name ?? "Your profile";
   const hasProfile = profilesAreComplete(state.profiles);
@@ -2778,7 +2797,7 @@ function renderOnboarding(scopedResults, flaggedCount, dueCount) {
     return;
   }
   onboardingTitle.textContent = `${profileName}: ${scopedResults.length} measurements`;
-  onboardingText.textContent = `${flaggedCount} warnings · ${dueCount} due or overdue`;
+  onboardingText.textContent = `${warningCount} warnings · ${cautionCount} cautions · ${dueCount} due or overdue`;
 }
 
 function formatRangeOrTarget(result) {
@@ -3382,7 +3401,7 @@ function disconnectTelegramReminders() {
 }
 
 function getVitaminProfileId() {
-  return cloudState.profileId || vitaminsProfileInput?.value || state.activeProfileId || state.profiles[0]?.id || "ben";
+  return cloudState.profileId || state.activeProfileId || state.profiles[0]?.id || "ben";
 }
 
 function getVitaminProfileSettings(profileId = getVitaminProfileId()) {
@@ -3423,24 +3442,9 @@ function renderVitaminsPanel() {
   if (!vitaminsPanel) return;
   const profileId = getVitaminProfileId();
   const profile = getProfile(profileId) ?? getDefaultProfile(profileId);
-  const settings = getVitaminProfileSettings(profileId);
   const items = getVitaminItems(profileId);
-  const hasRedYeastRice = items.some((item) => item.schedule === "every_other_day");
-  const hasCoq10 = (VITAMIN_ITEMS_BY_PROFILE[profileId] ?? []).some((item) => item.id === "coq10");
 
   if (vitaminsSubtitle) vitaminsSubtitle.textContent = `${profile.name}: weekly tablet organiser`;
-  if (vitaminsProfileInput) {
-    vitaminsProfileInput.innerHTML = state.profiles
-      .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`)
-      .join("");
-    vitaminsProfileInput.value = profile.id;
-  }
-  vitaminsProfileField?.classList.toggle("hidden", state.profiles.length <= 1);
-  if (vitaminsWeekStartInput) vitaminsWeekStartInput.value = settings.week_start_date;
-  if (vitaminsRedYeastDateInput) vitaminsRedYeastDateInput.value = settings.next_red_yeast_rice_dose_date;
-  vitaminsRedYeastField?.classList.toggle("hidden", !hasRedYeastRice);
-  vitaminsCoq10FinishedField?.classList.toggle("hidden", !hasCoq10);
-  if (vitaminsCoq10FinishedInput) vitaminsCoq10FinishedInput.checked = Boolean(settings.coq10_finished);
 
   vitaminsEmptyState?.classList.toggle("hidden", items.length > 0);
   vitaminsMainSection?.classList.toggle("hidden", items.length === 0);
@@ -3470,15 +3474,13 @@ function renderVitaminMainRows(items) {
 }
 
 function renderVitaminWeeklyRows(profileId, items) {
-  const weekStart = getVitaminProfileSettings(profileId).week_start_date;
   return VITAMIN_TIMINGS.map((timing) => {
     const timingItems = items.filter((item) => item.timing === timing);
     return `
       <tr>
         <th data-label="Timing">${escapeHtml(timing)}</th>
-        ${VITAMIN_WEEK_DAYS.map((day, index) => {
-          const date = addDays(weekStart, index);
-          const dayItems = timingItems.filter((item) => shouldShowVitaminItemOnDate(profileId, item, day.key, date));
+        ${VITAMIN_WEEK_DAYS.map((day) => {
+          const dayItems = timingItems.filter((item) => shouldShowVitaminItemOnDate(profileId, item, day.key));
           const cellContent = dayItems.length
             ? dayItems.map((item) => renderVitaminCellItem(profileId, item, day.key)).join("")
             : "<span class=\"vitamin-empty-cell\">-</span>";
@@ -3491,12 +3493,10 @@ function renderVitaminWeeklyRows(profileId, items) {
 
 function renderVitaminCellItem(profileId, item, dayKey) {
   if (item.schedule === "optional") {
-    const checked = getVitaminCoq10Days(profileId).includes(dayKey) ? " checked" : "";
     return `
-      <label class="vitamin-cell-item optional">
-        <input type="checkbox" data-vitamin-optional-day="${escapeHtml(dayKey)}"${checked} />
-        <span>${escapeHtml(item.item)}</span>
-      </label>
+      <span class="vitamin-cell-item optional">
+        ${escapeHtml(item.item)} optional
+      </span>
     `;
   }
   return `
@@ -3506,10 +3506,10 @@ function renderVitaminCellItem(profileId, item, dayKey) {
   `;
 }
 
-function shouldShowVitaminItemOnDate(profileId, item, dayKey, date) {
+function shouldShowVitaminItemOnDate(profileId, item, dayKey) {
   if (item.schedule === "daily") return true;
   if (item.schedule === "fixed") return item.days.includes(dayKey);
-  if (item.schedule === "every_other_day") return isEveryOtherDayDose(profileId, date);
+  if (item.schedule === "every_other_day") return item.days.includes(dayKey);
   if (item.schedule === "optional") return true;
   return false;
 }
@@ -3530,95 +3530,8 @@ function getVitaminScheduleLabel(item) {
   return "Scheduled";
 }
 
-function getVitaminCoq10Days(profileId = getVitaminProfileId()) {
-  const settings = getVitaminProfileSettings(profileId);
-  const weekStart = settings.week_start_date;
-  return settings.coq10_days_by_week?.[weekStart] ?? [];
-}
-
-function setVitaminCoq10Day(profileId, dayKey, isSelected) {
-  if (!assertCanEdit()) return;
-  const settings = getVitaminProfileSettings(profileId);
-  const days = new Set(getVitaminCoq10Days(profileId));
-  if (isSelected) days.add(dayKey);
-  else days.delete(dayKey);
-  if (days.size) settings.coq10_days_by_week[settings.week_start_date] = [...days];
-  else delete settings.coq10_days_by_week[settings.week_start_date];
-  saveSettings();
-  renderVitaminsPanel();
-}
-
-function updateVitaminWeekStart() {
-  if (!assertCanEdit()) return;
-  const profileId = getVitaminProfileId();
-  const settings = getVitaminProfileSettings(profileId);
-  const nextWeekStart = getMondayDateString(vitaminsWeekStartInput.value ? parseDateString(vitaminsWeekStartInput.value) : new Date());
-  settings.week_start_date = nextWeekStart;
-  saveSettings();
-  renderVitaminsPanel();
-}
-
-function updateVitaminRedYeastDate() {
-  if (!assertCanEdit()) return;
-  const profileId = getVitaminProfileId();
-  const settings = getVitaminProfileSettings(profileId);
-  settings.next_red_yeast_rice_dose_date = normaliseDateString(vitaminsRedYeastDateInput.value) || toDateString(new Date());
-  saveSettings();
-  renderVitaminsPanel();
-}
-
-function updateVitaminCoq10Finished() {
-  if (!assertCanEdit()) return;
-  const profileId = getVitaminProfileId();
-  const settings = getVitaminProfileSettings(profileId);
-  settings.coq10_finished = Boolean(vitaminsCoq10FinishedInput?.checked);
-  saveSettings();
-  renderVitaminsPanel();
-}
-
-function copyVitaminWeeklyList() {
-  const text = getVitaminWeeklyListText(getVitaminProfileId());
-  if (!text) return;
-  const setStatus = (message) => {
-    if (vitaminsCopyStatus) vitaminsCopyStatus.textContent = message;
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => setStatus("Copied.")).catch(() => setStatus("Copy failed."));
-    return;
-  }
-  setStatus("Copy not available in this browser.");
-}
-
 function printVitaminsPanel() {
   if (typeof window.print === "function") window.print();
-}
-
-function getVitaminWeeklyListText(profileId = getVitaminProfileId()) {
-  const profile = getProfile(profileId) ?? getDefaultProfile(profileId);
-  const settings = getVitaminProfileSettings(profileId);
-  const items = getVitaminItems(profileId);
-  if (!items.length) return "";
-  const lines = [
-    `Health Dashboard Vitamins - ${profile.name}`,
-    `Week starting ${formatDate(settings.week_start_date)}`,
-    "",
-  ];
-
-  VITAMIN_TIMINGS.forEach((timing) => {
-    lines.push(timing);
-    VITAMIN_WEEK_DAYS.forEach((day, index) => {
-      const date = addDays(settings.week_start_date, index);
-      const dayItems = items
-        .filter((item) => item.timing === timing)
-        .filter((item) => shouldShowVitaminItemOnDate(profileId, item, day.key, date))
-        .filter((item) => item.schedule !== "optional" || getVitaminCoq10Days(profileId).includes(day.key))
-        .map((item) => `${item.item} (${item.quantity})`);
-      if (dayItems.length) lines.push(`- ${day.label}: ${dayItems.join("; ")}`);
-    });
-    lines.push("");
-  });
-
-  return lines.join("\n").trim();
 }
 
 function renderMobileActions(dueCount) {
@@ -4189,6 +4102,7 @@ function exportForChatGpt() {
   const dueItems = getScheduleItems(null).filter((item) => ["due", "soon", "overdue"].includes(item.due.state));
   const latestResults = getLatestResultsForExport(scopedResults);
   const warnings = latestResults.filter(isActionableWarning);
+  const cautions = latestResults.filter(isActionableCaution);
   const riskContextResults = latestResults.filter(isRiskContextResult);
   const importSchema = getChatGptImportInstructions();
   const exportScope = getExportScopeLabel();
@@ -4230,11 +4144,17 @@ function exportForChatGpt() {
         }, height ${profile.height_cm ? `${profile.height_cm} cm` : "not set"}`,
     ),
     "",
-    "## Current Warnings",
+    "## Current Range Warnings",
     "",
     ...(warnings.length
       ? warnings.map(formatResultForExport)
       : ["- No range warnings in the selected data."]),
+    "",
+    "## Current Range Cautions",
+    "",
+    ...(cautions.length
+      ? cautions.map(formatResultForExport)
+      : ["- No range cautions in the selected data."]),
     "",
     "## Risk Context",
     "",
@@ -4278,6 +4198,7 @@ function exportReviewPack() {
   const exportScope = getExportScopeLabel();
   const latestResults = getLatestResultsForExport(state.results);
   const warnings = latestResults.filter(isActionableWarning);
+  const cautions = latestResults.filter(isActionableCaution);
   const riskContextResults = latestResults.filter(isRiskContextResult);
 
   const lines = [
@@ -4295,6 +4216,7 @@ function exportReviewPack() {
     "## Current Snapshot",
     "",
     `- Active warnings: ${warnings.length}`,
+    `- Active cautions: ${cautions.length}`,
     `- Due or overdue items: ${dueItems.length}`,
     `- Material changes: ${materialChanges.length}`,
     `- Latest measurements tracked: ${latestResults.length}`,
@@ -4302,6 +4224,10 @@ function exportReviewPack() {
     "## Range Warnings",
     "",
     ...(warnings.length ? warnings.map(formatResultForExport) : ["- No current range warnings."]),
+    "",
+    "## Range Cautions",
+    "",
+    ...(cautions.length ? cautions.map(formatResultForExport) : ["- No current range cautions."]),
     "",
     "## Risk Context",
     "",
@@ -4400,7 +4326,7 @@ function getMaterialChanges(results) {
       const percent = Math.abs(Number(result.percentage_change_since_previous_test));
       return (
         result.trend_direction === "Worse" ||
-        isActionableWarning(result) ||
+        isActionableFlag(result) ||
         (Number.isFinite(percent) && percent >= 10)
       );
     })
@@ -4816,7 +4742,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.67").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.68").catch(() => {});
   });
 }
 
@@ -4963,23 +4889,7 @@ if (telegramModal) {
 }
 if (vitaminsOpenButton) vitaminsOpenButton.addEventListener("click", openVitaminsPanel);
 if (vitaminsCloseButton) vitaminsCloseButton.addEventListener("click", closeVitaminsPanel);
-if (vitaminsProfileInput) {
-  vitaminsProfileInput.addEventListener("change", () => {
-    renderVitaminsPanel();
-  });
-}
-if (vitaminsWeekStartInput) vitaminsWeekStartInput.addEventListener("change", updateVitaminWeekStart);
-if (vitaminsRedYeastDateInput) vitaminsRedYeastDateInput.addEventListener("change", updateVitaminRedYeastDate);
-if (vitaminsCoq10FinishedInput) vitaminsCoq10FinishedInput.addEventListener("change", updateVitaminCoq10Finished);
-if (vitaminsCopyButton) vitaminsCopyButton.addEventListener("click", copyVitaminWeeklyList);
 if (vitaminsPrintButton) vitaminsPrintButton.addEventListener("click", printVitaminsPanel);
-if (vitaminsWeeklyBody) {
-  vitaminsWeeklyBody.addEventListener("change", (event) => {
-    const checkbox = event.target.closest("[data-vitamin-optional-day]");
-    if (!checkbox) return;
-    setVitaminCoq10Day(getVitaminProfileId(), checkbox.dataset.vitaminOptionalDay, checkbox.checked);
-  });
-}
 if (vitaminsModal) {
   vitaminsModal.addEventListener("click", (event) => {
     if (event.target === vitaminsModal) closeVitaminsPanel();

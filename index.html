@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.67" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.67" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.67" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.67" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.67" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.67" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.67" />
-    <link rel="stylesheet" href="styles.css?v=0.67" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.68" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.68" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.68" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.68" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.68" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.68" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.68" />
+    <link rel="stylesheet" href="styles.css?v=0.68" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -149,12 +149,12 @@
         </section>
 
         <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
-          <article class="active" role="button" tabindex="0" data-summary-filter="latest" data-summary-key="measurements">
-            <span class="metric" id="totalResults">0</span>
-            <span class="label">tracked measurements</span>
+          <article role="button" tabindex="0" data-summary-filter="cautions">
+            <span class="metric attention" id="cautionResults">0</span>
+            <span class="label">range cautions</span>
           </article>
-          <article role="button" tabindex="0" data-summary-filter="flagged">
-            <span class="metric attention" id="flaggedResults">0</span>
+          <article role="button" tabindex="0" data-summary-filter="warnings">
+            <span class="metric warning" id="warningResults">0</span>
             <span class="label">range warnings</span>
           </article>
           <article role="button" tabindex="0" data-summary-filter="due">
@@ -162,9 +162,9 @@
             <span class="label">due or overdue</span>
           </article>
           <article class="summary-static" id="nextDueCard">
+            <span class="label">next due</span>
             <span class="metric" id="nextDueDate">-</span>
             <small class="metric-meta" id="nextDueRelative">-</small>
-            <span class="label">next due</span>
           </article>
         </section>
 
@@ -317,7 +317,8 @@
                 <h2>Results</h2>
                 <div class="filters" role="group" aria-label="Filter results">
                   <button class="filter-button active" data-filter="latest" type="button">Current</button>
-                  <button class="filter-button" data-filter="flagged" type="button">Flagged</button>
+                  <button class="filter-button" data-filter="cautions" type="button">Cautions</button>
+                  <button class="filter-button" data-filter="warnings" type="button">Warnings</button>
                   <button class="filter-button" data-filter="due" type="button">Due</button>
                   <button class="filter-button" data-filter="all" type="button">Archive</button>
                 </div>
@@ -369,7 +370,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.67</span>
+          <span class="version-chip" id="appVersion">v0.68</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -451,55 +452,14 @@
           <button class="mini-button" id="vitaminsCloseButton" type="button">Close</button>
         </div>
 
-        <div class="vitamins-toolbar">
-          <label class="compact-select hidden" id="vitaminsProfileField">
-            Person
-            <select id="vitaminsProfileInput"></select>
-          </label>
-          <label>
-            Week starting
-            <input id="vitaminsWeekStartInput" type="date" />
-          </label>
-          <label id="vitaminsRedYeastField">
-            Next Red Yeast Rice dose
-            <input id="vitaminsRedYeastDateInput" type="date" />
-          </label>
-          <label class="vitamins-finished-check hidden" id="vitaminsCoq10FinishedField">
-            <input id="vitaminsCoq10FinishedInput" type="checkbox" />
-            CoQ10 bottle finished
-          </label>
-        </div>
-
         <div class="vitamins-actions">
-          <button class="ghost-button" id="vitaminsCopyButton" type="button">Copy Weekly List</button>
           <button class="ghost-button" id="vitaminsPrintButton" type="button">Print</button>
-          <span class="privacy-note" id="vitaminsCopyStatus"></span>
         </div>
 
         <div class="vitamins-empty hidden" id="vitaminsEmptyState">
           <strong>No vitamin organiser set yet</strong>
           <span>This profile is ready for a vitamin schedule when one is added.</span>
         </div>
-
-        <section class="vitamins-section" id="vitaminsMainSection">
-          <div class="panel-heading">
-            <h3>Main schedule</h3>
-          </div>
-          <div class="vitamins-table-wrap">
-            <table class="vitamins-table">
-              <thead>
-                <tr>
-                  <th>Timing</th>
-                  <th>Item</th>
-                  <th>Quantity</th>
-                  <th>Frequency / Days</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody id="vitaminsMainBody"></tbody>
-            </table>
-          </div>
-        </section>
 
         <section class="vitamins-section" id="vitaminsWeeklySection">
           <div class="panel-heading">
@@ -523,12 +483,32 @@
             </table>
           </div>
         </section>
+
+        <section class="vitamins-section" id="vitaminsMainSection">
+          <div class="panel-heading">
+            <h3>Main schedule</h3>
+          </div>
+          <div class="vitamins-table-wrap">
+            <table class="vitamins-table">
+              <thead>
+                <tr>
+                  <th>Timing</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Frequency / Days</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="vitaminsMainBody"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.67"></script>
+    <script src="supabase-config.js?v=0.68"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.67"></script>
-    <script src="privacy-guard.js?v=0.67"></script>
+    <script src="app.js?v=0.68"></script>
+    <script src="privacy-guard.js?v=0.68"></script>
   </body>
 </html>

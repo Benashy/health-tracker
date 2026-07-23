@@ -530,6 +530,10 @@ body:not(.signed-in) .auth-actions .ghost-button {
   color: var(--warn);
 }
 
+.metric.warning {
+  color: var(--bad);
+}
+
 .label,
 .privacy-note {
   color: var(--muted);
@@ -815,6 +819,7 @@ legend {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -884,23 +889,23 @@ legend {
 
 .vitamin-type.daily,
 .vitamin-cell-item.daily {
-  border-color: #9fcbb3;
-  background: var(--ok-bg);
-  color: var(--ok);
+  border-color: var(--line);
+  background: #ffffff;
+  color: var(--ink);
 }
 
 .vitamin-type.fixed,
 .vitamin-cell-item.fixed {
-  border-color: #e3b437;
-  background: var(--amber-bg);
-  color: var(--amber);
+  border-color: #d8c98b;
+  background: #fffaf0;
+  color: #70540f;
 }
 
 .vitamin-type.every_other_day,
 .vitamin-cell-item.every_other_day {
-  border-color: rgba(47, 111, 174, 0.32);
-  background: var(--info-bg);
-  color: var(--info);
+  border-color: rgba(47, 111, 174, 0.24);
+  background: #f2f7fc;
+  color: #2c5f94;
 }
 
 .vitamin-type.optional,
@@ -928,12 +933,6 @@ legend {
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.25;
-}
-
-label.vitamin-cell-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
 }
 
 .vitamin-cell-item:last-child {
@@ -2123,7 +2122,7 @@ button.status-pill:focus-visible {
 
   .vitamins-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .vitamins-actions .privacy-note {

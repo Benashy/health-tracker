@@ -10,9 +10,18 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.67`.
+- The app is now on `v0.68`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.68
+
+- Simplified the Vitamins tab into a plain weekly organiser by removing week-start, Red Yeast Rice date, CoQ10 finished, person selector, and copy controls.
+- Moved the Weekly Pill Case Guide above the detailed schedule.
+- Set Red Yeast Rice to the Tuesday, Thursday, and Saturday weekly organiser pattern.
+- Moved Vitamin D3 + K2 and Zinc to Monday and Friday.
+- Split the dashboard summary counts into amber `range cautions` and red `range warnings`.
+- Reordered the `Next due` tile so the label appears before the date and relative timing.
 
 ## Completed In v0.67
 
