@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.70";
+const APP_VERSION = "v0.71";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -527,6 +527,7 @@ const vitaminsSubtitle = document.querySelector("#vitaminsSubtitle");
 const vitaminsOpenButton = document.querySelector("#vitaminsOpenButton");
 const vitaminsCloseButton = document.querySelector("#vitaminsCloseButton");
 const vitaminsTodayButton = document.querySelector("#vitaminsTodayButton");
+const vitaminsTimetableButton = document.querySelector("#vitaminsTimetableButton");
 const vitaminsPrintButton = document.querySelector("#vitaminsPrintButton");
 const vitaminsDoseFeedback = document.querySelector("#vitaminsDoseFeedback");
 const vitaminsEmptyState = document.querySelector("#vitaminsEmptyState");
@@ -3447,11 +3448,18 @@ function closeVitaminsPanel() {
   syncVitaminsPanelVisibility();
 }
 
-function toggleVitaminsTodayView() {
+function showVitaminsTodayView() {
   if (!cloudState.user) return;
-  state.vitaminsTodayOpen = !state.vitaminsTodayOpen;
+  state.vitaminsTodayOpen = true;
   renderVitaminsPanel();
-  if (state.vitaminsTodayOpen) vitaminsTodaySection?.scrollIntoView({ behavior: "smooth", block: "start" });
+  vitaminsTodaySection?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showVitaminsTimetableView() {
+  if (!cloudState.user) return;
+  state.vitaminsTodayOpen = false;
+  renderVitaminsPanel();
+  vitaminsWeeklySection?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderVitaminsPanel() {
@@ -3463,16 +3471,17 @@ function renderVitaminsPanel() {
 
   if (vitaminsSubtitle) vitaminsSubtitle.textContent = `${profile.name}: weekly tablet organiser`;
   if (vitaminsTodayButton) {
-    vitaminsTodayButton.textContent = state.vitaminsTodayOpen ? "Hide today" : "Today";
+    vitaminsTodayButton.textContent = "Today";
     vitaminsTodayButton.classList.toggle("active", Boolean(state.vitaminsTodayOpen));
   }
+  vitaminsTimetableButton?.classList.toggle("active", !state.vitaminsTodayOpen);
   if (vitaminsTodayTitle) vitaminsTodayTitle.textContent = `Today: ${today.day.label}`;
   if (vitaminsTodaySubtitle) vitaminsTodaySubtitle.textContent = today.dateLabel;
 
   vitaminsEmptyState?.classList.toggle("hidden", items.length > 0);
   vitaminsTodaySection?.classList.toggle("hidden", items.length === 0 || !state.vitaminsTodayOpen);
-  vitaminsMainSection?.classList.toggle("hidden", items.length === 0);
-  vitaminsWeeklySection?.classList.toggle("hidden", items.length === 0);
+  vitaminsMainSection?.classList.toggle("hidden", items.length === 0 || state.vitaminsTodayOpen);
+  vitaminsWeeklySection?.classList.toggle("hidden", items.length === 0 || state.vitaminsTodayOpen);
   if (vitaminsTodayList) vitaminsTodayList.innerHTML = renderVitaminTodayList(profileId, items, today.day.key);
   if (vitaminsMainBody) vitaminsMainBody.innerHTML = renderVitaminMainRows(items);
   if (vitaminsWeeklyBody) vitaminsWeeklyBody.innerHTML = renderVitaminWeeklyRows(profileId, items);
@@ -4819,7 +4828,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.70").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.71").catch(() => {});
   });
 }
 
@@ -4966,7 +4975,8 @@ if (telegramModal) {
 }
 if (vitaminsOpenButton) vitaminsOpenButton.addEventListener("click", openVitaminsPanel);
 if (vitaminsCloseButton) vitaminsCloseButton.addEventListener("click", closeVitaminsPanel);
-if (vitaminsTodayButton) vitaminsTodayButton.addEventListener("click", toggleVitaminsTodayView);
+if (vitaminsTodayButton) vitaminsTodayButton.addEventListener("click", showVitaminsTodayView);
+if (vitaminsTimetableButton) vitaminsTimetableButton.addEventListener("click", showVitaminsTimetableView);
 if (vitaminsPrintButton) vitaminsPrintButton.addEventListener("click", printVitaminsPanel);
 if (vitaminsPanel) {
   vitaminsPanel.addEventListener("click", (event) => {

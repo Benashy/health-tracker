@@ -10,9 +10,15 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.70`.
+- The app is now on `v0.71`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.71
+
+- Changed the Vitamins module into a cleaner two-view switch: `Today` and `Timetable`.
+- `Today` now shows only today's tablets and hides the weekly timetable and expanded schedule.
+- `Timetable` restores the weekly packing timetable and expanded schedule.
 
 ## Completed In v0.70
 
