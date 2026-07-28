@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.69";
+const APP_VERSION = "v0.70";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -382,6 +382,7 @@ const state = {
   mobileView: "home",
   telegramPanelOpen: false,
   vitaminsPanelOpen: false,
+  vitaminsTodayOpen: false,
   completionNextDueTouched: false,
   entrySaveLocked: false,
   entryUnlockTimer: null,
@@ -525,9 +526,14 @@ const vitaminsPanel = document.querySelector("#vitaminsPanel");
 const vitaminsSubtitle = document.querySelector("#vitaminsSubtitle");
 const vitaminsOpenButton = document.querySelector("#vitaminsOpenButton");
 const vitaminsCloseButton = document.querySelector("#vitaminsCloseButton");
+const vitaminsTodayButton = document.querySelector("#vitaminsTodayButton");
 const vitaminsPrintButton = document.querySelector("#vitaminsPrintButton");
 const vitaminsDoseFeedback = document.querySelector("#vitaminsDoseFeedback");
 const vitaminsEmptyState = document.querySelector("#vitaminsEmptyState");
+const vitaminsTodaySection = document.querySelector("#vitaminsTodaySection");
+const vitaminsTodayTitle = document.querySelector("#vitaminsTodayTitle");
+const vitaminsTodaySubtitle = document.querySelector("#vitaminsTodaySubtitle");
+const vitaminsTodayList = document.querySelector("#vitaminsTodayList");
 const vitaminsMainSection = document.querySelector("#vitaminsMainSection");
 const vitaminsWeeklySection = document.querySelector("#vitaminsWeeklySection");
 const vitaminsMainBody = document.querySelector("#vitaminsMainBody");
@@ -976,6 +982,7 @@ function resetPrivateStateForSignedOut() {
   state.referenceDraftKey = null;
   state.mobileView = "home";
   state.vitaminsPanelOpen = false;
+  state.vitaminsTodayOpen = false;
   state.pendingImport = null;
   hydrateProfileForm();
   populatePeople();
@@ -3436,7 +3443,15 @@ function openVitaminsPanel() {
 function closeVitaminsPanel() {
   if (!vitaminsModal) return;
   state.vitaminsPanelOpen = false;
+  state.vitaminsTodayOpen = false;
   syncVitaminsPanelVisibility();
+}
+
+function toggleVitaminsTodayView() {
+  if (!cloudState.user) return;
+  state.vitaminsTodayOpen = !state.vitaminsTodayOpen;
+  renderVitaminsPanel();
+  if (state.vitaminsTodayOpen) vitaminsTodaySection?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderVitaminsPanel() {
@@ -3444,15 +3459,71 @@ function renderVitaminsPanel() {
   const profileId = getVitaminProfileId();
   const profile = getProfile(profileId) ?? getDefaultProfile(profileId);
   const items = getVitaminItems(profileId);
+  const today = getVitaminTodaySummary();
 
   if (vitaminsSubtitle) vitaminsSubtitle.textContent = `${profile.name}: weekly tablet organiser`;
+  if (vitaminsTodayButton) {
+    vitaminsTodayButton.textContent = state.vitaminsTodayOpen ? "Hide today" : "Today";
+    vitaminsTodayButton.classList.toggle("active", Boolean(state.vitaminsTodayOpen));
+  }
+  if (vitaminsTodayTitle) vitaminsTodayTitle.textContent = `Today: ${today.day.label}`;
+  if (vitaminsTodaySubtitle) vitaminsTodaySubtitle.textContent = today.dateLabel;
 
   vitaminsEmptyState?.classList.toggle("hidden", items.length > 0);
+  vitaminsTodaySection?.classList.toggle("hidden", items.length === 0 || !state.vitaminsTodayOpen);
   vitaminsMainSection?.classList.toggle("hidden", items.length === 0);
   vitaminsWeeklySection?.classList.toggle("hidden", items.length === 0);
+  if (vitaminsTodayList) vitaminsTodayList.innerHTML = renderVitaminTodayList(profileId, items, today.day.key);
   if (vitaminsMainBody) vitaminsMainBody.innerHTML = renderVitaminMainRows(items);
   if (vitaminsWeeklyBody) vitaminsWeeklyBody.innerHTML = renderVitaminWeeklyRows(profileId, items);
   setEditingAvailability();
+}
+
+function getVitaminTodaySummary(date = new Date()) {
+  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+  const day = VITAMIN_WEEK_DAYS[dayIndex] ?? VITAMIN_WEEK_DAYS[0];
+  return {
+    day,
+    dateLabel: new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    }).format(date),
+  };
+}
+
+function getVitaminItemsForDay(profileId, items, dayKey) {
+  return VITAMIN_TIMINGS.map((timing) => ({
+    timing,
+    items: items.filter((item) => item.schedule !== "optional" && item.timing === timing && shouldShowVitaminItemOnDate(profileId, item, dayKey)),
+  })).filter((group) => group.items.length);
+}
+
+function renderVitaminTodayList(profileId, items, dayKey) {
+  const groups = getVitaminItemsForDay(profileId, items, dayKey);
+  if (!groups.length) {
+    return `<p class="vitamins-today-empty">No tablets are listed for today.</p>`;
+  }
+  return groups.map((group) => `
+    <article class="vitamins-today-group">
+      <h4>${escapeHtml(group.timing)}</h4>
+      <div class="vitamins-today-items">
+        ${group.items.map((item) => renderVitaminTodayItem(item)).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderVitaminTodayItem(item) {
+  const label = item.schedule === "optional" ? `${item.item} optional` : item.item;
+  const doseText = getVitaminDoseText(item);
+  return `
+    <button class="vitamin-today-item ${escapeHtml(item.schedule)}" type="button" data-vitamin-dose="${escapeHtml(doseText)}" title="${escapeHtml(doseText)}" aria-label="${escapeHtml(`${label}. ${doseText}`)}">
+      <strong>${escapeHtml(label)}</strong>
+      <span>${escapeHtml(item.quantity)}</span>
+      ${item.notes ? `<small>${escapeHtml(item.notes)}</small>` : ""}
+    </button>
+  `;
 }
 
 function renderVitaminMainRows(items) {
@@ -4748,7 +4819,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.69").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.70").catch(() => {});
   });
 }
 
@@ -4895,9 +4966,10 @@ if (telegramModal) {
 }
 if (vitaminsOpenButton) vitaminsOpenButton.addEventListener("click", openVitaminsPanel);
 if (vitaminsCloseButton) vitaminsCloseButton.addEventListener("click", closeVitaminsPanel);
+if (vitaminsTodayButton) vitaminsTodayButton.addEventListener("click", toggleVitaminsTodayView);
 if (vitaminsPrintButton) vitaminsPrintButton.addEventListener("click", printVitaminsPanel);
-if (vitaminsWeeklyBody) {
-  vitaminsWeeklyBody.addEventListener("click", (event) => {
+if (vitaminsPanel) {
+  vitaminsPanel.addEventListener("click", (event) => {
     const doseButton = event.target.closest("[data-vitamin-dose]");
     if (!doseButton) return;
     showVitaminDoseFeedback(doseButton.dataset.vitaminDose);
