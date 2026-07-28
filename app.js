@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.71";
+const APP_VERSION = "v0.72";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -35,6 +35,7 @@ const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
 const SCHEDULE_PAGE_SIZE = 8;
+const RESULTS_CARD_FILTERS = new Set(["latest", "cautions", "warnings", "due"]);
 const NEAR_LIMIT_RATIO = 0.02;
 const TRACKING_ACTIVE = "active";
 const TRACKING_NOT_TRACKED = "not_tracked";
@@ -383,6 +384,7 @@ const state = {
   telegramPanelOpen: false,
   vitaminsPanelOpen: false,
   vitaminsTodayOpen: false,
+  entryDetailsOpen: false,
   completionNextDueTouched: false,
   entrySaveLocked: false,
   entryUnlockTimer: null,
@@ -467,6 +469,11 @@ const targetEnabled = document.querySelector("#targetEnabled");
 const referenceUpperEnabled = document.querySelector("#referenceUpperEnabled");
 const rangeEditButton = document.querySelector("#rangeEditButton");
 const rangeHint = document.querySelector("#rangeHint");
+const entryDetailsBar = document.querySelector("#entryDetailsBar");
+const entryModeTitle = document.querySelector("#entryModeTitle");
+const entryModeText = document.querySelector("#entryModeText");
+const entryDetailsToggle = document.querySelector("#entryDetailsToggle");
+const entryDetailsPanel = document.querySelector("#entryDetailsPanel");
 const testDateInput = document.querySelector("#dateInput");
 const sampleDateInput = document.querySelector("#sampleDateInput");
 const valueInput = document.querySelector("#valueInput");
@@ -500,8 +507,10 @@ const snapshotMetricInputs = [
 const snapshotGrid = document.querySelector("#snapshotGrid");
 const snapshotList = document.querySelector("#snapshotList");
 const markerSummary = document.querySelector("#markerSummary");
+const resultsCardGrid = document.querySelector("#resultsCardGrid");
 const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
+const reminderPlanner = document.querySelector("#reminderPlanner");
 const schedulePagination = document.querySelector("#schedulePagination");
 const schedulePrevButton = document.querySelector("#schedulePrevButton");
 const scheduleNextButton = document.querySelector("#scheduleNextButton");
@@ -1479,6 +1488,7 @@ function getQuickMetricNames() {
 function selectMetric(name) {
   const profileId = getSelectedProfile()?.id ?? state.activeProfileId ?? cloudState.profileId ?? null;
   if (!getMetric(name, profileId)) return;
+  state.entryDetailsOpen = false;
   metricSearchInput.value = "";
   populateMetrics();
   metricInput.value = name;
@@ -1613,6 +1623,60 @@ function renderEntryAssist() {
       <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(rangeLabel)} ${escapeHtml(rangeText)}</span>
     </div>
   `;
+}
+
+function syncEntryDetailsPanel() {
+  if (!entryDetailsBar || !entryDetailsPanel || !entryDetailsToggle) return;
+  const profile = getSelectedProfile();
+  const selectedMetric = getMetric(metricInput.value, profile?.id);
+  if (!selectedMetric || !profile) {
+    entryDetailsBar.classList.add("hidden");
+    entryDetailsPanel.classList.add("hidden");
+    return;
+  }
+
+  const isTracked = isMetricTrackedForProfile(selectedMetric, profile.id);
+  const isCompletion = isCompletionMetric(selectedMetric);
+  const key = getRangeKey(profile.id, selectedMetric.name);
+  const savedRange = getSavedRange(profile.id, selectedMetric.name);
+  const isEditing = state.editingRangeKey === key;
+  const needsReferenceSetup = !isCompletion && isTracked && !savedRange;
+  const shouldShowDetails = isTracked && (state.entryDetailsOpen || needsReferenceSetup || isEditing);
+  const isLockedRepeat = !isCompletion && Boolean(savedRange) && !isEditing;
+
+  entryDetailsBar.classList.toggle("hidden", !isTracked);
+  entryDetailsBar.classList.toggle("setup-needed", needsReferenceSetup || isEditing);
+  entryDetailsPanel.classList.toggle("hidden", !shouldShowDetails);
+  entryDetailsToggle.textContent = shouldShowDetails ? "Hide details" : "Details";
+  entryDetailsToggle.setAttribute("aria-expanded", shouldShowDetails ? "true" : "false");
+
+  if (entryModeTitle) {
+    entryModeTitle.textContent = needsReferenceSetup
+      ? "Set references"
+      : isEditing
+        ? "Editing references"
+        : isCompletion
+          ? "Health check"
+          : "Quick entry";
+  }
+
+  if (!entryModeText) return;
+  if (needsReferenceSetup) {
+    entryModeText.textContent = "Choose the limits or target once; repeat entries stay quicker.";
+  } else if (isEditing) {
+    entryModeText.textContent = "Adjust which reference fields apply, then lock them again.";
+  } else if (isCompletion) {
+    entryModeText.textContent = "Record completion and next due date. Open details only for notes.";
+  } else if (isLockedRepeat) {
+    entryModeText.textContent = "Reference fields are locked from previous entries.";
+  } else {
+    entryModeText.textContent = "Recorded-only metric. Open details only for notes.";
+  }
+}
+
+function toggleEntryDetailsPanel() {
+  state.entryDetailsOpen = !state.entryDetailsOpen;
+  syncEntryDetailsPanel();
 }
 
 function isCompletionMetric(metricOrName) {
@@ -1796,6 +1860,7 @@ function syncRangeDefaults() {
     if (highInput) highInput.value = "";
     state.editingRangeKey = null;
     state.referenceDraftKey = null;
+    syncEntryDetailsPanel();
     return;
   }
   referencePanel?.classList.remove("hidden");
@@ -1845,6 +1910,7 @@ function syncRangeDefaults() {
   rangeEditButton.textContent = isEditing ? "Lock fields" : "Edit fields";
   rangeHint.textContent = "";
   rangeHint.classList.add("hidden");
+  syncEntryDetailsPanel();
 }
 
 function isTargetMetric(metricName) {
@@ -2465,10 +2531,7 @@ function render() {
 
   renderEmptyState(results.length, dueCount);
   renderSummarySelection();
-  emptyState.classList.toggle("hidden", results.length > 0);
-  tableWrap.classList.toggle("hidden", results.length === 0);
-
-  resultsBody.innerHTML = renderResultRows(results);
+  renderResultsSurface(results);
   renderMobileActions(dueCount);
   renderMobileLayout();
 }
@@ -2645,12 +2708,32 @@ function handleSnapshotAction(target) {
   } else setFilter("latest");
 }
 
-function renderResultRows(results) {
-  const sorted = [...results].sort((a, b) => {
+function getSortedResultsByDisplayGroup(results) {
+  return [...results].sort((a, b) => {
     const groupSort = getDisplayGroupOrder(a.metric) - getDisplayGroupOrder(b.metric);
     if (groupSort) return groupSort;
     return a.metric.localeCompare(b.metric) || b.sample_date.localeCompare(a.sample_date);
   });
+}
+
+function renderResultsSurface(results) {
+  const dueItems = state.filter === "due" ? getPriorityScheduleItems() : [];
+  const showDueCards = state.filter === "due" && dueItems.length > 0;
+  const showResultCards = !showDueCards && RESULTS_CARD_FILTERS.has(state.filter) && results.length > 0;
+  const showCards = showDueCards || showResultCards;
+
+  emptyState.classList.toggle("hidden", showCards || results.length > 0);
+  if (resultsCardGrid) {
+    resultsCardGrid.classList.toggle("hidden", !showCards);
+    resultsCardGrid.innerHTML = showDueCards ? renderDueCheckCards(dueItems) : showResultCards ? renderResultCards(results) : "";
+  }
+  if (markerSummary) markerSummary.classList.toggle("hidden", showCards || results.length === 0);
+  tableWrap.classList.toggle("hidden", showCards || results.length === 0);
+  resultsBody.innerHTML = renderResultRows(results);
+}
+
+function renderResultRows(results) {
+  const sorted = getSortedResultsByDisplayGroup(results);
   let currentGroup = "";
   return sorted
     .map((result) => {
@@ -2686,6 +2769,127 @@ function renderResultRows(results) {
       `;
     })
     .join("");
+}
+
+function renderResultCards(results) {
+  const sorted = getSortedResultsByDisplayGroup(results);
+  const groups = [];
+  sorted.forEach((result) => {
+    const group = getDisplayGroupForMetric(result.metric);
+    let current = groups.at(-1);
+    if (!current || current.group !== group) {
+      current = { group, results: [] };
+      groups.push(current);
+    }
+    current.results.push(result);
+  });
+
+  return groups
+    .map(
+      (group) => `
+        <section class="result-card-section">
+          <h3>${escapeHtml(group.group)}</h3>
+          <div class="result-card-list">
+            ${group.results.map(renderResultCard).join("")}
+          </div>
+        </section>
+      `,
+    )
+    .join("");
+}
+
+function renderResultCard(result) {
+  const statusClass = getStatusClass(result.status_vs_range);
+  const due = getDueStatus(getProfile(result.profile_id), getMetric(result.metric, result.profile_id));
+  const range = formatRangeOrTarget(result);
+  const status = renderStatusPill(result, statusClass);
+  const value = formatValue(result.result_value, result.unit);
+  const change = `${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)})`;
+  const previous = formatValue(result.previous_result, result.unit);
+
+  return `
+    <article class="result-card ${statusClass}">
+      <div class="result-card-top">
+        <div>
+          <span>${formatDate(result.sample_date)}</span>
+          <strong>${escapeHtml(result.metric)}</strong>
+        </div>
+        ${status}
+      </div>
+      <div class="result-card-value">
+        <strong>${escapeHtml(value)}</strong>
+        <span>${range}</span>
+      </div>
+      <dl class="result-card-meta">
+        <div><dt>Due</dt><dd><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></dd></div>
+        <div><dt>Previous</dt><dd>${escapeHtml(previous)}</dd></div>
+        <div><dt>Change</dt><dd>${escapeHtml(change)}</dd></div>
+        <div><dt>Trend</dt><dd>${escapeHtml(result.trend_direction)}</dd></div>
+      </dl>
+      <div class="result-card-actions">
+        <button class="info-button" type="button" data-context-metric="${escapeHtml(result.metric)}">Info</button>
+        <button class="delete-button" type="button" data-id="${escapeHtml(result.id)}" aria-label="Delete result">Delete</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderDueCheckCards(items) {
+  const grouped = groupDueScheduleItems(items);
+  return grouped
+    .map(
+      (group) => `
+        <section class="result-card-section due-result-section">
+          <h3>${escapeHtml(group.label)}</h3>
+          <div class="result-card-list">
+            ${group.items.map(renderDueCheckCard).join("")}
+          </div>
+        </section>
+      `,
+    )
+    .join("");
+}
+
+function renderDueCheckCard(item) {
+  const latest = item.due.latest;
+  const nextDate = item.due.nextDate ? toDateString(item.due.nextDate) : "";
+  return `
+    <article class="result-card due-check-card ${item.due.state}" role="button" tabindex="0" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">
+      <div class="result-card-top">
+        <div>
+          <span>${escapeHtml(item.profile.name)} · ${escapeHtml(item.metric.cadence)}</span>
+          <strong>${escapeHtml(item.metric.name)}</strong>
+        </div>
+        <span class="due-pill ${item.due.state}">${escapeHtml(item.due.label)}</span>
+      </div>
+      <div class="result-card-value">
+        <strong>${latest ? escapeHtml(formatValue(latest.result_value, latest.unit)) : "Baseline due"}</strong>
+        <span>${nextDate ? `Next due ${formatDate(nextDate)}` : "No result recorded yet"}</span>
+      </div>
+      <dl class="result-card-meta">
+        <div><dt>Group</dt><dd>${escapeHtml(getScheduleGroup(item.metric).label)}</dd></div>
+        <div><dt>Notice</dt><dd>${escapeHtml(formatReminderNotice(item.metric))}</dd></div>
+      </dl>
+      <div class="result-card-actions">
+        <button class="mini-button" type="button" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">Enter</button>
+        <button class="mini-button snooze-button" type="button" data-snooze-profile="${escapeHtml(item.profile.id)}" data-snooze-metric="${escapeHtml(item.metric.name)}">Snooze</button>
+      </div>
+    </article>
+  `;
+}
+
+function groupDueScheduleItems(items) {
+  const groups = [];
+  items.forEach((item) => {
+    const label = getDisplayGroupForMetric(item.metric.name);
+    let group = groups.find((candidate) => candidate.label === label);
+    if (!group) {
+      group = { label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(item);
+  });
+  return groups;
 }
 
 function renderStatusPill(result, statusClass) {
@@ -3091,11 +3295,15 @@ function minBy(items, getter) {
   return items.reduce((best, item) => (getter(item) < getter(best) ? item : best), items[0]);
 }
 
-function renderSchedule() {
+function getPriorityScheduleItems() {
   const priorityOrder = { overdue: 0, due: 1, soon: 2, ok: 3, complete: 4 };
-  const items = getScheduleItems()
+  return getScheduleItems()
     .filter((item) => ["overdue", "due", "soon"].includes(item.due.state))
     .sort((a, b) => priorityOrder[a.due.state] - priorityOrder[b.due.state] || a.metric.name.localeCompare(b.metric.name));
+}
+
+function renderSchedule() {
+  const items = getPriorityScheduleItems();
   const totalPages = Math.max(1, Math.ceil(items.length / SCHEDULE_PAGE_SIZE));
   state.schedulePage = Math.min(Math.max(1, state.schedulePage), totalPages);
   const startIndex = (state.schedulePage - 1) * SCHEDULE_PAGE_SIZE;
@@ -3115,6 +3323,7 @@ function renderSchedule() {
         `)
         .join("")
     : renderCalmScheduleCard();
+  renderReminderPlanner();
 }
 
 function renderSchedulePagination(totalItems, startIndex, visibleCount, totalPages) {
@@ -3146,6 +3355,105 @@ function renderCalmScheduleCard() {
       <em>${escapeHtml(nextText)}</em>
     </article>
   `;
+}
+
+function renderReminderPlanner() {
+  if (!reminderPlanner) return;
+  const rows = getReminderPlanRows();
+  reminderPlanner.classList.toggle("hidden", rows.length === 0);
+  reminderPlanner.innerHTML = rows.length
+    ? `
+        <div class="reminder-planner-heading">
+          <div>
+            <strong>Reminder plan</strong>
+            <span>App warnings and Telegram reminders use the same practical booking windows.</span>
+          </div>
+        </div>
+        <div class="reminder-plan-grid">
+          ${rows.map(renderReminderPlanRow).join("")}
+        </div>
+      `
+    : "";
+}
+
+function getReminderPlanRows() {
+  const profileFilter = state.activeProfileId || cloudState.profileId || null;
+  const rowsByKey = new Map();
+  getScheduleItems(profileFilter).forEach((item) => {
+    const group = getScheduleGroup(item.metric);
+    const key = `${group.key}:${item.metric.intervalDays ?? item.metric.intervalMonths ?? "one-off"}:${item.metric.warningDays ?? ""}`;
+    if (!rowsByKey.has(key)) {
+      rowsByKey.set(key, {
+        key,
+        label: group.label,
+        cycle: getReminderCycleLabel(item.metric),
+        warning: formatReminderNotice(item.metric),
+        telegram: formatTelegramMilestones(item.metric),
+        nextDate: item.due.nextDate,
+        metricNames: [],
+      });
+    }
+    rowsByKey.get(key).metricNames.push(item.metric.name);
+  });
+  return [...rowsByKey.values()].sort((a, b) => {
+    const dateSort = (a.nextDate?.getTime?.() ?? Number.MAX_SAFE_INTEGER) - (b.nextDate?.getTime?.() ?? Number.MAX_SAFE_INTEGER);
+    return dateSort || a.label.localeCompare(b.label);
+  });
+}
+
+function renderReminderPlanRow(row) {
+  const metricNames = row.metricNames.slice(0, 4).join(", ");
+  const extraCount = row.metricNames.length - 4;
+  return `
+    <article>
+      <strong>${escapeHtml(row.label)}</strong>
+      <span>${escapeHtml(row.cycle)}</span>
+      <em>App: ${escapeHtml(row.warning)}</em>
+      <em>Telegram: ${escapeHtml(row.telegram)}</em>
+      <small>${escapeHtml(metricNames)}${extraCount > 0 ? ` +${extraCount} more` : ""}</small>
+    </article>
+  `;
+}
+
+function getReminderCycleLabel(selectedMetric) {
+  if (!selectedMetric) return "No cycle";
+  if (selectedMetric.intervalMonths) return getCompletionIntervalLabel(selectedMetric);
+  if (!selectedMetric.intervalDays) return "One-time or as needed";
+  if (selectedMetric.intervalDays <= 31) return `${selectedMetric.intervalDays}-day cycle`;
+  if (selectedMetric.intervalDays <= 95) return "3-month cycle";
+  if (selectedMetric.intervalDays <= 210) return "6-month cycle";
+  if (selectedMetric.intervalDays <= 400) return "12-month cycle";
+  return `${Math.round(selectedMetric.intervalDays / 365)}-year cycle`;
+}
+
+function formatReminderNotice(selectedMetric) {
+  const days = getWarningDays(selectedMetric);
+  if (!days) return "due date only";
+  if (days === 1) return "1 day before";
+  if (days % 7 === 0 && days < 30) return `${days / 7} week${days === 7 ? "" : "s"} before`;
+  if (days === 30) return "1 month before";
+  if (days === 42) return "6 weeks before";
+  if (days === 90) return "3 months before";
+  if (days === 120) return "4 months before";
+  return `${days} days before`;
+}
+
+function formatTelegramMilestones(selectedMetric) {
+  const days = getTelegramReminderMilestoneDays(selectedMetric);
+  const overdue = selectedMetric?.telegramOverdueReminderDay === -1 ? ["once expired"] : [];
+  const parts = days.map((day) => {
+    if (day === 0) return "due day";
+    if (day === 1) return "1d";
+    if (day === 7) return "1w";
+    if (day === 14) return "2w";
+    if (day === 30) return "1m";
+    if (day === 42) return "6w";
+    if (day === 60) return "2m";
+    if (day === 90) return "3m";
+    if (day === 120) return "4m";
+    return `${day}d`;
+  });
+  return [...parts, ...overdue].join(", ") || "no automatic reminder";
 }
 
 function getTelegramSettings() {
@@ -4085,6 +4393,7 @@ function addResult(event) {
   saveScheduleState();
   saveResults();
   form.reset();
+  state.entryDetailsOpen = false;
   setTodayDefaults();
   populatePeople();
   metricInput.value = selectedMetric.name;
@@ -4828,7 +5137,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.71").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.72").catch(() => {});
   });
 }
 
@@ -4883,14 +5192,17 @@ profileForm.addEventListener("submit", saveProfile);
 authForm.addEventListener("submit", signInWithPassword);
 magicLinkButton.addEventListener("click", sendMagicLink);
 personInput.addEventListener("change", () => {
+  state.entryDetailsOpen = false;
   populateMetrics();
   populateTrendMetrics();
 });
 metricInput.addEventListener("change", () => {
+  state.entryDetailsOpen = false;
   syncMetricDefaults();
   renderQuickMetrics();
 });
 if (trackingToggleButton) trackingToggleButton.addEventListener("click", toggleSelectedMetricTracking);
+if (entryDetailsToggle) entryDetailsToggle.addEventListener("click", toggleEntryDetailsPanel);
 if (schedulePrevButton) schedulePrevButton.addEventListener("click", () => changeSchedulePage(-1));
 if (scheduleNextButton) scheduleNextButton.addEventListener("click", () => changeSchedulePage(1));
 testDateInput.addEventListener("change", syncCompletionDueFields);
@@ -5137,7 +5449,20 @@ schedulePanel.addEventListener("keydown", (event) => {
   focusMetricEntry(card.dataset.scheduleProfile, card.dataset.scheduleMetric);
 });
 
-resultsBody.addEventListener("click", (event) => {
+function handleResultsAction(event, container) {
+  const snoozeButton = event.target.closest("[data-snooze-profile]");
+  if (snoozeButton) {
+    event.stopPropagation();
+    snoozeScheduleItem(snoozeButton.dataset.snoozeProfile, snoozeButton.dataset.snoozeMetric);
+    return;
+  }
+
+  const dueEntryButton = event.target.closest("[data-schedule-profile]");
+  if (dueEntryButton && !event.target.closest("[data-id]")) {
+    focusMetricEntry(dueEntryButton.dataset.scheduleProfile, dueEntryButton.dataset.scheduleMetric);
+    return;
+  }
+
   const contextButton = event.target.closest("[data-context-metric]");
   if (contextButton) {
     showMetricContext(contextButton.dataset.contextMetric);
@@ -5153,7 +5478,7 @@ resultsBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-id]");
   if (!button) return;
   if (button.dataset.confirming !== "true") {
-    resultsBody.querySelectorAll(".delete-button").forEach((item) => {
+    container.querySelectorAll(".delete-button").forEach((item) => {
       item.dataset.confirming = "false";
       item.textContent = "Delete";
       item.classList.remove("confirming");
@@ -5164,7 +5489,19 @@ resultsBody.addEventListener("click", (event) => {
     return;
   }
   deleteResult(button.dataset.id);
-});
+}
+
+resultsBody.addEventListener("click", (event) => handleResultsAction(event, resultsBody));
+if (resultsCardGrid) resultsCardGrid.addEventListener("click", (event) => handleResultsAction(event, resultsCardGrid));
+if (resultsCardGrid) {
+  resultsCardGrid.addEventListener("keydown", (event) => {
+    if (!["Enter", " "].includes(event.key)) return;
+    const card = event.target.closest("[data-schedule-profile]");
+    if (!card) return;
+    event.preventDefault();
+    focusMetricEntry(card.dataset.scheduleProfile, card.dataset.scheduleMetric);
+  });
+}
 
 clearLegacyData();
 hydrateProfileForm();

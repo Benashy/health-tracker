@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.71" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.71" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.71" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.71" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.71" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.71" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.71" />
-    <link rel="stylesheet" href="styles.css?v=0.71" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.72" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.72" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.72" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.72" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.72" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.72" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.72" />
+    <link rel="stylesheet" href="styles.css?v=0.72" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
@@ -178,6 +178,7 @@
             </div>
           </div>
           <div class="schedule-grid" id="schedulePanel"></div>
+          <div class="reminder-planner" id="reminderPlanner"></div>
         </section>
 
         <section class="content-grid hidden" id="contentGrid" data-private aria-hidden="true">
@@ -236,48 +237,58 @@
               </label>
             </div>
 
-            <div class="reference-panel" id="referencePanel">
-              <div class="reference-panel-top">
-                <span>Reference setup</span>
-                <button class="mini-button hidden" id="rangeEditButton" type="button">Edit fields</button>
+            <div class="entry-details-toggle" id="entryDetailsBar">
+              <div>
+                <strong id="entryModeTitle">Quick entry</strong>
+                <span id="entryModeText">Reference fields are saved for repeat entry.</span>
               </div>
-              <div class="reference-options hidden" id="referenceOptions" aria-label="Reference fields to use">
-                <label>
-                  <input id="referenceLowerEnabled" type="checkbox" />
-                  Reference lower limit
-                </label>
-                <label>
-                  <input id="targetEnabled" type="checkbox" />
-                  Target
-                </label>
-                <label>
-                  <input id="referenceUpperEnabled" type="checkbox" />
-                  Reference upper limit
-                </label>
-              </div>
-              <div class="inline-fields reference-fields">
-                <label class="hidden reference-field" id="lowField">
-                  <span id="lowLabel">Reference lower limit</span>
-                  <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" disabled />
-                </label>
-                <label class="hidden reference-field" id="targetField">
-                  <span id="targetLabel">Target</span>
-                  <input id="targetInput" type="number" inputmode="decimal" step="0.01" min="0" />
-                </label>
-                <label class="hidden reference-field" id="highField">
-                  <span id="highLabel">Reference upper limit</span>
-                  <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
-                </label>
-              </div>
-              <div class="range-tools">
-                <span class="hidden" id="rangeHint"></span>
-              </div>
+              <button class="mini-button" id="entryDetailsToggle" type="button" aria-expanded="false">Details</button>
             </div>
 
-            <label class="notes-field">
-              Notes
-              <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
-            </label>
+            <div class="entry-details-panel hidden" id="entryDetailsPanel">
+              <div class="reference-panel" id="referencePanel">
+                <div class="reference-panel-top">
+                  <span>Reference setup</span>
+                  <button class="mini-button hidden" id="rangeEditButton" type="button">Edit fields</button>
+                </div>
+                <div class="reference-options hidden" id="referenceOptions" aria-label="Reference fields to use">
+                  <label>
+                    <input id="referenceLowerEnabled" type="checkbox" />
+                    Reference lower limit
+                  </label>
+                  <label>
+                    <input id="targetEnabled" type="checkbox" />
+                    Target
+                  </label>
+                  <label>
+                    <input id="referenceUpperEnabled" type="checkbox" />
+                    Reference upper limit
+                  </label>
+                </div>
+                <div class="inline-fields reference-fields">
+                  <label class="hidden reference-field" id="lowField">
+                    <span id="lowLabel">Reference lower limit</span>
+                    <input id="lowInput" type="number" inputmode="decimal" step="0.01" min="0" disabled />
+                  </label>
+                  <label class="hidden reference-field" id="targetField">
+                    <span id="targetLabel">Target</span>
+                    <input id="targetInput" type="number" inputmode="decimal" step="0.01" min="0" />
+                  </label>
+                  <label class="hidden reference-field" id="highField">
+                    <span id="highLabel">Reference upper limit</span>
+                    <input id="highInput" type="number" inputmode="decimal" step="0.01" min="0" />
+                  </label>
+                </div>
+                <div class="range-tools">
+                  <span class="hidden" id="rangeHint"></span>
+                </div>
+              </div>
+
+              <label class="notes-field">
+                Notes
+                <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
+              </label>
+            </div>
 
             <select class="hidden" id="sourceTypeInput">
               <option value="Lab Report / PDF">Lab report / PDF</option>
@@ -325,6 +336,7 @@
               </div>
 
               <div class="marker-summary" id="markerSummary"></div>
+              <div class="result-card-grid hidden" id="resultsCardGrid"></div>
               <div class="empty-state" id="emptyState">
                 <strong>No results yet</strong>
                 <span>Add your first measurement to start tracking long-term trends.</span>
@@ -370,7 +382,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.71</span>
+          <span class="version-chip" id="appVersion">v0.72</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -519,9 +531,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.71"></script>
+    <script src="supabase-config.js?v=0.72"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.71"></script>
-    <script src="privacy-guard.js?v=0.71"></script>
+    <script src="app.js?v=0.72"></script>
+    <script src="privacy-guard.js?v=0.72"></script>
   </body>
 </html>

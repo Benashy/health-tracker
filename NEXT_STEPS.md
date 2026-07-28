@@ -10,9 +10,18 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.71`.
+- The app is now on `v0.72`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.72
+
+- Redesigned Add measurement into a calmer quick-entry flow with a collapsible details panel.
+- Reference/target setup now opens automatically when a metric needs first-time setup, then collapses again for repeat entries.
+- Added compact grouped Results cards for everyday `Current`, `Cautions`, `Warnings`, and `Due` views while keeping the full table in `Archive`.
+- Added due-check cards in the Results `Due` view so baseline-due items are visible even before any result has been entered.
+- Added a visible reminder-planning summary showing app warning windows and Telegram milestone timing by metric cycle.
+- Added tablet/iPad layout refinements so the entry form, results, due cards, and reminder planning breathe properly before the phone layout takes over.
 
 ## Completed In v0.71
 
@@ -285,39 +294,26 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Review the new v0.61 warning periods after real reminders have been received: 14-day checks warn 1 day before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, six-month checks warn 30 days before, annual checks warn 30 days before, two/three-year checks warn 90 days before, and Colonoscopy warns 120 days before.
    - Decide separately how each category should continue after the due date has passed, for example daily for short-cycle home readings, weekly for bloods/checks, and monthly for multi-year screening if not yet completed.
 
-2. Continue tablet and post-use mobile refinement.
-   - Test on Ben's real iPhone/iPad after a few data-entry sessions.
-   - Refine any Safari/PWA keyboard, scrolling, or installed-app quirks found in real use.
-   - Keep account, sync, refresh, version, and sign-out controls in the bottom footer.
-
-3. Redesign Add measurement and Results after more real use.
-   - Make Add measurement feel less clunky, especially when entering routine home measurements.
-   - Reduce the visual length of Results without losing the archive/audit function.
-   - Consider clearer tabs, compact grouped cards, progressive disclosure, and a smoother desktop/mobile split.
-
-4. Add health events and notes.
+2. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
-5. Add document upload/storage.
+3. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-6. Add in-app reminders and review scheduling.
-   - Keep reminders cautious and not excessive.
-   - Include annual bloods, home measurements, GP reviews, ECG, CAC consideration, and abnormal-result follow-up.
-   - Design warning windows based on how practical each item is to arrange, not only on its recurrence interval. For example, same-day reminders may work for weight, but blood tests, pilot medicals, eye tests, dermatology checks, and colonoscopy-style screening need earlier staged reminders.
-   - Later add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
-   - Later consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
-
-7. Add backup scheduling.
+4. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-8. Consider structured database tables later.
+5. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
+
+6. Later pilot-medical scheduling refinements.
+   - Add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
+   - Consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
 
 ## Standing Design Rules
 

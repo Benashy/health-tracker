@@ -136,6 +136,11 @@ function createDocument() {
     "referenceUpperEnabled",
     "rangeEditButton",
     "rangeHint",
+    "entryDetailsBar",
+    "entryModeTitle",
+    "entryModeText",
+    "entryDetailsToggle",
+    "entryDetailsPanel",
     "saveFeedback",
     "entrySubmitButton",
     "dateInput",
@@ -169,7 +174,9 @@ function createDocument() {
     "snapshotGrid",
     "snapshotList",
     "markerSummary",
+    "resultsCardGrid",
     "schedulePanel",
+    "reminderPlanner",
     "schedulePagination",
     "schedulePrevButton",
     "scheduleNextButton",
@@ -397,8 +404,8 @@ const telegramScheduleSql = fs.readFileSync("supabase/telegram_reminder_schedule
 const telegramFunction = fs.readFileSync("supabase/functions/health-tracker-telegram/index.ts", "utf8");
 const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
 const faviconIco = fs.readFileSync("favicon.ico");
-assert(indexHtml.includes("app.js?v=0.71"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.71"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.72"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.72"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
@@ -411,11 +418,14 @@ assert(indexHtml.includes("Export results"), "CSV export action should be labell
 assert(indexHtml.includes("Current snapshot"), "current health snapshot section should exist");
 assert(indexHtml.includes("snapshotEditor"), "snapshot editor should exist");
 assert(indexHtml.includes("entryAssist"), "entry assist area should exist");
+assert(indexHtml.includes("entryDetailsToggle"), "measurement entry should have a details toggle");
+assert(indexHtml.includes("entryDetailsPanel"), "measurement entry should have a collapsible details panel");
 assert(indexHtml.includes("trackingControl"), "metric tracking control should exist in add measurement");
 assert(indexHtml.includes("trackingToggleButton"), "metric tracking control should have a reversible toggle");
 assert(indexHtml.includes("nextDueRelative"), "next due tile should include relative timing text");
 assert(indexHtml.includes("schedulePagination"), "due soon panel should include pagination controls");
 assert(indexHtml.includes("scheduleNextButton"), "due soon panel should have a next-page button");
+assert(indexHtml.includes("reminderPlanner"), "due soon panel should include a reminder planning summary");
 assert(indexHtml.includes("telegramPanel"), "Telegram reminder setup panel should exist");
 assert(indexHtml.includes("telegramOpenButton"), "Telegram should have a private top-level management action");
 assert(indexHtml.includes('data-menu-action="telegram"'), "mobile menu should include Telegram settings");
@@ -437,13 +447,16 @@ assert(indexHtml.includes("Weekly timetable"), "Vitamins organiser should includ
 assert(indexHtml.includes("Expanded schedule"), "Vitamins organiser should include the expanded schedule");
 assert(indexHtml.indexOf("Weekly timetable") < indexHtml.indexOf("Expanded schedule"), "Vitamins weekly timetable should appear before the expanded schedule");
 assert(indexHtml.includes("vitaminsDoseFeedback"), "Vitamins organiser should include a dosage feedback area");
-assert(indexHtml.includes("v0.71"), "app shell should expose the new version");
+assert(indexHtml.includes("v0.72"), "app shell should expose the new version");
 assert(styles.includes("--info: #2f6fae"), "interactive hover colour should use the recorded blue");
 assert(styles.includes(".status-strip article.active"), "summary cards should have a visible selected state");
 assert(styles.includes("border-color: var(--info)"), "summary and snapshot hover states should use blue, not green");
 assert(styles.includes(".metric-meta"), "next due relative timing should use a subdued secondary style");
 assert(styles.includes(".tracking-control"), "metric tracking control should have compact styling");
 assert(styles.includes(".metric-not-tracked"), "stopped metrics should use a distinct form state");
+assert(styles.includes(".entry-details-toggle"), "measurement details should have a compact disclosure style");
+assert(styles.includes(".result-card-grid"), "current results should have compact card styling");
+assert(styles.includes(".reminder-plan-grid"), "reminder planning should have compact card styling");
 assert(styles.includes(".schedule-pagination"), "due soon pagination should have compact styling");
 assert(styles.includes(".vitamins-modal-panel"), "Vitamins organiser should have modal styling");
 assert(styles.includes("@media print"), "Vitamins organiser should include a print-friendly view");
@@ -491,6 +504,7 @@ assert(indexHtml.includes("mobileActionBar"), "mobile bottom action bar should e
 assert(indexHtml.includes("mobileMenuPanel"), "mobile menu panel should exist for secondary actions");
 assert(indexHtml.includes("trendViewPanel"), "trends should have a dedicated mobile view wrapper");
 assert(indexHtml.includes("resultsViewPanel"), "results should have a dedicated mobile view wrapper");
+assert(indexHtml.includes("resultsCardGrid"), "results should have a compact card surface for everyday use");
 assert(indexHtml.includes("entry-submit-button"), "mobile entry submit affordance should exist");
 assert(indexHtml.includes("referenceOptions"), "reference field selectors should exist");
 assert(indexHtml.includes("targetInput"), "target should have a dedicated input");
@@ -502,8 +516,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.71"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.71"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.72"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.72"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
@@ -531,24 +545,24 @@ assert(!indexHtml.includes("tracked measurements"), "summary strip should not pr
 assert(indexHtml.indexOf('<span class="label">next due</span>') < indexHtml.indexOf('id="nextDueDate"'), "next due tile should show its label before the date");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.71"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.72"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.71")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.71"), "iOS touch icon should use PNG");
-assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.71"), "browser favicon should use a unique Health Dashboard ICO filename");
-assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.71"), "browser favicon should use a unique 32px PNG filename");
-assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.71"), "browser favicon should use a unique 16px PNG filename");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.72")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.72"), "iOS touch icon should use PNG");
+assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.72"), "browser favicon should use a unique Health Dashboard ICO filename");
+assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.72"), "browser favicon should use a unique 32px PNG filename");
+assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.72"), "browser favicon should use a unique 16px PNG filename");
 assert(faviconIco.length > 100, "favicon ICO should be generated");
 assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
 assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
 assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
-assert(serviceWorker.includes("health-dashboard-v0.71"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.71"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.71"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.71"), "service worker should cache the unique ICO favicon");
-assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.71"), "service worker should cache the unique PNG favicon");
-assert(serviceWorker.includes("app-icon-512.png?v=0.71"), "service worker should cache PNG app icons");
+assert(serviceWorker.includes("health-dashboard-v0.72"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.72"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.72"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.72"), "service worker should cache the unique ICO favicon");
+assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.72"), "service worker should cache the unique PNG favicon");
+assert(serviceWorker.includes("app-icon-512.png?v=0.72"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -564,6 +578,7 @@ assert(styles.includes(".mobile-menu-panel.hidden"), "mobile menu should not ove
 assert(styles.includes("env(safe-area-inset-bottom)"), "iPhone safe-area spacing should be handled");
 assert(styles.includes(".entry-submit-button"), "mobile entry submit should be sticky");
 assert(styles.includes("max-height: calc(100vh - 40px)"), "desktop measurement entry should be scrollable inside its sticky panel");
+assert(styles.includes("@media (max-width: 1100px)"), "styles should include an iPad/tablet refinement breakpoint");
 assert(styles.includes(".vitamins-today-list"), "Vitamins Today view should have compact responsive styling");
 assert(styles.includes(".empty-actions"), "empty states should include compact action buttons");
 assert(styles.includes("86dvh"), "mobile modals should use a bottom-sheet-friendly height");
@@ -585,7 +600,7 @@ assert(telegramScheduleSql.includes("health_dashboard_telegram_pairing_codes"), 
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret"), "Telegram webhook should use a Vault-backed secret");
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret_matches"), "Telegram webhook secret matcher should exist");
 assert(telegramScheduleSql.includes("'0 8,9 * * *'"), "Telegram scheduled reminders should run around 09:00 Europe/Lisbon across DST");
-assert(document.elements.appVersion.textContent === "v0.71", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.72", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(document.elements.nextDueRelative.textContent, "next due summary should render relative timing");
 document.body.classList.add("app-booting");
@@ -619,7 +634,7 @@ assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out sh
 assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
 assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
 assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
-context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.71";
+context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.72";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should redirect to the canonical live dashboard URL");
 context.window.location.href = "http://localhost:3000/";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should not redirect to localhost");
@@ -816,6 +831,9 @@ assert(context.getWarningDays(180) === 30, "six-month checks should warn within 
 assert(context.getWarningDays(365) === 30, "annual checks should warn within thirty days");
 assert(context.getWarningDays(1825) === 90, "multi-year checks should warn within ninety days by default");
 assert(context.getWarningDays(context.getMetric("Colonoscopy", "angelika")) === 120, "colonoscopy should warn within one hundred and twenty days");
+assert(context.formatReminderNotice(context.getMetric("Colonoscopy", "angelika")) === "4 months before", "colonoscopy reminder plan should explain the long booking window");
+assert(context.formatTelegramMilestones(context.getMetric("Pilot medical", "ben")).includes("6w"), "pilot medical reminder plan should include the six-week milestone");
+assert(document.elements.reminderPlanner.innerHTML.includes("Reminder plan"), "dashboard should render the reminder planning summary");
 assert(context.getStatusClass("Recorded") === "recorded", "recorded status should use informational styling");
 assert(context.getDisplayGroupForMetric("LDL") === "Cardiovascular", "LDL should be grouped with cardiovascular metrics");
 
@@ -823,6 +841,8 @@ document.elements.personInput.value = "ben";
 document.elements.markerInput.value = "LDL";
 context.syncMetricDefaults();
 assert(document.elements.highLabel.textContent === "Reference upper limit", "LDL should use reference range labels");
+assert(!document.elements.entryDetailsPanel.classList.contains("hidden"), "first LDL setup should open the entry details panel");
+assert(document.elements.entryModeTitle.textContent === "Set references", "first LDL setup should explain that references are needed");
 assert(document.elements.lowField.classList.contains("hidden"), "LDL should hide unused lower limit field by default");
 assert(document.elements.targetField.classList.contains("hidden"), "LDL should hide target field by default");
 assert(!document.elements.highField.classList.contains("hidden"), "LDL should show upper limit field by default");
@@ -864,6 +884,8 @@ document.elements.sourceDocumentInput.value = "Rel21832308_06_06_2026.pdf";
 context.addResult({ preventDefault() {} });
 let results = JSON.parse(store["blood-results-tracker:v3"]);
 assert(results.length === 1, "one result should be saved");
+assert(document.elements.resultsCardGrid.innerHTML.includes("LDL"), "current results should render compact result cards");
+assert(document.elements.entryDetailsPanel.classList.contains("hidden"), "repeat LDL entry should collapse optional details after the range is saved");
 assert(document.elements.saveFeedback.textContent === "LDL added to tracker.", "saving should show clear measurement feedback");
 assert(results[0].test_date === "2026-01-15" && results[0].sample_date === "2026-01-15", "single date should populate both stored dates");
 assert(results[0].status_vs_range === "Outside range", "LDL 130 over 115 should be outside range");
@@ -877,6 +899,7 @@ document.elements.markerInput.value = "LDL";
 context.syncMetricDefaults();
 assert(document.elements.highInput.disabled === true, "saved range should lock on repeat entry");
 context.toggleRangeEditing();
+assert(!document.elements.entryDetailsPanel.classList.contains("hidden"), "editing a saved range should reopen the entry details panel");
 assert(document.elements.highInput.disabled === false, "edit range should unlock limits");
 
 document.elements.dateInput.value = "2026-06-15";
