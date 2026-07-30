@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-28
+Last updated: 2026-07-30
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,15 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.73`.
+- The app is now on `v0.74`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
 
-## Completed In v0.73
+## Completed In v0.74
 
-- Added Ben's IM8 Daily Ultimate Essentials as `Daily Essentials` in the Vitamins organiser.
-- Added Ben's IM8 Daily Ultimate Longevity as `Daily Longevity` in the Vitamins organiser.
+- Added Ben's IM8 Daily Ultimate Essentials as `IM8 Daily Essentials` in the Vitamins organiser.
+- Added Ben's IM8 Daily Ultimate Longevity as `IM8 Daily Longevity` in the Vitamins organiser.
 - Placed both IM8 items in the breakfast timing group, after the upon-waking fexofenadine entry.
+- Updated fexofenadine to show the 120 mg tablet dose.
 - Added notes so the Today view makes the fexofenadine gap clear before breakfast/IM8.
 
 ## Completed In v0.72
@@ -63,7 +64,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 ## Completed In v0.67
 
 - Added a private `Vitamins` tab for the weekly tablet organiser.
-- Populated Ben's organiser with the initial tablet/capsule schedule. IM8 items were added later in v0.73.
+- Populated Ben's organiser with the initial tablet/capsule schedule. IM8 items were added later in v0.74.
 - Added a weekly pill case guide, editable next Red Yeast Rice dose date, optional CoQ10 day selection, copy-to-clipboard support, and print-friendly styling.
 - Set up Angelika's Vitamins area as available but empty, ready for her supplement schedule to be added later.
 
@@ -301,24 +302,30 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Review the new v0.61 warning periods after real reminders have been received: 14-day checks warn 1 day before, 30-day checks warn 3 days before, 90-day checks warn 7 days before, six-month checks warn 30 days before, annual checks warn 30 days before, two/three-year checks warn 90 days before, and Colonoscopy warns 120 days before.
    - Decide separately how each category should continue after the due date has passed, for example daily for short-cycle home readings, weekly for bloods/checks, and monthly for multi-year screening if not yet completed.
 
-2. Add health events and notes.
+2. Move Vitamins schedule into private account data.
+   - The Vitamins organiser is currently populated from public app code, which means Ben-specific supplement/medication names, doses, timings, and notes are visible in the public GitHub source.
+   - Keep the Vitamins feature itself in the public app, but move each person's actual vitamin schedule into their private Supabase dashboard JSON.
+   - Add a small import/edit path for Vitamins so Ben and Angelika can update their own schedules without requiring code changes.
+   - Treat the current hard-coded schedule as temporary and migrate it on a privacy pass.
+
+3. Add health events and notes.
    - Add a per-user timeline.
    - Support categories such as investigations, procedures, clinician notes, medication/supplement changes, lifestyle milestones, and aviation medical events.
    - Allow GP/clinician notes per user.
 
-3. Add document upload/storage.
+4. Add document upload/storage.
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-4. Add backup scheduling.
+5. Add backup scheduling.
    - Use the backup process below.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
-5. Consider structured database tables later.
+6. Consider structured database tables later.
    - Keep the current simple per-user JSONB row while the app is evolving.
    - Move to structured tables only if reporting, audit trails, or complex querying becomes important.
 
-6. Later pilot-medical scheduling refinements.
+7. Later pilot-medical scheduling refinements.
    - Add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
    - Consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
 
