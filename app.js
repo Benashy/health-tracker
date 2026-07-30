@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.72";
+const APP_VERSION = "v0.73";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -67,6 +67,8 @@ const VITAMIN_TIMINGS = ["Upon waking", "Breakfast", "After lunch", "After dinne
 const VITAMIN_ITEMS_BY_PROFILE = {
   ben: [
     vitaminItem("fexofenadine", "Upon waking", "Fexofenadine", "1 tablet", "Daily", "Empty stomach. Take with plain water only. Wait 30-60 minutes before breakfast.", "daily"),
+    vitaminItem("daily-essentials", "Breakfast", "Daily Essentials", "1 serving", "Daily", "Take with/after breakfast, after the fexofenadine gap.", "daily"),
+    vitaminItem("daily-longevity", "Breakfast", "Daily Longevity", "1 serving", "Daily", "Take with/after breakfast, after the fexofenadine gap.", "daily"),
     vitaminItem("lions-mane", "Breakfast", "Lion's Mane", "1 tablet", "Daily", "Taken with breakfast.", "daily"),
     vitaminItem("omega-3-lunch", "After lunch", "Omega-3 Fish Oil", "1 softgel", "Daily", "First of two daily softgels.", "daily"),
     vitaminItem("vitamin-d3-k2", "After lunch", "Vitamin D3 + K2", "1 capsule", "Monday & Friday", "Twice weekly.", "fixed", ["monday", "friday"]),
@@ -5137,7 +5139,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.72").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.73").catch(() => {});
   });
 }
 

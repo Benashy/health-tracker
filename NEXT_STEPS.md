@@ -10,9 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.72`.
+- The app is now on `v0.73`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.73
+
+- Added Ben's IM8 Daily Ultimate Essentials as `Daily Essentials` in the Vitamins organiser.
+- Added Ben's IM8 Daily Ultimate Longevity as `Daily Longevity` in the Vitamins organiser.
+- Placed both IM8 items in the breakfast timing group, after the upon-waking fexofenadine entry.
+- Added notes so the Today view makes the fexofenadine gap clear before breakfast/IM8.
 
 ## Completed In v0.72
 
@@ -56,7 +63,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 ## Completed In v0.67
 
 - Added a private `Vitamins` tab for the weekly tablet organiser.
-- Populated Ben's organiser with the current tablet/capsule schedule, excluding IM8 drinks.
+- Populated Ben's organiser with the initial tablet/capsule schedule. IM8 items were added later in v0.73.
 - Added a weekly pill case guide, editable next Red Yeast Rice dose date, optional CoQ10 day selection, copy-to-clipboard support, and print-friendly styling.
 - Set up Angelika's Vitamins area as available but empty, ready for her supplement schedule to be added later.
 
