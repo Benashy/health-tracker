@@ -702,6 +702,7 @@ function buildSnoozeReplyMarkup(dueItems: ReturnType<typeof getDueItems>) {
   return {
     inline_keyboard: [
       [
+        { text: "Snooze all 1d", callback_data: `${SNOOZE_CALLBACK_PREFIX}:all:1` },
         { text: "Snooze all 3d", callback_data: `${SNOOZE_CALLBACK_PREFIX}:all:3` },
         { text: "Snooze all 7d", callback_data: `${SNOOZE_CALLBACK_PREFIX}:all:7` },
       ],
@@ -1019,7 +1020,7 @@ function getDatePlusDays(dateString: string, days: number) {
 function parseSnoozeCallbackData(data: string) {
   const parts = data.split(":");
   if (parts[0] !== SNOOZE_CALLBACK_PREFIX) return null;
-  if (parts[1] === "all" && ["3", "7"].includes(parts[2])) {
+  if (parts[1] === "all" && ["1", "3", "7"].includes(parts[2])) {
     return { mode: "all", days: Number(parts[2]), groupKey: "" };
   }
   if (parts[1] === "g" && parts[2]) {

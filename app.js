@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.74";
+const APP_VERSION = "v0.75";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -2232,11 +2232,6 @@ function getDueStatus(profile, selectedMetric) {
 
   if (!latest && !nextDate) return { state: "due", label: "Baseline due", latest: null, nextDate: null };
 
-  const snoozedDate = getSnoozedDueDate(profile.id, selectedMetric.name);
-  if (snoozedDate && (!nextDate || new Date(`${snoozedDate}T00:00:00`) > nextDate)) {
-    nextDate = new Date(`${snoozedDate}T00:00:00`);
-  }
-
   const daysRemaining = daysBetween(new Date(), nextDate);
   const warningDays = getWarningDays(selectedMetric);
   if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, latest, nextDate };
@@ -2316,55 +2311,6 @@ function getScheduleGroup(selectedMetric) {
 
 function getSnoozeKey(profileId, metricName) {
   return `${profileId}:${metricName}`;
-}
-
-function getSnoozedDueDate(profileId, metricName) {
-  return state.scheduleState.snoozes?.[getSnoozeKey(profileId, metricName)]?.due_date ?? null;
-}
-
-function snoozeScheduleItem(profileId, metricName) {
-  if (!assertCanEdit()) return;
-  const selectedMetric = getMetric(metricName);
-  if (!selectedMetric?.intervalDays) return;
-  const nextDate = getNextSnoozeDate(profileId, selectedMetric);
-  state.scheduleState.snoozes[getSnoozeKey(profileId, metricName)] = {
-    due_date: toDateString(nextDate),
-    updated_at: new Date().toISOString(),
-  };
-  state.schedulePage = 1;
-  saveScheduleState();
-  render();
-}
-
-function getNextSnoozeDate(profileId, selectedMetric) {
-  if ((selectedMetric.firstDueDate || isCompletionMetric(selectedMetric)) && selectedMetric.intervalMonths) {
-    const nextDate = getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], selectedMetric).nextDate;
-    return nextDate
-      ? addMonths(nextDate, selectedMetric.intervalMonths)
-      : addMonths(parseDateString(selectedMetric.firstDueDate), selectedMetric.intervalMonths);
-  }
-
-  const group = getScheduleGroup(selectedMetric);
-  const today = new Date();
-  const peerDates = metrics
-    .filter((item) =>
-      isMetricAvailableForProfile(item, profileId) &&
-      isMetricTrackedForProfile(item, profileId) &&
-      item.name !== selectedMetric.name &&
-      item.intervalDays === selectedMetric.intervalDays &&
-      !item.firstDueDate &&
-      getScheduleGroup(item).key === group.key
-    )
-    .map((item) => getDueStatus(profileId ? getProfile(profileId) : state.profiles[0], item).nextDate)
-    .filter((date) => date && daysBetween(today, date) >= 0)
-    .sort((a, b) => a - b);
-
-  if (peerDates.length) return peerDates[0];
-
-  const fallback = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  fallback.setDate(fallback.getDate() + selectedMetric.intervalDays);
-  if (selectedMetric.intervalDays >= 180) return new Date(fallback.getFullYear(), fallback.getMonth(), 1);
-  return fallback;
 }
 
 function getWarningDays(metricOrIntervalDays) {
@@ -2874,7 +2820,6 @@ function renderDueCheckCard(item) {
       </dl>
       <div class="result-card-actions">
         <button class="mini-button" type="button" data-schedule-profile="${escapeHtml(item.profile.id)}" data-schedule-metric="${escapeHtml(item.metric.name)}">Enter</button>
-        <button class="mini-button snooze-button" type="button" data-snooze-profile="${escapeHtml(item.profile.id)}" data-snooze-metric="${escapeHtml(item.metric.name)}">Snooze</button>
       </div>
     </article>
   `;
@@ -2951,7 +2896,7 @@ function renderEmptyState(resultCount, dueCount) {
     emptyState.innerHTML = dueCount
       ? `
           <strong>Due checks are waiting</strong>
-          <span>Use the due list to enter the next measurement or snooze it into the next grouped set.</span>
+          <span>Use the due list to enter the next measurement.</span>
           <div class="empty-actions">
             <button class="mini-button" type="button" data-empty-action="due">Show due list</button>
             <button class="mini-button" type="button" data-empty-action="add">Add manually</button>
@@ -3319,8 +3264,7 @@ function renderSchedule() {
             <strong>${escapeHtml(item.metric.name)}</strong>
             <span>${escapeHtml(item.profile.name)} · ${escapeHtml(getScheduleGroup(item.metric).label)} · ${escapeHtml(item.metric.cadence)}</span>
             <em>${escapeHtml(item.due.label)} · tap to enter</em>
-            <small>Snooze aligns this with the next grouped check.</small>
-            <button class="mini-button snooze-button" type="button" data-snooze-profile="${escapeHtml(item.profile.id)}" data-snooze-metric="${escapeHtml(item.metric.name)}">Snooze</button>
+            <small>Telegram snooze buttons only pause reminder messages. This check stays due until entered.</small>
           </article>
         `)
         .join("")
@@ -3665,7 +3609,7 @@ async function sendTelegramDueTestMessage() {
       due_test_sent_at: new Date().toISOString(),
     });
     telegramSetupState.status = data.due_count
-      ? `Due test sent with ${data.due_count} checks and snooze buttons.`
+      ? `Due test sent with ${data.due_count} checks and Telegram snooze buttons.`
       : "Due test sent. Nothing is due right now.";
     saveSettings();
   } catch (error) {
@@ -5139,7 +5083,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.74").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.75").catch(() => {});
   });
 }
 
@@ -5431,13 +5375,6 @@ trendPanel.addEventListener("click", (event) => {
 });
 
 schedulePanel.addEventListener("click", (event) => {
-  const snoozeButton = event.target.closest("[data-snooze-profile]");
-  if (snoozeButton) {
-    event.stopPropagation();
-    snoozeScheduleItem(snoozeButton.dataset.snoozeProfile, snoozeButton.dataset.snoozeMetric);
-    return;
-  }
-
   const card = event.target.closest("[data-schedule-profile]");
   if (!card) return;
   focusMetricEntry(card.dataset.scheduleProfile, card.dataset.scheduleMetric);
@@ -5452,13 +5389,6 @@ schedulePanel.addEventListener("keydown", (event) => {
 });
 
 function handleResultsAction(event, container) {
-  const snoozeButton = event.target.closest("[data-snooze-profile]");
-  if (snoozeButton) {
-    event.stopPropagation();
-    snoozeScheduleItem(snoozeButton.dataset.snoozeProfile, snoozeButton.dataset.snoozeMetric);
-    return;
-  }
-
   const dueEntryButton = event.target.closest("[data-schedule-profile]");
   if (dueEntryButton && !event.target.closest("[data-id]")) {
     focusMetricEntry(dueEntryButton.dataset.scheduleProfile, dueEntryButton.dataset.scheduleMetric);

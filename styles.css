@@ -663,10 +663,6 @@ legend {
   border-color: var(--accent);
 }
 
-.schedule-card .snooze-button {
-  margin-top: 10px;
-}
-
 .schedule-section {
   margin-bottom: 16px;
 }
@@ -2572,11 +2568,6 @@ button.status-pill:focus-visible {
   .schedule-card {
     display: grid;
     gap: 3px;
-  }
-
-  .schedule-card .snooze-button {
-    width: 100%;
-    margin-top: 8px;
   }
 
   .quick-metrics {

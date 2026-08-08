@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-07-30
+Last updated: 2026-08-08
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,9 +10,16 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.74`.
+- The app is now on `v0.75`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.75
+
+- Added a 1-day Telegram snooze button for due-reminder messages.
+- Changed dashboard due calculations so Telegram snoozes no longer hide due or overdue checks inside the app.
+- Removed the misleading in-app due-card snooze control, keeping snooze as a Telegram reminder action only.
+- Updated due-list copy to make clear that checks remain due until the measurement or health check is entered.
 
 ## Completed In v0.74
 
