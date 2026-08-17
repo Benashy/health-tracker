@@ -28,11 +28,14 @@
   }
 
   function getSupabaseClient() {
+    if (window.HEALTH_TRACKER_SUPABASE_CLIENT) return window.HEALTH_TRACKER_SUPABASE_CLIENT;
     const config = window.HEALTH_TRACKER_SUPABASE ?? {};
     const url = String(config.url ?? "").trim();
     const anonKey = String(config.anonKey ?? "").trim();
     if (!url || !anonKey || !window.supabase?.createClient) return null;
-    return window.supabase.createClient(url, anonKey);
+    const client = window.supabase.createClient(url, anonKey);
+    window.HEALTH_TRACKER_SUPABASE_CLIENT = client;
+    return client;
   }
 
   function isApprovedSession(session) {
