@@ -408,6 +408,7 @@ assert(indexHtml.includes("app.js?v=0.76"), "script should use cache-busting ver
 assert(indexHtml.includes("supabase-config.js?v=0.76"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
+assert(indexHtml.includes('name="theme-color" content="#1d7968"'), "browser chrome should use the Colour Clinical green");
 assert(indexHtml.includes("authPanel"), "cloud auth panel should exist");
 assert(indexHtml.includes("data-private"), "private dashboard sections should be hidden before sign-in");
 assert(indexHtml.includes('<body class="app-booting">'), "app should start in a locked boot state before auth is resolved");
