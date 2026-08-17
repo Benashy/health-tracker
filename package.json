@@ -1,0 +1,15 @@
+{
+  "name": "health-tracker",
+  "version": "0.81.0",
+  "private": true,
+  "description": "Private preventative health dashboard",
+  "scripts": {
+    "check": "node --check app.js && node --check service-worker.js && node work/function-test.js",
+    "test:browser": "playwright test",
+    "test": "pnpm run check && pnpm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

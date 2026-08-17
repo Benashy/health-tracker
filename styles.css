@@ -4606,6 +4606,123 @@ summary:focus-visible,
   }
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
+.quick-metrics-field,
+.measurement-value-field {
+  min-width: 0;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.measurement-unit {
+  display: grid;
+  min-width: 0;
+  min-height: 52px;
+  place-items: center;
+  border-left: 1px solid var(--line);
+  background: #f1f5f3;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.save-feedback.error {
+  color: var(--bad);
+}
+
+.restore-warning {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-bg);
+  padding: 12px;
+  color: var(--ink);
+}
+
+.backup-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.backup-details div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) 1fr;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.backup-details dt {
+  color: var(--muted);
+}
+
+.backup-details dd {
+  margin: 0;
+}
+
+.undo-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(420px, calc(100vw - 28px));
+  border: 1px solid #a7c9df;
+  border-radius: 7px;
+  background: var(--info-bg);
+  box-shadow: 0 12px 34px rgba(12, 28, 22, 0.16);
+  padding: 10px 12px;
+  color: var(--ink);
+}
+
+.undo-toast.hidden {
+  display: none;
+}
+
+.undo-toast .mini-button {
+  margin-left: auto;
+}
+
+.modal-panel:focus {
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  button,
+  summary,
+  [role="button"] {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 700px) {
+  .undo-toast {
+    right: 14px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    left: 14px;
+  }
+
+  .backup-details div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

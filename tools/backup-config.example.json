@@ -1,0 +1,9 @@
+{
+  "supabase_url": "https://YOUR-PROJECT.supabase.co",
+  "service_role_key": "STORE_THE_PRIVATE_KEY_HERE_ONLY",
+  "backup_root": "~/Library/CloudStorage/Dropbox/Health Dashboard Backups",
+  "tables": [
+    "health_dashboard_data",
+    "health_dashboard_telegram_reminder_state"
+  ]
+}

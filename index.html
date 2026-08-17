@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,21 +8,21 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.80" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.80" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.80" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.80" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.80" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.80" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.80" />
-    <link rel="stylesheet" href="styles.css?v=0.80" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.81" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.81" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.81" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.81" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.81" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.81" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.81" />
+    <link rel="stylesheet" href="styles.css?v=0.81" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
       <section class="workspace">
         <header class="topbar">
           <div class="brand-lockup">
-            <img class="brand-symbol" src="app-icon.svg?v=0.80" alt="" width="46" height="46" />
+            <img class="brand-symbol" src="app-icon.svg?v=0.81" alt="" width="46" height="46" />
             <div>
               <p class="eyebrow">Private prevention log</p>
               <h1>Health Dashboard</h1>
@@ -33,19 +33,26 @@
               <summary class="ghost-button"><span class="ui-icon icon-folder-down" aria-hidden="true"></span><span>Data</span></summary>
               <div class="utility-menu-panel">
                 <button class="utility-menu-action" id="importChatGptButton" type="button">
-                  <span class="ui-icon icon-file-up" aria-hidden="true"></span><span><strong>Import from ChatGPT</strong><small>Review a prepared JSON file</small></span>
+                  <span class="ui-icon icon-file-up" aria-hidden="true"></span><span><strong>Import review file</strong><small>Review JSON prepared with ChatGPT</small></span>
                 </button>
                 <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
                 <button class="utility-menu-action" id="exportReviewPackButton" type="button">
-                  <span class="ui-icon icon-sparkles" aria-hidden="true"></span><span><strong>Prepare AI Review</strong><small>Export a complete review pack</small></span>
+                  <span class="ui-icon icon-sparkles" aria-hidden="true"></span><span><strong>Prepare AI Review</strong><small>Download a file; nothing is sent automatically</small></span>
                 </button>
                 <button class="utility-menu-action" id="exportCsvButton" type="button">
                   <span class="ui-icon icon-download" aria-hidden="true"></span><span><strong>Export results</strong><small>Download readings as CSV</small></span>
                 </button>
+                <button class="utility-menu-action" id="exportBackupButton" type="button">
+                  <span class="ui-icon icon-download" aria-hidden="true"></span><span><strong>Download full backup</strong><small>Portable JSON for complete recovery</small></span>
+                </button>
+                <button class="utility-menu-action" id="restoreBackupButton" type="button">
+                  <span class="ui-icon icon-file-up" aria-hidden="true"></span><span><strong>Restore full backup</strong><small>Preview before replacing this dashboard</small></span>
+                </button>
+                <input class="hidden" id="restoreBackupInput" type="file" accept="application/json,.json" />
               </div>
             </details>
             <button class="ghost-button utility-button" id="telegramOpenButton" type="button"><span class="ui-icon icon-send" aria-hidden="true"></span><span>Telegram</span></button>
-            <button class="ghost-button utility-button" id="vitaminsOpenButton" type="button"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Vitamins</span></button>
+            <button class="ghost-button utility-button" id="vitaminsOpenButton" type="button"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Medicines &amp; supplements</span></button>
           </div>
         </header>
 
@@ -220,10 +227,13 @@
 
             <input class="hidden" id="metricSearchInput" type="hidden" value="" />
 
-            <div class="quick-metrics" id="quickMetricPanel" aria-label="Common metrics"></div>
+            <div class="quick-metrics-field">
+              <span class="field-label">Frequent</span>
+              <div class="quick-metrics" id="quickMetricPanel" aria-label="Frequent metrics"></div>
+            </div>
 
             <label>
-              Metric
+              All metrics
               <select id="markerInput" required></select>
             </label>
 
@@ -246,7 +256,8 @@
                 <span>Value</span>
                 <span class="measurement-value-control">
                   <input id="valueInput" type="text" required />
-                  <input id="unitInput" type="text" readonly tabindex="-1" aria-label="Measurement unit" />
+                  <span class="measurement-unit" id="unitDisplay" aria-label="Measurement unit"></span>
+                  <input id="unitInput" type="hidden" />
                 </span>
               </label>
             </div>
@@ -392,16 +403,18 @@
           <div class="mobile-menu-group">
             <h3>Data</h3>
             <div class="mobile-menu-actions">
-              <button class="ghost-button" type="button" data-menu-action="import-gpt"><span class="ui-icon icon-file-up" aria-hidden="true"></span><span>Import from ChatGPT</span></button>
+              <button class="ghost-button" type="button" data-menu-action="import-gpt"><span class="ui-icon icon-file-up" aria-hidden="true"></span><span>Import review file</span></button>
               <button class="ghost-button" type="button" data-menu-action="ai-review"><span class="ui-icon icon-sparkles" aria-hidden="true"></span><span>Prepare AI Review</span></button>
               <button class="ghost-button" type="button" data-menu-action="csv"><span class="ui-icon icon-download" aria-hidden="true"></span><span>Export results</span></button>
+              <button class="ghost-button" type="button" data-menu-action="backup"><span class="ui-icon icon-download" aria-hidden="true"></span><span>Download backup</span></button>
+              <button class="ghost-button" type="button" data-menu-action="restore"><span class="ui-icon icon-file-up" aria-hidden="true"></span><span>Restore backup</span></button>
             </div>
           </div>
           <div class="mobile-menu-group">
             <h3>Services</h3>
             <div class="mobile-menu-actions">
               <button class="ghost-button" type="button" data-menu-action="telegram"><span class="ui-icon icon-send" aria-hidden="true"></span><span>Telegram</span></button>
-              <button class="ghost-button" type="button" data-menu-action="vitamins"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Vitamins</span></button>
+              <button class="ghost-button" type="button" data-menu-action="vitamins"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Medicines &amp; supplements</span></button>
             </div>
           </div>
         </section>
@@ -409,7 +422,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.80</span>
+          <span class="version-chip" id="appVersion">v0.81</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -422,6 +435,11 @@
         </nav>
       </section>
     </main>
+
+    <div class="undo-toast hidden" id="undoToast" data-private aria-hidden="true" role="status" aria-live="polite">
+      <span id="undoText">Measurement deleted.</span>
+      <button class="mini-button" id="undoButton" type="button">Undo</button>
+    </div>
 
     <section class="modal hidden" id="importReviewModal" role="dialog" aria-modal="true" aria-labelledby="importReviewTitle" data-private aria-hidden="true">
       <div class="modal-panel">
@@ -436,6 +454,23 @@
         <div class="modal-actions">
           <button class="ghost-button" id="discardImportButton" type="button">Discard</button>
           <button class="primary-button" id="confirmImportButton" type="button">Import reviewed data</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="modal hidden" id="backupRestoreModal" role="dialog" aria-modal="true" aria-labelledby="backupRestoreTitle" data-private aria-hidden="true">
+      <div class="modal-panel backup-restore-panel">
+        <div class="panel-heading">
+          <div>
+            <h2 id="backupRestoreTitle">Restore dashboard backup</h2>
+            <span class="privacy-note">Review the backup before replacing this account</span>
+          </div>
+          <button class="mini-button" id="cancelBackupRestoreButton" type="button">Cancel</button>
+        </div>
+        <div class="backup-restore-review" id="backupRestoreContent"></div>
+        <div class="modal-actions">
+          <button class="ghost-button" id="discardBackupRestoreButton" type="button">Discard</button>
+          <button class="primary-button" id="confirmBackupRestoreButton" type="button">Restore backup</button>
         </div>
       </div>
     </section>
@@ -485,8 +520,8 @@
       <div class="modal-panel vitamins-modal-panel" id="vitaminsPanel">
         <div class="panel-heading">
           <div>
-            <h2 id="vitaminsTitle">Vitamins</h2>
-            <span class="privacy-note" id="vitaminsSubtitle">Weekly tablet organiser</span>
+            <h2 id="vitaminsTitle">Medicines &amp; supplements</h2>
+            <span class="privacy-note" id="vitaminsSubtitle">Daily schedule and weekly organiser</span>
           </div>
           <button class="mini-button" id="vitaminsCloseButton" type="button">Close</button>
         </div>
@@ -558,9 +593,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.80"></script>
+    <script src="supabase-config.js?v=0.81"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.80"></script>
-    <script src="privacy-guard.js?v=0.80"></script>
+    <script src="app.js?v=0.81"></script>
+    <script src="privacy-guard.js?v=0.81"></script>
   </body>
 </html>

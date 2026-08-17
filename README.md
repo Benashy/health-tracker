@@ -1,46 +1,51 @@
 # Preventative Health Dashboard
 
-A private, browser-based preventative health dashboard focused on long-term trend analysis. Lab tracking remains blood and urine only; STI and immunoserology tests are intentionally excluded.
+A private two-person health dashboard for Ben and Angelika, focused on prevention, due checks and long-term trends. Blood and urine tracking excludes STI and immunoserology tests.
 
-## Open it
+## Live app
 
-Open `index.html` in a browser.
+The production dashboard is available at [benashy.github.io/health-tracker](https://benashy.github.io/health-tracker/). Health data is stored in each signed-in user's private Supabase row, not in the public GitHub Pages files.
 
-## Cloud Setup
+## Main capabilities
 
-The app can run locally without Supabase. Cloud login and sync activate after `supabase-config.js` is filled with the Supabase project URL and public anon key, and after the SQL in `supabase/health_dashboard_data.sql` has been run in Supabase.
+- Separate Supabase accounts and independent data for Ben and Angelika
+- Password sign-in with magic link as a fallback
+- Manual measurements, completion-style health checks and per-user reference or target fields
+- Current snapshot, due schedule, grouped results, archive and trend charts
+- Practical warning windows and 09:00 Europe/Lisbon Telegram reminders
+- Telegram-only snoozes, while the dashboard continues to show the truthful due state
+- ChatGPT review-file import with validation, preview and pagination
+- AI review and CSV exports
+- Portable full-account backup and previewed restore
+- Offline viewing from the last local cache, with editing disabled
+- PWA shell for iPhone, iPad and desktop
 
-## What it does
+## Local development
 
-- Saves results locally in the browser
-- Supports two people: Ben and Angelika
-- Stores stable profile context separately: name, date of birth, and height
-- Shows saved people as clickable profile cards, with an Edit button for corrections
-- Tracks result date and sample/measurement date separately
-- Tracks baseline demographics, vitals, fitness, annual blood/urine tests, cardiovascular markers, and clinically indicated hormone markers
-- Does not track BMI
-- Uses built-in suggested testing intervals, from twice-monthly body metrics through multi-year investigations
-- Remembers reference lower and upper limits per person and metric after first entry
-- Locks saved reference ranges unless edited deliberately
-- Flags values as in range, near a range limit, or outside range
-- Shows due soon and overdue checks with amber/red visual cues
-- Shows a trends section with latest value, previous change, highest, lowest, recent history, and a chart
-- Stores status versus range, previous result, absolute change, percentage change, and trend direction
-- Uses Improved / Stable / Worse trend labels where a metric has a clear preferred direction
-- Handles qualitative urine values such as `Negative` or `Rare` as changed/unchanged
-- Shows latest values by metric
-- Exports results as CSV
-- Exports a ChatGPT-friendly Markdown summary with purpose, profiles, warnings, due items, latest values, and full measurement history
-- Imports ChatGPT-generated JSON measurement files
-- Reviews ChatGPT imports before saving them
-- Shows a lightweight line chart for numeric metric trends
-- Exports a focused review pack for warnings, due items, and material changes
-- Shows a low-distraction footer with local status, manual refresh, version, and future sign-out placement
-- Includes PWA-ready manifest, PNG/SVG app icons, and hosted service-worker shell caching
-- Includes Supabase Auth/cloud-sync scaffolding that activates once `supabase-config.js` is configured
+Serve the repository over HTTP rather than opening the file directly:
 
-This is a personal record-keeping tool, not medical advice.
+```sh
+python3 -m http.server 8791 --bind 127.0.0.1
+```
 
-## Future Hosting
+Then open `http://127.0.0.1:8791/`. The checked-in `supabase-config.js` contains only the public browser configuration. Private service keys and Telegram credentials remain server-side or in private Mac configuration.
 
-See `SUPABASE_PLAN.md` for the GitHub/Supabase architecture, per-user privacy, import workflow, and backup requirements. The cloud version uses Supabase Auth plus one private JSONB dashboard row per user, with manual refresh, conflict protection, offline read-only viewing, visible versioning, and a bottom sync footer.
+## Verification
+
+Install the development dependency once, then run the complete checks:
+
+```sh
+pnpm install
+pnpm exec playwright install chromium webkit
+pnpm test
+```
+
+The function suite covers health calculations, due logic, imports, date handling, backup validation, undo and Telegram conflict protection. Playwright checks the signed-out desktop and iPhone presentation and versioned app assets. The same checks run in GitHub Actions.
+
+## Recovery
+
+Use `Data > Download full backup` for a portable account-level recovery file. The separate Mac backup tool exports the Supabase tables to dated Dropbox folders. Setup and restore guidance is in [docs/BACKUP_AND_RECOVERY.md](docs/BACKUP_AND_RECOVERY.md).
+
+Deployment and rollback guidance is in [docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md). Current deferred work is tracked in [NEXT_STEPS.md](NEXT_STEPS.md).
+
+This is a personal record-keeping tool, not a diagnostic system.

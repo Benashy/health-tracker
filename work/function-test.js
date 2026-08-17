@@ -55,6 +55,18 @@ class Element {
     this[name] = String(value);
   }
 
+  getAttribute(name) {
+    return this[name] ?? null;
+  }
+
+  removeAttribute(name) {
+    delete this[name];
+  }
+
+  querySelectorAll() {
+    return [];
+  }
+
   click() {
     this.clicked = true;
   }
@@ -120,6 +132,7 @@ function createDocument() {
     "nextDueInput",
     "completionHint",
     "unitInput",
+    "unitDisplay",
     "lowField",
     "targetField",
     "highField",
@@ -235,6 +248,14 @@ function createDocument() {
     "cancelImportButton",
     "discardImportButton",
     "confirmImportButton",
+    "exportBackupButton",
+    "restoreBackupButton",
+    "restoreBackupInput",
+    "backupRestoreModal",
+    "backupRestoreContent",
+    "cancelBackupRestoreButton",
+    "discardBackupRestoreButton",
+    "confirmBackupRestoreButton",
     "metricContextModal",
     "metricContextTitle",
     "metricContextSubtitle",
@@ -245,6 +266,9 @@ function createDocument() {
     "appVersion",
     "signOutButton",
     "resetButton",
+    "undoToast",
+    "undoText",
+    "undoButton",
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element(id)]));
   [
@@ -254,11 +278,12 @@ function createDocument() {
     "mobileActionBar",
     "primaryNavigation",
     "importReviewModal",
+    "backupRestoreModal",
     "metricContextModal",
     "telegramModal",
     "vitaminsModal",
   ].forEach((id) => elements[id].classList.add("hidden"));
-  ["importReviewModal", "metricContextModal", "telegramModal", "vitaminsModal"].forEach((id) => elements[id].classList.add("modal"));
+  ["importReviewModal", "backupRestoreModal", "metricContextModal", "telegramModal", "vitaminsModal"].forEach((id) => elements[id].classList.add("modal"));
   const classes = {
     ".results-table-wrap": new Element("results-table-wrap"),
     ".results-panel": new Element("results-panel"),
@@ -278,6 +303,7 @@ function createDocument() {
     elements.mobileActionBar,
     elements.primaryNavigation,
     elements.importReviewModal,
+    elements.backupRestoreModal,
     elements.metricContextModal,
     elements.telegramModal,
     elements.vitaminsModal,
@@ -291,12 +317,18 @@ function createDocument() {
 
   return {
     body: new Element("body"),
+    activeElement: null,
     elements,
+    addEventListener() {},
     createElement() {
       return new Element();
     },
     querySelector(selector) {
       if (selector.startsWith("#")) return elements[selector.slice(1)];
+      if (selector === ".modal:not(.hidden)") {
+        return [elements.importReviewModal, elements.backupRestoreModal, elements.metricContextModal, elements.telegramModal, elements.vitaminsModal]
+          .find((element) => !element.classList.contains("hidden")) ?? null;
+      }
       return classes[selector] ?? null;
     },
     querySelectorAll(selector) {
@@ -398,7 +430,7 @@ vm.runInContext(appSource, context);
 
 assert(context.importChatGptPayload, "import function should be exposed");
 assert(!appSource.includes('name: "BMI"'), "BMI metric should not exist");
-assert(fs.readFileSync("index.html", "utf8").includes("Import from ChatGPT"), "import button should exist");
+assert(fs.readFileSync("index.html", "utf8").includes("Import review file"), "import button should exist");
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8"));
 const serviceWorker = fs.readFileSync("service-worker.js", "utf8");
@@ -409,8 +441,8 @@ const telegramScheduleSql = fs.readFileSync("supabase/telegram_reminder_schedule
 const telegramFunction = fs.readFileSync("supabase/functions/health-tracker-telegram/index.ts", "utf8");
 const appIconSvg = fs.readFileSync("app-icon.svg", "utf8");
 const faviconIco = fs.readFileSync("favicon.ico");
-assert(indexHtml.includes("app.js?v=0.80"), "script should use cache-busting version");
-assert(indexHtml.includes("supabase-config.js?v=0.80"), "Supabase config should be loaded before the app");
+assert(indexHtml.includes("app.js?v=0.81"), "script should use cache-busting version");
+assert(indexHtml.includes("supabase-config.js?v=0.81"), "Supabase config should be loaded before the app");
 assert(fs.readFileSync("supabase-config.js", "utf8").includes("HEALTH_TRACKER_SUPABASE"), "Supabase config placeholder should exist");
 assert(indexHtml.includes('rel="manifest"'), "PWA manifest should be linked");
 assert(indexHtml.includes('name="theme-color" content="#1d7968"'), "browser chrome should use the Colour Clinical green");
@@ -460,7 +492,7 @@ assert(indexHtml.includes("Weekly timetable"), "Vitamins organiser should includ
 assert(indexHtml.includes("Expanded schedule"), "Vitamins organiser should include the expanded schedule");
 assert(indexHtml.indexOf("Weekly timetable") < indexHtml.indexOf("Expanded schedule"), "Vitamins weekly timetable should appear before the expanded schedule");
 assert(indexHtml.includes("vitaminsDoseFeedback"), "Vitamins organiser should include a dosage feedback area");
-assert(indexHtml.includes("v0.80"), "app shell should expose the new version");
+assert(indexHtml.includes("v0.81"), "app shell should expose the new version");
 assert(styles.includes("--info: #2d72a6"), "interactive hover colour should use the Colour Clinical blue");
 assert(styles.includes("--accent: #1d7968"), "Colour Clinical should use the richer green brand accent");
 assert(styles.includes("Colour Clinical visual system"), "Colour Clinical visual overrides should be present");
@@ -536,8 +568,8 @@ assert(indexHtml.indexOf("authPanel") < indexHtml.indexOf("profile-section"), "a
 assert(indexHtml.indexOf("profile-section") < indexHtml.indexOf("snapshotSection"), "profile details should appear before current snapshot");
 assert(indexHtml.indexOf("snapshotSection") < indexHtml.indexOf("status-strip"), "current snapshot should appear before overview tiles");
 assert(indexHtml.indexOf("status-strip") < indexHtml.indexOf("schedule-section"), "overview tiles should appear before due soon");
-assert(indexHtml.includes("privacy-guard.js?v=0.80"), "privacy guard should be cache-busted");
-assert(serviceWorker.includes("privacy-guard.js?v=0.80"), "privacy guard should be cached with the app shell");
+assert(indexHtml.includes("privacy-guard.js?v=0.81"), "privacy guard should be cache-busted");
+assert(serviceWorker.includes("privacy-guard.js?v=0.81"), "privacy guard should be cached with the app shell");
 assert(fs.readFileSync("app.js", "utf8").includes("APPROVED_EMAILS"), "main app should enforce approved sign-in emails");
 assert(fs.readFileSync("app.js", "utf8").includes("hasPrivateCloudConfig ? [] : loadResults"), "live cloud app should not hydrate private local results before auth");
 assert(fs.readFileSync("privacy-guard.js", "utf8").includes("angelika_kleczka@hotmail.com"), "privacy guard should use the approved email list");
@@ -565,24 +597,24 @@ assert(!indexHtml.includes("tracked measurements"), "summary strip should not pr
 assert(indexHtml.indexOf('<span class="label">next due</span>') < indexHtml.indexOf('id="nextDueDate"'), "next due tile should show its label before the date");
 assert(indexHtml.includes("apple-mobile-web-app-capable"), "iOS PWA metadata should exist");
 assert(manifest.display === "standalone", "manifest should enable standalone display");
-assert(manifest.start_url.includes("v=0.80"), "manifest start URL should be cache-busted");
+assert(manifest.start_url.includes("v=0.81"), "manifest start URL should be cache-busted");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-192.png")), "manifest should include 192px PNG icon");
 assert(manifest.icons.some((icon) => icon.src.includes("app-icon-512.png")), "manifest should include 512px PNG icon");
-assert(manifest.icons.every((icon) => icon.src.includes("v=0.80")), "manifest icons should be cache-busted");
-assert(indexHtml.includes("app-icon-180.png?v=0.80"), "iOS touch icon should use PNG");
-assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.80"), "browser favicon should use a unique Health Dashboard ICO filename");
-assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.80"), "browser favicon should use a unique 32px PNG filename");
-assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.80"), "browser favicon should use a unique 16px PNG filename");
+assert(manifest.icons.every((icon) => icon.src.includes("v=0.81")), "manifest icons should be cache-busted");
+assert(indexHtml.includes("app-icon-180.png?v=0.81"), "iOS touch icon should use PNG");
+assert(indexHtml.includes("health-dashboard-favicon.ico?v=0.81"), "browser favicon should use a unique Health Dashboard ICO filename");
+assert(indexHtml.includes("health-dashboard-favicon-32.png?v=0.81"), "browser favicon should use a unique 32px PNG filename");
+assert(indexHtml.includes("health-dashboard-favicon-16.png?v=0.81"), "browser favicon should use a unique 16px PNG filename");
 assert(faviconIco.length > 100, "favicon ICO should be generated");
 assert(appIconSvg.includes("#236f62"), "health app icon should use the dashboard green");
 assert(appIconSvg.includes("fill=\"#ffffff\""), "health app icon should include a white cross");
 assert(!appIconSvg.includes("stroke-width"), "health app icon should not use the old line-chart mark");
-assert(serviceWorker.includes("health-dashboard-v0.80"), "service worker cache should match app version");
-assert(serviceWorker.includes("app.js?v=0.80"), "service worker should cache current app bundle");
-assert(serviceWorker.includes("supabase-config.js?v=0.80"), "service worker should cache Supabase config placeholder");
-assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.80"), "service worker should cache the unique ICO favicon");
-assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.80"), "service worker should cache the unique PNG favicon");
-assert(serviceWorker.includes("app-icon-512.png?v=0.80"), "service worker should cache PNG app icons");
+assert(serviceWorker.includes("health-dashboard-v0.81"), "service worker cache should match app version");
+assert(serviceWorker.includes("app.js?v=0.81"), "service worker should cache current app bundle");
+assert(serviceWorker.includes("supabase-config.js?v=0.81"), "service worker should cache Supabase config placeholder");
+assert(serviceWorker.includes("health-dashboard-favicon.ico?v=0.81"), "service worker should cache the unique ICO favicon");
+assert(serviceWorker.includes("health-dashboard-favicon-32.png?v=0.81"), "service worker should cache the unique PNG favicon");
+assert(serviceWorker.includes("app-icon-512.png?v=0.81"), "service worker should cache PNG app icons");
 assert(styles.includes("@media (max-width: 700px)"), "styles should include an iPhone optimisation breakpoint");
 assert(styles.includes('content: attr(data-label)'), "mobile result cards should use data labels");
 assert(styles.includes(".results-table tr:not(.result-group-row)"), "mobile results should render as cards");
@@ -623,7 +655,7 @@ assert(telegramScheduleSql.includes("health_dashboard_telegram_pairing_codes"), 
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret"), "Telegram webhook should use a Vault-backed secret");
 assert(telegramScheduleSql.includes("health_tracker_telegram_webhook_secret_matches"), "Telegram webhook secret matcher should exist");
 assert(telegramScheduleSql.includes("'0 8,9 * * *'"), "Telegram scheduled reminders should run around 09:00 Europe/Lisbon across DST");
-assert(document.elements.appVersion.textContent === "v0.80", "footer should show app version");
+assert(document.elements.appVersion.textContent === "v0.81", "footer should show app version");
 assert(document.elements.nextDueDate.textContent, "next due summary should render a value");
 assert(document.elements.nextDueRelative.textContent, "next due summary should render relative timing");
 document.body.classList.add("app-booting");
@@ -657,7 +689,7 @@ assert(!document.elements.authPanel.classList.contains("hidden"), "signed-out sh
 assert(document.elements.authForm.classList.contains("hidden"), "local unconfigured copies should hide unusable sign-in controls");
 assert(!fs.readFileSync("app.js", "utf8").includes("Local draft only"), "signed-out UI should not expose local draft language");
 assert(!fs.readFileSync("app.js", "utf8").includes("Sign in to sync"), "signed-out UI should not expose sync prompts in the footer");
-context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.80";
+context.window.location.href = "https://benashy.github.io/health-tracker/index.html?v=0.81";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should redirect to the canonical live dashboard URL");
 context.window.location.href = "http://localhost:3000/";
 assert(context.getAuthRedirectUrl() === "https://benashy.github.io/health-tracker/", "magic links should not redirect to localhost");
@@ -927,7 +959,7 @@ let results = JSON.parse(store["blood-results-tracker:v3"]);
 assert(results.length === 1, "one result should be saved");
 assert(document.elements.resultsCardGrid.innerHTML.includes("LDL"), "current results should render compact result cards");
 assert(document.elements.entryDetailsPanel.classList.contains("hidden"), "repeat LDL entry should collapse optional details after the range is saved");
-assert(document.elements.saveFeedback.textContent === "LDL added to tracker.", "saving should show clear measurement feedback");
+assert(document.elements.saveFeedback.textContent === "LDL saved to your dashboard.", "saving should show clear measurement feedback");
 assert(results[0].test_date === "2026-01-15" && results[0].sample_date === "2026-01-15", "single date should populate both stored dates");
 assert(results[0].status_vs_range === "Outside range", "LDL 130 over 115 should be outside range");
 assert(results[0].source_type === "Lab Report / PDF", "source type should save");
@@ -1351,5 +1383,61 @@ assert(telegramSettings.enabled === true && telegramSettings.paused_at === "", "
 context.disconnectTelegramReminders();
 telegramSettings = JSON.parse(store["health-dashboard-settings:v1"]).telegram;
 assert(telegramSettings.chat_id === "" && telegramSettings.enabled === false, "disconnect should clear Telegram chat and disable reminders");
+
+assert(context.daysBetween(context.parseDateString("2026-03-28"), context.parseDateString("2026-03-30")) === 2, "date-only intervals should not change across daylight-saving weekends");
+assert(context.toDateString(context.addMonths(context.parseDateString("2026-01-31"), 1)) === "2026-02-28", "month recurrence should clamp safely at month end");
+assert(context.toDateString(context.addMonths(context.parseDateString("2024-01-31"), 1)) === "2024-02-29", "month recurrence should preserve leap-day month ends");
+assert(context.isValidDateString("2026-02-29") === false, "invalid calendar dates should be rejected");
+
+const allDashboardData = context.serializeDashboardData();
+const benDashboardData = {
+  ...allDashboardData,
+  profiles: allDashboardData.profiles.filter((profile) => profile.id === "ben"),
+  measurements: allDashboardData.measurements.filter((measurement) => measurement.profile_id === "ben"),
+  reference_ranges: Object.fromEntries(Object.entries(allDashboardData.reference_ranges).filter(([key]) => key.startsWith("ben:"))),
+  schedule_state: { snoozes: {} },
+  data_version: 2,
+};
+const fullBackup = context.createFullBackupPayload(benDashboardData);
+assert(fullBackup.backup_type === "health_dashboard_full_backup", "full backup should identify its recovery format");
+assert(fullBackup.data.measurements.length > 0, "full backup should include dashboard measurements");
+vm.runInContext('state.activeProfileId = "ben";', context);
+const restoreReview = context.prepareFullBackupRestore(fullBackup);
+assert(restoreReview.profileName === "Ben", "restore review should confirm the target account");
+assert(restoreReview.measurementCount === benDashboardData.measurements.length, "restore review should count every measurement");
+let rejectedOtherProfileRange = false;
+try {
+  context.prepareFullBackupRestore({
+    ...fullBackup,
+    data: { ...benDashboardData, reference_ranges: { ...benDashboardData.reference_ranges, "angelika:LDL": { high: 3 } } },
+  });
+} catch {
+  rejectedOtherProfileRange = true;
+}
+assert(rejectedOtherProfileRange, "restore should reject saved ranges belonging to another profile");
+let rejectedFutureVersion = false;
+try {
+  context.migrateDashboardData({ data_version: 999 });
+} catch {
+  rejectedFutureVersion = true;
+}
+assert(rejectedFutureVersion, "future dashboard data versions should be rejected rather than guessed");
+
+const firstResultId = vm.runInContext("state.results[0].id", context);
+const resultCountBeforeDelete = JSON.parse(store["blood-results-tracker:v3"]).length;
+context.deleteResult(firstResultId);
+assert(JSON.parse(store["blood-results-tracker:v3"]).length === resultCountBeforeDelete - 1, "deleting a measurement should remove it immediately");
+assert(!document.elements.undoToast.classList.contains("hidden"), "deletion should offer a visible undo action");
+context.undoDeleteResult();
+assert(JSON.parse(store["blood-results-tracker:v3"]).length === resultCountBeforeDelete, "undo should restore the deleted measurement");
+
+assert(indexHtml.includes("Download full backup"), "data menu should expose a portable full backup");
+assert(indexHtml.includes("Restore full backup"), "data menu should expose validated full restore");
+assert(appSource.includes('.eq("updated_at", cloudState.cloudUpdatedAt)'), "browser cloud saves should use the loaded update token");
+assert(appSource.includes("savePromise") && appSource.includes("saveQueued"), "browser cloud saves should serialise queued edits");
+assert(telegramFunction.includes("updated_at=eq."), "Telegram snoozes should use an update token");
+assert(telegramFunction.includes("for (let attempt = 0; attempt < 3"), "Telegram snoozes should retry bounded conflicts");
+assert(indexHtml.includes('lang="en-GB"'), "document language should match the British interface copy");
+assert(indexHtml.includes('aria-labelledby="backupRestoreTitle"'), "restore review should be an accessible dialog");
 
 console.log("function test passed");

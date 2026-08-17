@@ -8,9 +8,11 @@ The backup system should run locally on the Mac and save recovery copies into Dr
 
 ## Backup Tool
 
+Status: implemented in `tools/backup_health_dashboard.py`. Activation requires the private Mac configuration described in `docs/BACKUP_AND_RECOVERY.md`.
+
 Use a local Python script.
 
-The script should:
+The script:
 
 - connect to Supabase using a private service-role key
 - download `health_dashboard_data`
@@ -64,7 +66,7 @@ This is convenient, but it is not the source of truth. Dropbox may block or dela
 
 ## Automatic Schedule
 
-A macOS LaunchAgent should run the backup automatically.
+A macOS LaunchAgent template and installer are included. Once activated, it runs the backup automatically.
 
 It should try to run:
 

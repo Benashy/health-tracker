@@ -84,6 +84,7 @@ type DashboardMeasurement = {
 type DashboardRow = {
   user_id: string;
   data: Record<string, unknown>;
+  updated_at: string;
 };
 
 type ReminderStateRow = {
@@ -476,7 +477,7 @@ async function getDashboardData(user: DashboardUser) {
 }
 
 async function getAllDashboardRows() {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?select=user_id,data`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?select=user_id,data,updated_at`, {
     headers: getAdminHeaders(),
   });
   if (!response.ok) {
@@ -516,21 +517,31 @@ async function upsertReminderState(userId: string, reminderDate: string, signatu
   }
 }
 
-async function updateDashboardData(userId: string, data: Record<string, unknown>, updatedAt: string) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?user_id=eq.${encodeURIComponent(userId)}`, {
+async function updateDashboardData(
+  userId: string,
+  data: Record<string, unknown>,
+  expectedUpdatedAt: string,
+  nextUpdatedAt: string,
+) {
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/health_dashboard_data?user_id=eq.${encodeURIComponent(userId)}&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}&select=updated_at`,
+    {
     method: "PATCH",
     headers: {
       ...getAdminHeaders(),
-      Prefer: "return=minimal",
+      Prefer: "return=representation",
     },
     body: JSON.stringify({
       data,
-      updated_at: updatedAt,
+      updated_at: nextUpdatedAt,
     }),
-  });
+    },
+  );
   if (!response.ok) {
     throw new Error("Could not save Telegram snooze state.");
   }
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) && rows.length === 1;
 }
 
 async function getDashboardRowForTelegramChat(chatId: string) {
@@ -1204,25 +1215,39 @@ async function handleTelegramCallbackWebhook(callback: TelegramCallbackQuery) {
   const messageId = callback.message?.message_id;
 
   if (!callbackId || !chatId) return;
-  const row = await getDashboardRowForTelegramChat(chatId);
-  if (!row) {
+  let result = { count: 0, label: "That reminder action is no longer available." };
+  let saved = false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const row = await getDashboardRowForTelegramChat(chatId);
+    if (!row) {
+      await telegramApi("answerCallbackQuery", {
+        callback_query_id: callbackId,
+        text: "Telegram is not linked to a Health Dashboard account.",
+        show_alert: true,
+      });
+      return;
+    }
+
+    result = applySnoozeCallback(row.data, callbackData);
+    if (result.count === 0) break;
+    saved = await updateDashboardData(row.user_id, row.data, row.updated_at, new Date().toISOString());
+    if (saved) break;
+  }
+
+  if (result.count > 0 && !saved) {
     await telegramApi("answerCallbackQuery", {
       callback_query_id: callbackId,
-      text: "Telegram is not linked to a Health Dashboard account.",
+      text: "The dashboard changed while saving. Please tap Snooze again.",
       show_alert: true,
     });
     return;
   }
 
-  const result = applySnoozeCallback(row.data, callbackData);
-  if (result.count > 0) {
-    await updateDashboardData(row.user_id, row.data, new Date().toISOString());
-    if (messageId) {
-      await telegramApi("editMessageReplyMarkup", {
-        chat_id: chatId,
-        message_id: messageId,
-      });
-    }
+  if (saved && messageId) {
+    await telegramApi("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+    });
   }
 
   await telegramApi("answerCallbackQuery", {

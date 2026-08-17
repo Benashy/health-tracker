@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.80";
+const APP_VERSION = "v0.81";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -8,7 +8,7 @@ const SETTINGS_STORAGE_KEY = "health-dashboard-settings:v1";
 const LAST_LOCAL_UPDATE_KEY = "health-dashboard-last-local-update:v1";
 const CLOUD_CACHE_KEY = "health-dashboard-cloud-cache:v1";
 const CLOUD_TABLE = "health_dashboard_data";
-const DATA_VERSION = 1;
+const DATA_VERSION = 2;
 const PRODUCTION_AUTH_REDIRECT_URL = "https://benashy.github.io/health-tracker/";
 const TELEGRAM_FUNCTION_NAME = "health-tracker-telegram";
 const TELEGRAM_BOT_USERNAME = "HealthTrackerReminderBot";
@@ -34,6 +34,15 @@ const REMINDER_MILESTONES_ANNUAL = [30, 14, 7, 0];
 const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
+const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_IMPORT_MEASUREMENTS = 2000;
+const MAX_IMPORT_RANGES = 500;
+const MAX_BACKUP_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_BACKUP_MEASUREMENTS = 10000;
+const MAX_BACKUP_RANGES = 2000;
+const BACKUP_TYPE = "health_dashboard_full_backup";
+const BACKUP_VERSION = 1;
+const DELETE_UNDO_MS = 10000;
 const SCHEDULE_PAGE_SIZE = 8;
 const RESULTS_PAGE_SIZE = 20;
 const RESULTS_CARD_FILTERS = new Set(["latest", "cautions", "warnings", "due", "all"]);
@@ -394,6 +403,10 @@ const state = {
   saveFeedbackTimer: null,
   pendingImport: null,
   pendingImportPage: 1,
+  pendingBackupRestore: null,
+  pendingDeletion: null,
+  deleteUndoTimer: null,
+  modalReturnFocus: null,
   schedulePage: 1,
   resultsPage: 1,
 };
@@ -414,7 +427,11 @@ const cloudState = {
   cloudUpdatedAt: null,
   loadedAt: null,
   saveTimer: null,
+  savePromise: null,
+  saveQueued: false,
   saving: false,
+  localRevision: 0,
+  savedRevision: 0,
   applyingCloudData: false,
   conflict: false,
   lastError: "",
@@ -457,6 +474,7 @@ const nextDueLabel = document.querySelector("#nextDueLabel");
 const nextDueInput = document.querySelector("#nextDueInput");
 const completionHint = document.querySelector("#completionHint");
 const unitInput = document.querySelector("#unitInput");
+const unitDisplay = document.querySelector("#unitDisplay");
 const lowField = document.querySelector("#lowField");
 const targetField = document.querySelector("#targetField");
 const highField = document.querySelector("#highField");
@@ -564,11 +582,19 @@ const exportChatGptButton = document.querySelector("#exportChatGptButton");
 const exportReviewPackButton = document.querySelector("#exportReviewPackButton");
 const importChatGptButton = document.querySelector("#importChatGptButton");
 const importChatGptInput = document.querySelector("#importChatGptInput");
+const exportBackupButton = document.querySelector("#exportBackupButton");
+const restoreBackupButton = document.querySelector("#restoreBackupButton");
+const restoreBackupInput = document.querySelector("#restoreBackupInput");
 const importReviewModal = document.querySelector("#importReviewModal");
 const importReviewContent = document.querySelector("#importReviewContent");
 const cancelImportButton = document.querySelector("#cancelImportButton");
 const discardImportButton = document.querySelector("#discardImportButton");
 const confirmImportButton = document.querySelector("#confirmImportButton");
+const backupRestoreModal = document.querySelector("#backupRestoreModal");
+const backupRestoreContent = document.querySelector("#backupRestoreContent");
+const cancelBackupRestoreButton = document.querySelector("#cancelBackupRestoreButton");
+const discardBackupRestoreButton = document.querySelector("#discardBackupRestoreButton");
+const confirmBackupRestoreButton = document.querySelector("#confirmBackupRestoreButton");
 const metricContextModal = document.querySelector("#metricContextModal");
 const metricContextTitle = document.querySelector("#metricContextTitle");
 const metricContextSubtitle = document.querySelector("#metricContextSubtitle");
@@ -581,6 +607,9 @@ const signOutButton = document.querySelector("#signOutButton");
 const resetButton = document.querySelector("#resetButton");
 const saveFeedback = document.querySelector("#saveFeedback");
 const entrySubmitButton = document.querySelector("#entrySubmitButton");
+const undoToast = document.querySelector("#undoToast");
+const undoText = document.querySelector("#undoText");
+const undoButton = document.querySelector("#undoButton");
 
 function metric(name, group, unit, low, high, type, priority, intervalDays, goal, cadence, normal, options = {}) {
   return {
@@ -865,6 +894,7 @@ function saveResults() {
 
 function markLocalUpdated() {
   localStorage.setItem(LAST_LOCAL_UPDATE_KEY, new Date().toISOString());
+  cloudState.localRevision += 1;
   scheduleCloudSave();
   renderSyncFooter();
 }
@@ -1001,6 +1031,8 @@ function resetPrivateStateForSignedOut() {
   state.vitaminsPanelOpen = false;
   state.vitaminsTodayOpen = false;
   state.pendingImport = null;
+  state.pendingBackupRestore = null;
+  clearDeletionUndo();
   hydrateProfileForm();
   populatePeople();
   populateMetrics();
@@ -1043,7 +1075,30 @@ function serializeDashboardData() {
   };
 }
 
-function applyDashboardData(data) {
+function migrateDashboardData(source) {
+  const data = source && typeof source === "object" ? JSON.parse(JSON.stringify(source)) : {};
+  const version = Number(data.data_version ?? 1);
+  if (!Number.isInteger(version) || version < 1) throw new Error("Dashboard data has an invalid version.");
+  if (version > DATA_VERSION) throw new Error("This dashboard data was created by a newer app version.");
+
+  if (version < 2) {
+    const measurements = Array.isArray(data.measurements ?? data.results) ? data.measurements ?? data.results : [];
+    data.measurements = measurements.map((measurement) => {
+      const date = measurement.sample_date || measurement.test_date || measurement.date || "";
+      return {
+        ...measurement,
+        test_date: measurement.test_date || date,
+        sample_date: measurement.sample_date || date,
+      };
+    });
+  }
+
+  data.data_version = DATA_VERSION;
+  return data;
+}
+
+function applyDashboardData(source) {
+  const data = migrateDashboardData(source);
   const profileId = cloudState.profileId ?? "ben";
   const fallback = [getDefaultProfile(profileId)];
   const profiles = Array.isArray(data?.profiles) && data.profiles.length ? data.profiles : fallback;
@@ -1060,6 +1115,9 @@ function applyDashboardData(data) {
   localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(state.scheduleState));
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
   localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(data ?? createFreshCloudData(profileId)));
+  cloudState.localRevision = 0;
+  cloudState.savedRevision = 0;
+  cloudState.saveQueued = false;
 }
 
 async function loadCloudData() {
@@ -1137,6 +1195,7 @@ function loadCachedCloudData() {
 function scheduleCloudSave() {
   if (!cloudState.enabled || !cloudState.user || cloudState.applyingCloudData) return;
   if (isReadOnlyMode()) return;
+  cloudState.saveQueued = true;
   if (typeof clearTimeout === "function") clearTimeout(cloudState.saveTimer);
   if (typeof setTimeout === "function") {
     cloudState.saveTimer = setTimeout(() => saveCloudData(), 450);
@@ -1144,47 +1203,63 @@ function scheduleCloudSave() {
 }
 
 async function saveCloudData() {
-  if (!cloudState.client || !cloudState.user || cloudState.saving || isReadOnlyMode()) return false;
-  cloudState.saving = true;
-  cloudState.lastError = "";
-  renderSyncFooter();
+  if (!cloudState.client || !cloudState.user || isReadOnlyMode()) return false;
+  cloudState.saveQueued = true;
+  if (cloudState.savePromise) return cloudState.savePromise;
 
-  try {
-    const nextUpdatedAt = new Date().toISOString();
-    const nextDashboardData = serializeDashboardData();
-    const { data, error } = await cloudState.client
-      .from(CLOUD_TABLE)
-      .update({ data: nextDashboardData, updated_at: nextUpdatedAt })
-      .eq("user_id", cloudState.user.id)
-      .eq("updated_at", cloudState.cloudUpdatedAt)
-      .select("updated_at")
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) {
-      cloudState.conflict = true;
-      cloudState.lastError = "Cloud changed on another device. Tap Refresh before saving again.";
-      setEditingAvailability();
-      window.alert(cloudState.lastError);
-      return false;
-    }
-
-    cloudState.cloudUpdatedAt = data.updated_at;
-    cloudState.loadedAt = new Date().toISOString();
-    localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(nextDashboardData));
-    return true;
-  } catch (error) {
-    cloudState.lastError = error.message;
-    return false;
-  } finally {
-    cloudState.saving = false;
+  cloudState.savePromise = (async () => {
+    cloudState.saving = true;
+    cloudState.lastError = "";
     renderSyncFooter();
-  }
+
+    try {
+      while (cloudState.saveQueued && !isReadOnlyMode()) {
+        cloudState.saveQueued = false;
+        const revisionBeingSaved = cloudState.localRevision;
+        const nextUpdatedAt = new Date().toISOString();
+        const nextDashboardData = serializeDashboardData();
+        const { data, error } = await cloudState.client
+          .from(CLOUD_TABLE)
+          .update({ data: nextDashboardData, updated_at: nextUpdatedAt })
+          .eq("user_id", cloudState.user.id)
+          .eq("updated_at", cloudState.cloudUpdatedAt)
+          .select("updated_at")
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          cloudState.conflict = true;
+          cloudState.lastError = "Cloud changed on another device. Tap Refresh before saving again.";
+          setEditingAvailability();
+          window.alert(cloudState.lastError);
+          return false;
+        }
+
+        cloudState.cloudUpdatedAt = data.updated_at;
+        cloudState.loadedAt = new Date().toISOString();
+        cloudState.savedRevision = revisionBeingSaved;
+        localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(nextDashboardData));
+        if (cloudState.localRevision > revisionBeingSaved) cloudState.saveQueued = true;
+      }
+      return cloudState.savedRevision === cloudState.localRevision;
+    } catch (error) {
+      cloudState.saveQueued = true;
+      cloudState.lastError = error.message || "Cloud save failed.";
+      return false;
+    } finally {
+      cloudState.saving = false;
+      cloudState.savePromise = null;
+      renderSyncFooter();
+    }
+  })();
+
+  return cloudState.savePromise;
 }
 
 async function flushCloudSaveNow() {
   if (!cloudState.enabled || !cloudState.user) return true;
   if (typeof clearTimeout === "function" && cloudState.saveTimer) clearTimeout(cloudState.saveTimer);
   cloudState.saveTimer = null;
+  cloudState.saveQueued = true;
   return saveCloudData();
 }
 
@@ -1207,6 +1282,7 @@ function setEditingAvailability() {
     profileForm,
     form,
     importChatGptButton,
+    restoreBackupButton,
     exportCsvButton,
     exportChatGptButton,
     exportReviewPackButton,
@@ -1234,6 +1310,8 @@ function setEditingAvailability() {
   if (entrySubmitButton) entrySubmitButton.disabled = disabled || state.entrySaveLocked;
   if (trackingToggleButton) trackingToggleButton.disabled = disabled;
   importChatGptButton.disabled = disabled;
+  if (restoreBackupButton) restoreBackupButton.disabled = disabled;
+  if (confirmBackupRestoreButton) confirmBackupRestoreButton.disabled = disabled;
   if (snapshotEditButton) snapshotEditButton.disabled = disabled;
   if (telegramPairButton) telegramPairButton.disabled = disabled || telegramSetupState.busy;
   if (telegramCheckButton) telegramCheckButton.disabled = disabled || telegramSetupState.busy || !telegramSetupState.pairingCode;
@@ -1272,7 +1350,16 @@ function renderProfileScope() {
 
 function setPrivateVisibility(isVisible) {
   document.body.classList.remove("app-booting");
+  if (!isVisible) {
+    document.body.classList.remove("modal-open");
+    state.modalReturnFocus = null;
+  }
   document.querySelectorAll("[data-private]").forEach((section) => {
+    if (section.id === "undoToast") {
+      if (!isVisible) section.classList.add("hidden");
+      section.setAttribute("aria-hidden", section.classList.contains("hidden") ? "true" : "false");
+      return;
+    }
     if (section.id === "telegramModal") {
       if (!isVisible) state.telegramPanelOpen = false;
       syncTelegramPanelVisibility(isVisible);
@@ -1302,7 +1389,9 @@ function renderSyncFooter() {
     const label = cloudState.saving
       ? "Saving..."
       : cloudState.lastError
-        ? cloudState.lastError
+        ? `Unsaved changes: ${cloudState.lastError}`
+        : cloudState.saveQueued || cloudState.savedRevision < cloudState.localRevision
+          ? "Changes pending..."
         : cloudState.loadedAt
           ? `Updated ${formatRelativeTime(cloudState.loadedAt)}`
           : "Cloud connected";
@@ -1532,6 +1621,10 @@ function syncMetricDefaults() {
   const isCompletion = isCompletionMetric(selectedMetric);
   state.completionNextDueTouched = false;
   unitInput.value = selectedMetric.unit;
+  if (unitDisplay) {
+    unitDisplay.textContent = selectedMetric.unit;
+    unitDisplay.classList.toggle("hidden", !selectedMetric.unit);
+  }
   valueInput.type = selectedMetric.type === "numeric" ? "number" : "text";
   valueInput.step = selectedMetric.type === "numeric" ? "0.01" : "";
   valueInput.inputMode = selectedMetric.type === "numeric" ? "decimal" : "text";
@@ -2241,7 +2334,7 @@ function getDueStatus(profile, selectedMetric) {
 
   if (!latest && !nextDate) return { state: "due", label: "Baseline due", latest: null, nextDate: null };
 
-  const daysRemaining = daysBetween(new Date(), nextDate);
+  const daysRemaining = daysBetween(parseDateString(getLocalDateString()), nextDate);
   const warningDays = getWarningDays(selectedMetric);
   if (daysRemaining < 0) return { state: "overdue", label: `Overdue by ${Math.abs(daysRemaining)} days`, latest, nextDate };
   if (daysRemaining === 0) return { state: "due", label: "Due today", latest, nextDate };
@@ -2352,8 +2445,9 @@ function getTelegramReminderMilestoneDays(selectedMetric) {
 }
 
 function addDays(dateString, days) {
-  const date = new Date(`${dateString}T00:00:00`);
-  date.setDate(date.getDate() + days);
+  const date = parseDateString(dateString);
+  if (!date) return null;
+  date.setUTCDate(date.getUTCDate() + days);
   return date;
 }
 
@@ -2373,14 +2467,27 @@ function parseDateString(dateString) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function isValidDateString(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ""))) return false;
+  const parsed = parseDateString(value);
+  return Boolean(parsed && toDateString(parsed) === value);
+}
+
 function daysBetween(start, end) {
-  const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  return Math.ceil((endDate - startDate) / 86400000);
+  const startDay = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  return Math.round((endDay - startDay) / 86400000);
 }
 
 function toDateString(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function normaliseDateString(value) {
@@ -3183,25 +3290,25 @@ function renderTrends() {
 }
 
 function renderTrendRangeButton(range, label) {
-  return `<button class="${state.trendRange === range ? "active" : ""}" type="button" data-trend-range="${range}">${label}</button>`;
+  const isActive = state.trendRange === range;
+  return `<button class="${isActive ? "active" : ""}" type="button" data-trend-range="${range}" aria-pressed="${isActive ? "true" : "false"}">${label}</button>`;
 }
 
 function filterTrendResultsByRange(results) {
   if (state.trendRange === "all" || !results.length) return results;
   const latest = results[results.length - 1];
-  const end = new Date(`${latest.sample_date}T00:00:00`);
-  const start = new Date(end);
+  const end = parseDateString(latest.sample_date);
   const months = state.trendRange === "6m" ? 6 : state.trendRange === "2y" ? 24 : 12;
-  start.setMonth(start.getMonth() - months);
-  return results.filter((result) => new Date(`${result.sample_date}T00:00:00`) >= start);
+  const start = addMonths(end, -months);
+  return results.filter((result) => parseDateString(result.sample_date) >= start);
 }
 
 function findClosestPriorResult(results, latest, targetDays, toleranceDays) {
-  const latestDate = new Date(`${latest.sample_date}T00:00:00`);
+  const latestDate = parseDateString(latest.sample_date);
   const candidates = results
     .filter((result) => result.id !== latest.id && result.metric_type === "numeric" && result.sample_date < latest.sample_date)
     .map((result) => {
-      const days = daysBetween(new Date(`${result.sample_date}T00:00:00`), latestDate);
+      const days = daysBetween(parseDateString(result.sample_date), latestDate);
       return { result, distance: Math.abs(days - targetDays) };
     })
     .filter((item) => item.distance <= toleranceDays)
@@ -3245,7 +3352,9 @@ function createSparkline(results, latest) {
   const last = results[results.length - 1];
 
   return `
-    <svg class="sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="Trend chart">
+    <svg class="sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="trendChartTitle trendChartDescription">
+      <title id="trendChartTitle">${escapeHtml(latest.metric)} trend</title>
+      <desc id="trendChartDescription">${escapeHtml(formatValue(first.result_value, first.unit))} on ${escapeHtml(formatDate(first.sample_date))} to ${escapeHtml(formatValue(last.result_value, last.unit))} on ${escapeHtml(formatDate(last.sample_date))}, across ${results.length} results.</desc>
       ${rangeBand}
       <line class="axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
       <line class="axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
@@ -3536,12 +3645,13 @@ function openTelegramPanel() {
   state.telegramPanelOpen = true;
   renderTelegramPanel();
   syncTelegramPanelVisibility(true);
+  openModal(telegramModal, telegramCloseButton);
 }
 
 function closeTelegramPanel() {
   if (!telegramModal) return;
   state.telegramPanelOpen = false;
-  syncTelegramPanelVisibility();
+  closeModal(telegramModal);
 }
 
 function generateTelegramPairingCode() {
@@ -3746,13 +3856,14 @@ function openVitaminsPanel() {
   state.vitaminsPanelOpen = true;
   renderVitaminsPanel();
   syncVitaminsPanelVisibility(true);
+  openModal(vitaminsModal, vitaminsTodayButton);
 }
 
 function closeVitaminsPanel() {
   if (!vitaminsModal) return;
   state.vitaminsPanelOpen = false;
   state.vitaminsTodayOpen = false;
-  syncVitaminsPanelVisibility();
+  closeModal(vitaminsModal);
 }
 
 function showVitaminsTodayView() {
@@ -4095,7 +4206,9 @@ function setFilter(filter, summaryKey = filter) {
   state.resultsPage = 1;
   state.activeSummaryFilter = summaryKey;
   document.querySelectorAll(".filter-button").forEach((item) => {
-    item.classList.toggle("active", item.dataset.filter === filter);
+    const isActive = item.dataset.filter === filter;
+    item.classList.toggle("active", isActive);
+    item.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
   renderSummarySelection();
   render();
@@ -4134,7 +4247,7 @@ function getNextDueSummary() {
 }
 
 function formatRelativeDueLabel(date) {
-  const days = daysBetween(new Date(), date);
+  const days = daysBetween(parseDateString(getLocalDateString()), date);
   if (days < 0) {
     const overdueDays = Math.abs(days);
     return `overdue by ${overdueDays} day${overdueDays === 1 ? "" : "s"}`;
@@ -4194,7 +4307,7 @@ function focusCurrentResults() {
 }
 
 function handleActionShortcut(action) {
-  if (!cloudState.user && ["home", "add", "trends", "results", "menu", "due", "current", "import", "review", "vitamins"].includes(action)) {
+  if (!cloudState.user && ["home", "add", "trends", "results", "menu", "due", "current", "import", "review", "backup", "restore", "vitamins"].includes(action)) {
     return;
   }
   if (action === "add") {
@@ -4221,6 +4334,14 @@ function handleActionShortcut(action) {
     exportReviewPackButton.click();
     return;
   }
+  if (action === "backup") {
+    downloadFullBackup();
+    return;
+  }
+  if (action === "restore") {
+    restoreBackupInput.click();
+    return;
+  }
   if (action === "vitamins") {
     openVitaminsPanel();
   }
@@ -4239,6 +4360,14 @@ function handleMenuAction(action) {
   }
   if (action === "csv") {
     exportCsv();
+    return;
+  }
+  if (action === "backup") {
+    downloadFullBackup();
+    return;
+  }
+  if (action === "restore") {
+    if (!restoreBackupButton.disabled) restoreBackupInput.click();
     return;
   }
   if (action === "telegram") openTelegramPanel();
@@ -4307,14 +4436,12 @@ function showMetricContext(metricName) {
     </div>
     <p class="privacy-note">General prevention context only. Use persistent, marked, symptomatic, or concerning changes as prompts for clinician discussion.</p>
   `;
-  metricContextModal.classList.remove("hidden");
-  metricContextModal.setAttribute("aria-hidden", "false");
+  openModal(metricContextModal, closeContextButton);
 }
 
 function closeMetricContext() {
   if (!metricContextModal) return;
-  metricContextModal.classList.add("hidden");
-  metricContextModal.setAttribute("aria-hidden", "true");
+  closeModal(metricContextModal);
 }
 
 function getStatusClass(status) {
@@ -4334,10 +4461,15 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function showSaveFeedback(metricName) {
+function showSaveFeedback(metricName, status = "saved") {
   if (saveFeedback) {
-    saveFeedback.textContent = `${metricName} added to tracker.`;
+    saveFeedback.textContent = status === "saving"
+      ? `Saving ${metricName}...`
+      : status === "failed"
+        ? `${metricName} is kept on this device, but cloud sync has not completed.`
+        : `${metricName} saved to your dashboard.`;
     saveFeedback.classList.add("visible");
+    saveFeedback.classList.toggle("error", status === "failed");
     if (typeof clearTimeout === "function") clearTimeout(state.saveFeedbackTimer);
     if (typeof setTimeout === "function") {
       state.saveFeedbackTimer = setTimeout(() => saveFeedback.classList.remove("visible"), 4500);
@@ -4347,13 +4479,30 @@ function showSaveFeedback(metricName) {
   if (!entrySubmitButton) return;
   state.entrySaveLocked = true;
   entrySubmitButton.disabled = true;
-  entrySubmitButton.textContent = "Added";
+  entrySubmitButton.textContent = status === "saving" ? "Saving..." : status === "failed" ? "Saved locally" : "Saved";
+  if (status === "saving") return;
   if (typeof clearTimeout === "function") clearTimeout(state.entryUnlockTimer);
   if (typeof setTimeout === "function") {
     state.entryUnlockTimer = setTimeout(unlockEntrySubmit, 1200);
   } else {
     unlockEntrySubmit();
   }
+}
+
+function showEntryError(message, field) {
+  if (saveFeedback) {
+    saveFeedback.textContent = message;
+    saveFeedback.classList.add("visible", "error");
+  }
+  if (field) {
+    field.setAttribute("aria-invalid", "true");
+    field.focus();
+  }
+}
+
+function clearEntryError() {
+  saveFeedback?.classList.remove("visible", "error");
+  [testDateInput, valueInput, lowInput, targetInput, highInput].forEach((field) => field?.removeAttribute("aria-invalid"));
 }
 
 function unlockEntrySubmit() {
@@ -4367,6 +4516,7 @@ function addResult(event) {
   event.preventDefault();
   if (state.entrySaveLocked) return;
   if (!assertCanEdit()) return;
+  clearEntryError();
 
   const profile = getProfile(personInput.value);
   const selectedMetric = getMetric(metricInput.value, profile?.id);
@@ -4378,19 +4528,38 @@ function addResult(event) {
   const isCompletion = isCompletionMetric(selectedMetric);
 
   const resultValue = isCompletion ? "Completed" : parseResultValue(valueInput.value, selectedMetric.type);
-  if (resultValue === null || resultValue === "") return;
+  if (resultValue === null || resultValue === "") {
+    showEntryError("Enter a valid measurement value.", valueInput);
+    return;
+  }
   if (isCompletion && !completionInput.checked) {
     window.alert("Tick completed before saving this health check.");
     return;
   }
 
   const measurementDate = testDateInput.value;
+  if (!isValidDateString(measurementDate)) {
+    showEntryError("Enter a valid measurement date.", testDateInput);
+    return;
+  }
   const completionNextDueDate = getCompletionResultNextDueDate(selectedMetric, measurementDate);
   if (isCompletion && !completionNextDueDate) {
     window.alert("Enter the next due or expiry date before saving this health check.");
     return;
   }
   const referenceFields = isCompletion ? { lower: false, target: false, upper: false } : getReferenceOptionValues();
+  const referenceLow = referenceFields.lower ? parseLimit(lowInput.value) : null;
+  const referenceHigh = referenceFields.upper ? parseLimit(highInput.value) : null;
+  if (referenceLow !== null && referenceHigh !== null && referenceLow > referenceHigh) {
+    showEntryError("The lower reference limit cannot be higher than the upper limit.", lowInput);
+    return;
+  }
+  const sameDayResult = state.results.find(
+    (item) => item.profile_id === profile.id && item.metric === selectedMetric.name && item.sample_date === measurementDate,
+  );
+  if (sameDayResult && !window.confirm(`${selectedMetric.name} already has a result on ${formatDate(measurementDate)}. Add another result for the same day?`)) {
+    return;
+  }
   const result = {
     id: getId(),
     profile_id: profile.id,
@@ -4402,9 +4571,9 @@ function addResult(event) {
     metric_type: selectedMetric.type,
     result_value: resultValue,
     unit: isCompletion ? "" : unitInput.value.trim(),
-    reference_lower_limit: referenceFields.lower ? parseLimit(lowInput.value) : null,
+    reference_lower_limit: referenceLow,
     target_value: referenceFields.target ? parseLimit(targetInput.value) : null,
-    reference_upper_limit: referenceFields.upper ? parseLimit(highInput.value) : null,
+    reference_upper_limit: referenceHigh,
     reference_fields: referenceFields,
     priority: selectedMetric.priority,
     cadence: selectedMetric.cadence,
@@ -4440,7 +4609,12 @@ function addResult(event) {
   syncSourceDefaults();
   renderQuickMetrics();
   render();
-  showSaveFeedback(selectedMetric.name);
+  if (!cloudState.enabled || !cloudState.user) {
+    showSaveFeedback(selectedMetric.name, "saved");
+    return;
+  }
+  showSaveFeedback(selectedMetric.name, "saving");
+  flushCloudSaveNow().then((saved) => showSaveFeedback(selectedMetric.name, saved ? "saved" : "failed"));
 }
 
 function saveProfile(event) {
@@ -4473,9 +4647,41 @@ function saveProfile(event) {
 
 function deleteResult(id) {
   if (!assertCanEdit()) return;
+  const index = state.results.findIndex((result) => result.id === id);
+  if (index < 0) return;
+  clearDeletionUndo();
+  const deletedResult = state.results[index];
+  state.pendingDeletion = { result: deletedResult, index };
   state.results = state.results.filter((result) => result.id !== id);
   saveResults();
   render();
+  if (undoText) undoText.textContent = `${deletedResult.metric} deleted.`;
+  undoToast?.classList.remove("hidden");
+  undoToast?.setAttribute("aria-hidden", "false");
+  if (typeof setTimeout === "function") {
+    state.deleteUndoTimer = setTimeout(clearDeletionUndo, DELETE_UNDO_MS);
+  }
+}
+
+function undoDeleteResult() {
+  const pending = state.pendingDeletion;
+  if (!pending || !assertCanEdit()) return;
+  if (typeof clearTimeout === "function") clearTimeout(state.deleteUndoTimer);
+  state.results.splice(Math.min(pending.index, state.results.length), 0, pending.result);
+  state.pendingDeletion = null;
+  state.deleteUndoTimer = null;
+  undoToast?.classList.add("hidden");
+  undoToast?.setAttribute("aria-hidden", "true");
+  saveResults();
+  render();
+}
+
+function clearDeletionUndo() {
+  if (typeof clearTimeout === "function" && state.deleteUndoTimer) clearTimeout(state.deleteUndoTimer);
+  state.pendingDeletion = null;
+  state.deleteUndoTimer = null;
+  undoToast?.classList.add("hidden");
+  undoToast?.setAttribute("aria-hidden", "true");
 }
 
 function getId() {
@@ -4528,6 +4734,261 @@ function exportCsv() {
   link.download = getExportFilename("results", "csv");
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function createFullBackupPayload(data = serializeDashboardData()) {
+  return {
+    backup_type: BACKUP_TYPE,
+    backup_version: BACKUP_VERSION,
+    exported_at: new Date().toISOString(),
+    app_version: APP_VERSION,
+    data,
+  };
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getFocusableElements(modal) {
+  if (!modal?.querySelectorAll) return [];
+  return [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => !element.classList?.contains("hidden") && element.getAttribute?.("aria-hidden") !== "true");
+}
+
+function openModal(modal, initialFocus = null) {
+  if (!modal) return;
+  state.modalReturnFocus = typeof HTMLElement !== "undefined" && document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : document.activeElement ?? null;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  const focusTarget = initialFocus && !initialFocus.disabled ? initialFocus : getFocusableElements(modal)[0];
+  if (focusTarget?.focus) {
+    if (typeof setTimeout === "function") setTimeout(() => focusTarget.focus(), 0);
+    else focusTarget.focus();
+  }
+}
+
+function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+  if (!document.querySelector('.modal:not(.hidden)')) document.body.classList.remove("modal-open");
+  const returnFocus = state.modalReturnFocus;
+  state.modalReturnFocus = null;
+  if (returnFocus?.focus) {
+    if (typeof setTimeout === "function") setTimeout(() => returnFocus.focus(), 0);
+    else returnFocus.focus();
+  }
+}
+
+function closeActiveModal(modal) {
+  if (modal === importReviewModal) closeImportReview();
+  else if (modal === backupRestoreModal) closeBackupRestore();
+  else if (modal === metricContextModal) closeMetricContext();
+  else if (modal === telegramModal) closeTelegramPanel();
+  else if (modal === vitaminsModal) closeVitaminsPanel();
+}
+
+function handleModalKeydown(event) {
+  const modal = document.querySelector('.modal:not(.hidden)');
+  if (!modal) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeActiveModal(modal);
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = getFocusableElements(modal);
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function downloadFullBackup(suffix = "full-backup") {
+  const payload = createFullBackupPayload();
+  downloadText(
+    getExportFilename(suffix, "json"),
+    JSON.stringify(payload, null, 2),
+    "application/json",
+  );
+  return payload;
+}
+
+function importFullBackupFile(file) {
+  if (!file) return;
+  if (file.size > MAX_BACKUP_FILE_BYTES) {
+    window.alert("Restore failed: the backup file is larger than 8 MB.");
+    restoreBackupInput.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const payload = JSON.parse(String(reader.result));
+      state.pendingBackupRestore = prepareFullBackupRestore(payload);
+      renderBackupRestoreReview();
+      openModal(backupRestoreModal, confirmBackupRestoreButton);
+    } catch (error) {
+      window.alert(`Restore failed: ${error.message}`);
+    } finally {
+      restoreBackupInput.value = "";
+    }
+  });
+  reader.readAsText(file);
+}
+
+function prepareFullBackupRestore(payload) {
+  if (!payload || payload.backup_type !== BACKUP_TYPE || Number(payload.backup_version) !== BACKUP_VERSION) {
+    throw new Error("This is not a supported Health Dashboard full backup.");
+  }
+  const data = migrateDashboardData(payload.data);
+  const profileId = cloudState.profileId ?? state.activeProfileId;
+  const sourceProfiles = Array.isArray(data.profiles) ? data.profiles : [];
+  const sourceProfile = sourceProfiles.find((profile) => profile.id === profileId);
+  if (!profileId || !sourceProfile) throw new Error("This backup belongs to a different dashboard account.");
+
+  const profiles = normaliseProfiles([sourceProfile], false, profileId);
+  const rawMeasurements = Array.isArray(data.measurements) ? data.measurements : [];
+  if (rawMeasurements.length > MAX_BACKUP_MEASUREMENTS) {
+    throw new Error(`Full backups can contain no more than ${MAX_BACKUP_MEASUREMENTS} measurements.`);
+  }
+  const measurements = rawMeasurements.map((measurement, index) => {
+    if (measurement.profile_id !== profileId) throw new Error(`Measurement ${index + 1} belongs to another profile.`);
+    if (!getMetric(measurement.metric, profileId)) throw new Error(`Measurement ${index + 1} uses an unknown metric.`);
+    if (!isValidDateString(measurement.sample_date || measurement.test_date)) {
+      throw new Error(`Measurement ${index + 1} has an invalid date.`);
+    }
+    return normaliseResult(measurement, profiles);
+  });
+  const rawRanges = data.reference_ranges && typeof data.reference_ranges === "object" ? data.reference_ranges : {};
+  const rangeEntries = Object.entries(rawRanges);
+  if (rangeEntries.length > MAX_BACKUP_RANGES) {
+    throw new Error(`Full backups can contain no more than ${MAX_BACKUP_RANGES} saved ranges.`);
+  }
+  const profilePrefix = `${profileId}:`;
+  const profileRangeEntries = rangeEntries.filter(([key]) => key.startsWith(profilePrefix));
+  if (profileRangeEntries.length !== rangeEntries.length) {
+    throw new Error("This backup contains saved ranges for another profile.");
+  }
+  profileRangeEntries.forEach(([key]) => {
+    if (!getMetric(key.slice(profilePrefix.length), profileId)) throw new Error("This backup contains a saved range for an unknown metric.");
+  });
+  const referenceRanges = normaliseMetricRanges(Object.fromEntries(profileRangeEntries));
+
+  const rawSnoozes = data.schedule_state?.snoozes && typeof data.schedule_state.snoozes === "object"
+    ? data.schedule_state.snoozes
+    : {};
+  const scheduleSnoozes = Object.fromEntries(
+    Object.entries(rawSnoozes).filter(([key]) => key.startsWith(profilePrefix) && getMetric(key.slice(profilePrefix.length), profileId)),
+  );
+  const settings = normaliseSettings(data.settings ?? {});
+  settings.snapshot_metrics_by_profile = {
+    [profileId]: normaliseSnapshotMetricNames(settings.snapshot_metrics_by_profile?.[profileId], profileId),
+  };
+  settings.metric_tracking_by_profile = settings.metric_tracking_by_profile?.[profileId]
+    ? { [profileId]: settings.metric_tracking_by_profile[profileId] }
+    : {};
+  settings.vitamins_by_profile = {
+    [profileId]: normaliseVitaminProfileSettings(profileId, settings.vitamins_by_profile?.[profileId]),
+  };
+  settings.active_profile_id = profileId;
+
+  return {
+    payload: {
+      data_version: DATA_VERSION,
+      app_version: APP_VERSION,
+      profiles,
+      measurements: recalculateDerivedFields(measurements, profiles),
+      reference_ranges: referenceRanges,
+      schedule_state: { snoozes: scheduleSnoozes },
+      imports: [],
+      settings,
+      exported_at: payload.exported_at || data.exported_at || "",
+    },
+    backupExportedAt: payload.exported_at || data.exported_at || "",
+    sourceAppVersion: payload.app_version || data.app_version || "Unknown",
+    profileName: profiles[0]?.name || "This account",
+    measurementCount: measurements.length,
+    rangeCount: Object.keys(referenceRanges).length,
+  };
+}
+
+function renderBackupRestoreReview() {
+  const review = state.pendingBackupRestore;
+  if (!review || !backupRestoreContent) return;
+  backupRestoreContent.innerHTML = `
+    <div class="import-summary backup-summary">
+      <article><strong>${escapeHtml(review.profileName)}</strong><span>account</span></article>
+      <article><strong>${review.measurementCount}</strong><span>measurements</span></article>
+      <article><strong>${review.rangeCount}</strong><span>saved ranges</span></article>
+    </div>
+    <div class="restore-warning">
+      <strong>This replaces the current dashboard.</strong>
+      <span>A safety copy of the current dashboard will download before restoration starts.</span>
+    </div>
+    <dl class="backup-details">
+      <div><dt>Backup created</dt><dd>${review.backupExportedAt ? escapeHtml(formatDateTime(review.backupExportedAt)) : "Not recorded"}</dd></div>
+      <div><dt>Source version</dt><dd>${escapeHtml(review.sourceAppVersion)}</dd></div>
+    </dl>
+  `;
+}
+
+function closeBackupRestore() {
+  state.pendingBackupRestore = null;
+  if (backupRestoreContent) backupRestoreContent.innerHTML = "";
+  closeModal(backupRestoreModal);
+}
+
+async function confirmFullBackupRestore() {
+  if (!state.pendingBackupRestore || !assertCanEdit()) return;
+  const review = state.pendingBackupRestore;
+  const previousData = serializeDashboardData();
+  confirmBackupRestoreButton.disabled = true;
+  confirmBackupRestoreButton.textContent = "Restoring...";
+  downloadText(
+    getExportFilename("before-restore", "json"),
+    JSON.stringify(createFullBackupPayload(previousData), null, 2),
+    "application/json",
+  );
+
+  applyDashboardData(review.payload);
+  cloudState.localRevision = 1;
+  cloudState.saveQueued = true;
+  hydrateProfileForm();
+  populatePeople();
+  populateMetrics();
+  populateTrendMetrics();
+  render();
+  const saved = await flushCloudSaveNow();
+  confirmBackupRestoreButton.disabled = false;
+  confirmBackupRestoreButton.textContent = "Restore backup";
+  if (!saved) {
+    applyDashboardData(previousData);
+    render();
+    window.alert(`The backup was not restored because cloud saving failed: ${cloudState.lastError || "unknown error"}`);
+    return;
+  }
+  closeBackupRestore();
+  window.alert(`Restored ${review.measurementCount} measurements. The dashboard is saved to the cloud.`);
 }
 
 function exportForChatGpt() {
@@ -4817,6 +5278,11 @@ function getChatGptImportInstructions() {
 
 function importFromChatGptFile(file) {
   if (!file) return;
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    window.alert("Import failed: the file is larger than 2 MB.");
+    importChatGptInput.value = "";
+    return;
+  }
   const reader = new FileReader();
   reader.addEventListener("load", () => {
     try {
@@ -4839,6 +5305,12 @@ function prepareChatGptImport(payload) {
 
   const incomingMeasurements = Array.isArray(payload.measurements) ? payload.measurements : [];
   const incomingRanges = Array.isArray(payload.reference_ranges) ? payload.reference_ranges : [];
+  if (incomingMeasurements.length > MAX_IMPORT_MEASUREMENTS) {
+    throw new Error(`Import files can contain no more than ${MAX_IMPORT_MEASUREMENTS} measurements.`);
+  }
+  if (incomingRanges.length > MAX_IMPORT_RANGES) {
+    throw new Error(`Import files can contain no more than ${MAX_IMPORT_RANGES} reference ranges.`);
+  }
   const prepared = {
     measurements: [],
     ranges: [],
@@ -4924,15 +5396,15 @@ function prepareChatGptImport(payload) {
       absolute_change_since_previous_test: null,
       percentage_change_since_previous_test: null,
       trend_direction: "first",
-      notes: item.notes ?? "Imported from ChatGPT extraction.",
+      notes: String(item.notes ?? "Imported from ChatGPT extraction.").slice(0, 2000),
       source_type: sourceType,
       source_confidence: item.source_confidence || getSourceConfidence(sourceType),
-      source_notes: item.source_notes ?? "",
-      linked_source_document: item.linked_source_document ?? item.source_document ?? "",
+      source_notes: String(item.source_notes ?? "").slice(0, 1000),
+      linked_source_document: String(item.linked_source_document ?? item.source_document ?? "").slice(0, 500),
     };
 
-    if (!result.test_date || !result.sample_date) {
-      prepared.skipped.push({ reason: "Missing date", item });
+    if (!isValidDateString(result.test_date) || !isValidDateString(result.sample_date)) {
+      prepared.skipped.push({ reason: "Missing or invalid date", item });
       return;
     }
     const duplicateKey = getMeasurementKey(result);
@@ -4985,8 +5457,7 @@ function renderImportReview(review) {
   state.pendingImportPage = 1;
   confirmImportButton.disabled = !review.measurements.length && !review.ranges.length;
   renderImportReviewContent();
-  importReviewModal.classList.remove("hidden");
-  importReviewModal.setAttribute("aria-hidden", "false");
+  openModal(importReviewModal, confirmImportButton);
 }
 
 function renderImportReviewContent() {
@@ -5089,8 +5560,7 @@ function closeImportReview() {
   state.pendingImportPage = 1;
   importReviewContent.innerHTML = "";
   confirmImportButton.disabled = false;
-  importReviewModal.classList.add("hidden");
-  importReviewModal.setAttribute("aria-hidden", "true");
+  closeModal(importReviewModal);
 }
 
 async function confirmReviewedImport() {
@@ -5158,7 +5628,7 @@ function downloadText(filename, content, type) {
 }
 
 function setTodayDefaults() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
   testDateInput.value = today;
   sampleDateInput.value = today;
 }
@@ -5176,7 +5646,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.80").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.81").catch(() => {});
   });
 }
 
@@ -5283,11 +5753,17 @@ form.addEventListener("submit", addResult);
 exportCsvButton.addEventListener("click", exportCsv);
 if (exportChatGptButton) exportChatGptButton.addEventListener("click", exportForChatGpt);
 exportReviewPackButton.addEventListener("click", exportReviewPack);
+exportBackupButton.addEventListener("click", () => downloadFullBackup());
+restoreBackupButton.addEventListener("click", () => restoreBackupInput.click());
+restoreBackupInput.addEventListener("change", () => importFullBackupFile(restoreBackupInput.files[0]));
 importChatGptButton.addEventListener("click", () => importChatGptInput.click());
 importChatGptInput.addEventListener("change", () => importFromChatGptFile(importChatGptInput.files[0]));
 cancelImportButton.addEventListener("click", closeImportReview);
 discardImportButton.addEventListener("click", closeImportReview);
 confirmImportButton.addEventListener("click", confirmReviewedImport);
+cancelBackupRestoreButton.addEventListener("click", closeBackupRestore);
+discardBackupRestoreButton.addEventListener("click", closeBackupRestore);
+confirmBackupRestoreButton.addEventListener("click", confirmFullBackupRestore);
 manualRefreshButton.addEventListener("click", () => {
   if (cloudState.enabled && cloudState.user) loadCloudData();
   else window.location.reload();
@@ -5303,10 +5779,14 @@ window.addEventListener("offline", () => {
   setEditingAvailability();
 });
 window.addEventListener("resize", renderMobileLayout);
+document.addEventListener("keydown", handleModalKeydown);
 importReviewModal.addEventListener("click", (event) => {
   if (event.target === importReviewModal) closeImportReview();
 });
 importReviewContent.addEventListener("click", handleImportReviewNavigation);
+backupRestoreModal.addEventListener("click", (event) => {
+  if (event.target === backupRestoreModal) closeBackupRestore();
+});
 metricContextModal.addEventListener("click", (event) => {
   if (event.target === metricContextModal) closeMetricContext();
 });
@@ -5341,6 +5821,7 @@ if (vitaminsModal) {
     if (event.target === vitaminsModal) closeVitaminsPanel();
   });
 }
+if (undoButton) undoButton.addEventListener("click", undoDeleteResult);
 if (resetButton) {
   resetButton.addEventListener("click", () => {
     if (!assertCanEdit()) return;

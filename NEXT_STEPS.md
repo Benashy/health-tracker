@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,9 +10,21 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.80`.
+- The app is now on `v0.81`.
 - The app is usable for early real-world testing, with focused Home, Add, Trends and Results workspaces, compact grouped results, paginated history, import review, AI review export, current snapshot, metric context notes, and a cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.81
+
+- Serialised cloud saves so rapid consecutive edits cannot be silently dropped, and made entry feedback distinguish saving, saved and failed states.
+- Added `updated_at` conflict protection and bounded retry to Telegram snooze callbacks so they cannot overwrite newer dashboard edits.
+- Standardised date-only recurrence calculations across local time, daylight-saving changes and month ends.
+- Added import size/count limits, strict calendar-date validation, same-day duplicate warnings and a ten-second undo for deleted measurements.
+- Added a versioned full-account JSON backup, previewed restore and automatic safety download before replacement.
+- Added the independent Mac-to-Dropbox database backup tool, CSV/JSON/summary outputs, duplicate prevention, LaunchAgent template and recovery drill guidance.
+- Improved modal keyboard focus, Escape handling, active-control semantics, chart descriptions, touch targets, static unit presentation and inline form errors.
+- Added repeatable function tests, Chromium and iPhone WebKit smoke tests, and a GitHub Actions quality gate.
+- Refreshed release, rollback, schema, backup and recovery documentation.
 
 ## Completed In v0.80
 
@@ -359,8 +371,9 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Use Supabase Storage for original PDFs and source documents.
    - Attach documents to blood results, timeline events, metrics, or profiles where useful.
 
-5. Add backup scheduling.
-   - Use the backup process below.
+5. Activate and prove the independent Dropbox backup schedule.
+   - The script and LaunchAgent are implemented, but the private service-role configuration still needs to be created on the Mac.
+   - Run one forced backup, inspect its files, install the schedule, then complete a restore drill in a separate test project.
    - Store backups in Dropbox under `Dropbox/Health Dashboard Backups/`.
 
 6. Consider structured database tables later.
@@ -370,6 +383,10 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 7. Later pilot-medical scheduling refinements.
    - Add age-based ECG and audiogram cycles as part of Ben's pilot medical planning once the CAA frequency details are supplied.
    - Consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
+
+8. Complete the separate security and privacy phase.
+   - Treat `PRIVACY_SECURITY_AUDIT.md` as the scope and review each change before implementation.
+   - This remains separate from the v0.81 reliability, usability and recovery work as requested.
 
 ## Standing Design Rules
 
@@ -391,7 +408,7 @@ The app's live data is stored in Supabase, not in the GitHub website files. GitH
 
 Use `BACKUP_PLAN.md` as the detailed backup implementation guide.
 
-The backup system should use a local Python script on the Mac which:
+The implemented backup system uses a local Python script on the Mac which:
 
 - Connects to Supabase using a private service-role key.
 - Downloads `health_dashboard_data`.
@@ -415,7 +432,7 @@ There can also be a `latest-scheduled` folder, but it is best effort only. Dropb
 
 ## Automatic Schedule
 
-A macOS LaunchAgent should run the backup automatically.
+The included macOS LaunchAgent runs the backup automatically once the private configuration is activated.
 
 It should be configured to try:
 
