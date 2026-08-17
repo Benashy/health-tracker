@@ -8,22 +8,25 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.75" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.75" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.75" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.75" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.75" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.75" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.75" />
-    <link rel="stylesheet" href="styles.css?v=0.75" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.76" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.76" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.76" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.76" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.76" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.76" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.76" />
+    <link rel="stylesheet" href="styles.css?v=0.76" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
       <section class="workspace">
         <header class="topbar">
-          <div>
-            <p class="eyebrow">Private prevention log</p>
-            <h1>Health Dashboard</h1>
+          <div class="brand-lockup">
+            <img class="brand-symbol" src="app-icon.svg?v=0.76" alt="" width="46" height="46" />
+            <div>
+              <p class="eyebrow">Private prevention log</p>
+              <h1>Health Dashboard</h1>
+            </div>
           </div>
           <div class="topbar-actions hidden" data-private aria-hidden="true">
             <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
@@ -149,19 +152,19 @@
         </section>
 
         <section class="status-strip hidden" data-private aria-hidden="true" aria-label="Tracker overview">
-          <article role="button" tabindex="0" data-summary-filter="cautions">
+          <article class="summary-caution" role="button" tabindex="0" data-summary-filter="cautions">
             <span class="metric attention" id="cautionResults">0</span>
             <span class="label">range cautions</span>
           </article>
-          <article role="button" tabindex="0" data-summary-filter="warnings">
+          <article class="summary-warning" role="button" tabindex="0" data-summary-filter="warnings">
             <span class="metric warning" id="warningResults">0</span>
             <span class="label">range warnings</span>
           </article>
-          <article role="button" tabindex="0" data-summary-filter="due">
+          <article class="summary-due" role="button" tabindex="0" data-summary-filter="due">
             <span class="metric attention" id="dueSoonResults">0</span>
             <span class="label">due or overdue</span>
           </article>
-          <article class="summary-static" id="nextDueCard">
+          <article class="summary-static summary-next" id="nextDueCard">
             <span class="label">next due</span>
             <span class="metric" id="nextDueDate">-</span>
             <small class="metric-meta" id="nextDueRelative">-</small>
@@ -382,7 +385,7 @@
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.75</span>
+          <span class="version-chip" id="appVersion">v0.76</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -531,9 +534,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.75"></script>
+    <script src="supabase-config.js?v=0.76"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.75"></script>
-    <script src="privacy-guard.js?v=0.75"></script>
+    <script src="app.js?v=0.76"></script>
+    <script src="privacy-guard.js?v=0.76"></script>
   </body>
 </html>

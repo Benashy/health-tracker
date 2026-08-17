@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-08-08
+Last updated: 2026-08-17
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -10,9 +10,17 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.75`.
+- The app is now on `v0.76`.
 - The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.76
+
+- Applied the approved Colour Clinical design across the dashboard without changing health data, privacy rules, calculations, or workflows.
+- Added a compact branded header using the Health Dashboard icon and lighter typography.
+- Rebalanced the palette so green carries product identity, blue identifies navigation and scheduling, and amber/red remain reserved for health cautions and warnings.
+- Reduced heavy shadows and font weights, introduced fine dividers, and refined cards, forms, results, trends, modals, and mobile navigation.
+- Updated the PWA theme colours and cache-busting release markers.
 
 ## Completed In v0.75
 

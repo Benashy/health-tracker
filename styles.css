@@ -1,24 +1,24 @@
 :root {
   color-scheme: light;
-  --bg: #f6f7f4;
+  --bg: #f5f8f7;
   --surface: #ffffff;
-  --surface-soft: #eef4ef;
-  --ink: #1d2522;
-  --muted: #65706b;
-  --line: #dce2dd;
-  --accent: #236f62;
-  --accent-dark: #174c44;
-  --warn: #a44d24;
-  --warn-bg: #fff0e7;
-  --amber: #8a650f;
-  --amber-bg: #fff7dc;
-  --bad: #a52a2a;
-  --bad-bg: #ffe9e6;
-  --ok: #2f7656;
-  --ok-bg: #e7f3ec;
-  --info: #2f6fae;
-  --info-bg: #e8f2ff;
-  --shadow: 0 18px 50px rgba(40, 52, 48, 0.1);
+  --surface-soft: #e9f6f0;
+  --ink: #17211d;
+  --muted: #607169;
+  --line: #d5dfda;
+  --accent: #1d7968;
+  --accent-dark: #14594d;
+  --warn: #91680b;
+  --warn-bg: #fff8e5;
+  --amber: #91680b;
+  --amber-bg: #fff8e5;
+  --bad: #a63a31;
+  --bad-bg: #fff0ee;
+  --ok: #256f52;
+  --ok-bg: #e9f6f0;
+  --info: #2d72a6;
+  --info-bg: #edf5fc;
+  --shadow: 0 8px 24px rgba(20, 57, 45, 0.06);
 }
 
 * {
@@ -28,13 +28,11 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(246, 247, 244, 0.98)),
-    var(--bg);
+  background: var(--bg);
   color: var(--ink);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+    "Avenir Next", Avenir, "Helvetica Neue", Inter, ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 
@@ -104,22 +102,39 @@ body.app-booting #signOutButton {
 }
 
 body:not(.signed-in) h1 {
-  font-size: clamp(2.3rem, 9vw, 4.2rem);
+  font-size: clamp(2rem, 8vw, 2.8rem);
 }
 
 .topbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-symbol {
+  display: block;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
 }
 
 .eyebrow {
   margin: 0 0 6px;
   color: var(--accent);
   font-size: 0.82rem;
-  font-weight: 750;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -131,14 +146,16 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 4vw, 4.8rem);
-  line-height: 0.95;
+  font-size: clamp(1.9rem, 3vw, 2.65rem);
+  font-weight: 500;
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 0;
   font-size: 1rem;
+  font-weight: 500;
 }
 
 .topbar-actions,
@@ -178,11 +195,11 @@ h2 {
 .mini-button {
   min-height: 42px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--surface);
   color: var(--ink);
   padding: 0 14px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .ghost-button:hover,
@@ -2907,6 +2924,532 @@ button.status-pill:focus-visible {
 
   .entry-submit-button {
     bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Colour Clinical visual system */
+.status-strip article,
+.auth-panel,
+.onboarding-panel,
+.profile-panel,
+.schedule-section,
+.entry-panel,
+.results-panel,
+.snapshot-section,
+.mobile-menu-panel,
+.modal-panel {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-panel,
+.profile-panel,
+.snapshot-section,
+.entry-panel,
+.results-panel,
+.modal-panel {
+  border-top: 3px solid var(--accent);
+}
+
+.results-panel,
+.modal-panel,
+.mobile-menu-panel {
+  border-top-color: var(--info);
+}
+
+.panel-heading {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-heading h2,
+.panel-heading h3 {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.label,
+.privacy-note,
+.metric-meta {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.metric {
+  font-weight: 500;
+}
+
+.status-strip article {
+  min-height: 96px;
+  border-left: 3px solid var(--info);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.status-strip article.summary-caution {
+  border-left-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.status-strip article.summary-warning {
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.status-strip article.summary-due {
+  border-left-color: var(--info);
+  background: var(--info-bg);
+}
+
+.status-strip article.summary-next {
+  border-left-color: var(--accent);
+  background: var(--ok-bg);
+}
+
+.status-strip article:hover,
+.status-strip article:focus-visible,
+.status-strip article.active {
+  border-color: var(--info);
+  border-left-color: var(--info);
+  background: var(--info-bg);
+  box-shadow: 0 0 0 2px rgba(45, 114, 166, 0.12);
+  outline: none;
+}
+
+.status-strip article.summary-static:hover,
+.status-strip article.summary-static:focus-visible {
+  border-color: var(--line);
+  border-left-color: var(--accent);
+  background: var(--ok-bg);
+  box-shadow: none;
+}
+
+.status-strip article.summary-due.due-now {
+  border-color: #ead897;
+  border-left-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.status-strip article.summary-due.overdue {
+  border-color: #e9bbb5;
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.snapshot-section {
+  padding: 18px;
+}
+
+.snapshot-card,
+.snapshot-item,
+.profile-card,
+.schedule-card,
+.trend-card,
+.summary-card,
+.result-card,
+.telegram-card,
+.telegram-group-grid article,
+.reminder-plan-grid article,
+.import-summary article {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.snapshot-card {
+  border: 0;
+  border-top: 3px solid var(--accent);
+  background: var(--surface-soft);
+  padding: 14px;
+}
+
+.snapshot-card.focus {
+  border-left: 0;
+  border-top-color: #86aa9d;
+  background: #f2f7f4;
+}
+
+.snapshot-card.ok {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.snapshot-card.warning {
+  border-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.snapshot-card.bad {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.snapshot-card.neutral {
+  border-color: var(--info);
+  background: var(--info-bg);
+}
+
+.snapshot-card:hover,
+.snapshot-card:focus-visible,
+.snapshot-item:hover,
+.snapshot-item:focus-visible {
+  border-color: var(--info);
+  background: var(--info-bg);
+  box-shadow: 0 0 0 2px rgba(45, 114, 166, 0.12);
+  outline: none;
+}
+
+.snapshot-card strong {
+  font-weight: 500;
+}
+
+.snapshot-card span,
+.snapshot-item strong,
+.snapshot-editor label {
+  font-weight: 500;
+}
+
+.snapshot-item {
+  border-left: 3px solid var(--info);
+  background: var(--info-bg);
+}
+
+.snapshot-item.warning,
+.snapshot-item.soon,
+.snapshot-item.change {
+  border-color: #ead897;
+  border-left-color: var(--amber);
+}
+
+.snapshot-item.overdue,
+.snapshot-item.due {
+  border-color: #e9bbb5;
+  border-left-color: var(--bad);
+}
+
+.snapshot-item.ok {
+  border-color: #b9ddcd;
+  border-left-color: var(--ok);
+}
+
+.onboarding-panel {
+  border: 0;
+  border-left: 4px solid var(--accent);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.profile-card {
+  background: #f7faf8;
+}
+
+.profile-card.active {
+  border-color: #a9d3c3;
+  background: var(--surface-soft);
+}
+
+.profile-card strong,
+.schedule-card strong,
+.telegram-card strong,
+.telegram-group-grid strong,
+.reminder-plan-grid strong {
+  font-weight: 500;
+}
+
+.schedule-section {
+  border-color: #cfdfea;
+  border-top: 3px solid var(--info);
+  background: #f4f9fd;
+}
+
+.schedule-card {
+  border-left: 3px solid var(--info);
+  background: var(--surface);
+}
+
+.schedule-card:hover,
+.schedule-card:focus-visible {
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px rgba(45, 114, 166, 0.12);
+  outline: none;
+}
+
+.schedule-card.soon {
+  border-color: #ead897;
+  border-left-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.schedule-card.due,
+.schedule-card.overdue {
+  border-color: #e9bbb5;
+  border-left-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.schedule-card.ok {
+  border-color: #b9ddcd;
+  border-left-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.reminder-planner {
+  border-top-color: #cfdfea;
+}
+
+.reminder-plan-grid article {
+  border-left: 3px solid var(--info);
+  background: #ffffff;
+}
+
+.entry-panel {
+  background: #ffffff;
+}
+
+.entry-panel label,
+.profile-panel label,
+.auth-form label,
+.compact-select,
+.vitamins-toolbar label,
+.snapshot-editor label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+input,
+select,
+textarea {
+  border-radius: 6px;
+  border-color: var(--line);
+  background: #ffffff;
+  color: var(--ink);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  border-color: var(--info);
+  box-shadow: 0 0 0 3px rgba(45, 114, 166, 0.14);
+  outline: none;
+}
+
+.value-fields {
+  border-color: #9fcdbc;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface-soft);
+}
+
+.reference-panel,
+.entry-details-panel,
+.completion-panel {
+  border-radius: 6px;
+  background: #f3f6f4;
+}
+
+.reference-panel {
+  border-color: #dbe2de;
+}
+
+.tracking-control,
+.entry-assist,
+.entry-details-toggle {
+  border-radius: 6px;
+}
+
+.quick-metric-button,
+.filter-button {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.quick-metric-button.active,
+.filter-button.active,
+.vitamins-actions .ghost-button.active {
+  border-color: var(--info);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.primary-button {
+  border-color: var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  font-weight: 500;
+}
+
+.primary-button:hover {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+}
+
+.ghost-button:hover,
+.filter-button:hover,
+.mini-button:hover {
+  border-color: #a7c9df;
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.result-card {
+  border-top: 3px solid var(--info);
+  background: #ffffff;
+}
+
+.result-card.ok {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.result-card.near,
+.result-card.soon {
+  border-color: var(--amber);
+  background: var(--amber-bg);
+}
+
+.result-card.bad,
+.result-card.due,
+.result-card.overdue {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.result-card.recorded {
+  border-color: var(--info);
+  background: var(--info-bg);
+}
+
+.result-card-top strong,
+.result-card-value strong,
+.trend-card strong,
+.summary-card strong {
+  font-weight: 500;
+}
+
+.trend-card,
+.summary-card {
+  border-left: 3px solid var(--info);
+  background: var(--info-bg);
+}
+
+.marker-summary article {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.results-table-wrap,
+.vitamins-table-wrap,
+.import-table-wrap {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.results-table th,
+.vitamins-table th,
+.import-table th {
+  background: #edf4f1;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.results-table tbody tr:hover,
+.import-table tbody tr:hover {
+  background: var(--info-bg);
+}
+
+.modal {
+  background: rgba(12, 28, 22, 0.38);
+}
+
+.telegram-card,
+.telegram-group-grid article {
+  border-left: 3px solid var(--info);
+  background: var(--info-bg);
+}
+
+.telegram-code {
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-weight: 500;
+}
+
+.vitamins-today-section {
+  border-color: #cfdfea;
+  background: #f4f9fd;
+}
+
+.vitamin-today-item {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.account-sync-footer {
+  border-top-color: var(--line);
+  color: var(--muted);
+}
+
+.sync-status,
+.version-chip {
+  font-weight: 500;
+}
+
+@media (max-width: 940px) {
+  .brand-lockup {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+  }
+
+  .brand-symbol {
+    width: 40px;
+    height: 40px;
+  }
+
+  h1 {
+    font-size: 1.9rem;
+  }
+
+  .status-strip article {
+    min-height: 86px;
+    padding: 14px;
+  }
+
+  .snapshot-card {
+    padding: 12px;
+  }
+
+  .mobile-action-bar {
+    border-color: rgba(213, 223, 218, 0.94);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 12px 30px rgba(20, 57, 45, 0.14);
+  }
+
+  .mobile-action-bar button {
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .mobile-action-bar button.active {
+    border-color: #b9d6e9;
+    background: var(--info-bg);
+    color: var(--info);
+  }
+
+  .mobile-action-bar button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #ffffff;
+  }
+
+  .mobile-action-bar button.primary.active {
+    border-color: var(--accent-dark);
+    background: var(--accent-dark);
   }
 }
 
