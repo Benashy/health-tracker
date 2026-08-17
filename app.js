@@ -4059,7 +4059,7 @@ function setMobileView(view, options = {}) {
 
   if (options.scroll === false) return;
   const target = {
-    home: profileSection ?? snapshotSection,
+    home: document.querySelector(".topbar") ?? profileSection ?? snapshotSection,
     add: form,
     trends: resultsPanel,
     results: resultsPanel,

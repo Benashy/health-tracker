@@ -4361,6 +4361,8 @@ summary:focus-visible,
   }
 
   .profile-edit-button {
+    grid-column: 2;
+    grid-row: 1;
     align-self: start;
     min-width: 44px;
     min-height: 44px;
@@ -4385,6 +4387,7 @@ summary:focus-visible,
 
   .quick-metrics {
     display: flex;
+    flex-wrap: nowrap;
     gap: 7px;
     overflow-x: auto;
     margin-right: -14px;
@@ -4468,13 +4471,25 @@ summary:focus-visible,
   }
 
   .filters {
+    flex-direction: row;
+    flex-wrap: nowrap;
     width: calc(100% + 14px);
     margin-right: -14px;
     padding-right: 14px;
   }
 
   .filter-button {
+    width: auto;
     min-height: 42px;
+  }
+
+  .entry-details-toggle {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .entry-details-toggle .mini-button {
+    width: auto;
   }
 
   .result-compact-group > summary {
