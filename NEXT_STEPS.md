@@ -10,9 +10,21 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.76`.
-- The app is usable for early real-world testing, with a calmer first-use flow, improved measurement entry, grouped current results, archive view, trend charts, import review, AI review export, current snapshot, metric context notes, and a more cautious actionability layer.
+- The app is now on `v0.77`.
+- The app is usable for early real-world testing, with focused Home, Add, Trends and Results workspaces, compact grouped results, paginated history, import review, AI review export, current snapshot, metric context notes, and a cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.77
+
+- Introduced shared Home, Add measurement, Trends and Results navigation across desktop, tablet and mobile.
+- Replaced the very long current-results surface with collapsible clinical groups and compact metric rows that reveal full detail on demand.
+- Added pagination to the Results Archive, with 20 historical entries per page.
+- Reordered Trends so the chart appears before supporting statistics, with secondary statistics in a collapsible section.
+- Simplified Add measurement by making Value visually dominant, presenting the unit as a quiet suffix, balancing quick metrics, and moving tracking controls into Details.
+- Compressed the signed-in profile into a clear identity row and moved reminder-planning detail into a collapsed disclosure.
+- Grouped import, AI review and export under a Data menu while retaining Telegram and Vitamins as separate utilities.
+- Added consistent local Lucide icons, lighter typography, clearer selected states, keyboard selection state, larger mobile touch targets and reduced-motion support.
+- Preserved the private signed-out screen, cloud data structure, health calculations, due logic and Telegram behaviour.
 
 ## Completed In v0.76
 

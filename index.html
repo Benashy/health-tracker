@@ -8,35 +8,48 @@
     <meta name="apple-mobile-web-app-title" content="Health Dashboard" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Preventative Health Dashboard</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.76" />
-    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.76" type="image/x-icon" />
-    <link rel="icon" href="health-dashboard-favicon.ico?v=0.76" sizes="any" />
-    <link rel="icon" href="app-icon.svg?v=0.76" type="image/svg+xml" />
-    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.76" type="image/png" sizes="32x32" />
-    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.76" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.76" />
-    <link rel="stylesheet" href="styles.css?v=0.76" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.77" />
+    <link rel="shortcut icon" href="health-dashboard-favicon.ico?v=0.77" type="image/x-icon" />
+    <link rel="icon" href="health-dashboard-favicon.ico?v=0.77" sizes="any" />
+    <link rel="icon" href="app-icon.svg?v=0.77" type="image/svg+xml" />
+    <link rel="icon" href="health-dashboard-favicon-32.png?v=0.77" type="image/png" sizes="32x32" />
+    <link rel="icon" href="health-dashboard-favicon-16.png?v=0.77" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="app-icon-180.png?v=0.77" />
+    <link rel="stylesheet" href="styles.css?v=0.77" />
   </head>
   <body class="app-booting">
     <main class="app-shell">
       <section class="workspace">
         <header class="topbar">
           <div class="brand-lockup">
-            <img class="brand-symbol" src="app-icon.svg?v=0.76" alt="" width="46" height="46" />
+            <img class="brand-symbol" src="app-icon.svg?v=0.77" alt="" width="46" height="46" />
             <div>
               <p class="eyebrow">Private prevention log</p>
               <h1>Health Dashboard</h1>
             </div>
           </div>
           <div class="topbar-actions hidden" data-private aria-hidden="true">
-            <button class="ghost-button" id="importChatGptButton" type="button">Import from ChatGPT</button>
-            <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
-            <button class="ghost-button" id="exportReviewPackButton" type="button">Prepare AI Review</button>
-            <button class="ghost-button" id="exportCsvButton" type="button">Export results</button>
-            <button class="ghost-button" id="telegramOpenButton" type="button">Telegram</button>
-            <button class="ghost-button" id="vitaminsOpenButton" type="button">Vitamins</button>
+            <details class="utility-menu" id="dataMenu">
+              <summary class="ghost-button"><span class="ui-icon icon-folder-down" aria-hidden="true"></span><span>Data</span></summary>
+              <div class="utility-menu-panel">
+                <button class="utility-menu-action" id="importChatGptButton" type="button">
+                  <span class="ui-icon icon-file-up" aria-hidden="true"></span><span><strong>Import from ChatGPT</strong><small>Review a prepared JSON file</small></span>
+                </button>
+                <input class="hidden" id="importChatGptInput" type="file" accept="application/json,.json" />
+                <button class="utility-menu-action" id="exportReviewPackButton" type="button">
+                  <span class="ui-icon icon-sparkles" aria-hidden="true"></span><span><strong>Prepare AI Review</strong><small>Export a complete review pack</small></span>
+                </button>
+                <button class="utility-menu-action" id="exportCsvButton" type="button">
+                  <span class="ui-icon icon-download" aria-hidden="true"></span><span><strong>Export results</strong><small>Download readings as CSV</small></span>
+                </button>
+              </div>
+            </details>
+            <button class="ghost-button utility-button" id="telegramOpenButton" type="button"><span class="ui-icon icon-send" aria-hidden="true"></span><span>Telegram</span></button>
+            <button class="ghost-button utility-button" id="vitaminsOpenButton" type="button"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Vitamins</span></button>
           </div>
         </header>
+
+        <nav class="primary-navigation hidden" id="primaryNavigation" data-private aria-label="Dashboard sections" aria-hidden="true"></nav>
 
         <section class="auth-panel hidden" id="authPanel" aria-label="Account login">
           <div class="panel-heading">
@@ -181,7 +194,11 @@
             </div>
           </div>
           <div class="schedule-grid" id="schedulePanel"></div>
-          <div class="reminder-planner" id="reminderPlanner"></div>
+          <p class="schedule-shared-note hidden" id="scheduleSharedNote">Snoozing pauses Telegram reminders only. A check remains due until it is recorded.</p>
+          <details class="reminder-plan-disclosure">
+            <summary><span class="ui-icon icon-calendar-clock" aria-hidden="true"></span><span>Reminder schedule</span><small>View booking windows and reminder timing</small></summary>
+            <div class="reminder-planner" id="reminderPlanner"></div>
+          </details>
         </section>
 
         <section class="content-grid hidden" id="contentGrid" data-private aria-hidden="true">
@@ -210,11 +227,6 @@
               <select id="markerInput" required></select>
             </label>
 
-            <div class="tracking-control" id="trackingControl">
-              <span id="trackingStatusText">Tracked</span>
-              <button class="mini-button" id="trackingToggleButton" type="button">Stop tracking</button>
-            </div>
-
             <div class="entry-assist" id="entryAssist"></div>
 
             <div class="completion-panel hidden" id="completionPanel">
@@ -229,14 +241,13 @@
               <span class="privacy-note" id="completionHint"></span>
             </div>
 
-            <div class="inline-fields value-fields" id="valueFields">
-              <label>
-                Value
-                <input id="valueInput" type="text" required />
-              </label>
-              <label>
-                Unit
-                <input id="unitInput" type="text" readonly />
+            <div class="value-fields" id="valueFields">
+              <label class="measurement-value-field">
+                <span>Value</span>
+                <span class="measurement-value-control">
+                  <input id="valueInput" type="text" required />
+                  <input id="unitInput" type="text" readonly tabindex="-1" aria-label="Measurement unit" />
+                </span>
               </label>
             </div>
 
@@ -291,6 +302,11 @@
                 Notes
                 <textarea id="notesInput" rows="4" placeholder="Fasting, collection context, symptoms, follow-up notes"></textarea>
               </label>
+
+              <div class="tracking-control" id="trackingControl">
+                <span id="trackingStatusText">Tracked</span>
+                <button class="mini-button" id="trackingToggleButton" type="button">Stop tracking</button>
+              </div>
             </div>
 
             <select class="hidden" id="sourceTypeInput">
@@ -373,19 +389,27 @@
           <div class="panel-heading">
             <h2>Menu</h2>
           </div>
-          <div class="mobile-menu-actions">
-            <button class="ghost-button" type="button" data-menu-action="import-gpt">Import from ChatGPT</button>
-            <button class="ghost-button" type="button" data-menu-action="ai-review">Prepare AI Review</button>
-            <button class="ghost-button" type="button" data-menu-action="csv">Export results</button>
-            <button class="ghost-button" type="button" data-menu-action="telegram">Telegram</button>
-            <button class="ghost-button" type="button" data-menu-action="vitamins">Vitamins</button>
+          <div class="mobile-menu-group">
+            <h3>Data</h3>
+            <div class="mobile-menu-actions">
+              <button class="ghost-button" type="button" data-menu-action="import-gpt"><span class="ui-icon icon-file-up" aria-hidden="true"></span><span>Import from ChatGPT</span></button>
+              <button class="ghost-button" type="button" data-menu-action="ai-review"><span class="ui-icon icon-sparkles" aria-hidden="true"></span><span>Prepare AI Review</span></button>
+              <button class="ghost-button" type="button" data-menu-action="csv"><span class="ui-icon icon-download" aria-hidden="true"></span><span>Export results</span></button>
+            </div>
+          </div>
+          <div class="mobile-menu-group">
+            <h3>Services</h3>
+            <div class="mobile-menu-actions">
+              <button class="ghost-button" type="button" data-menu-action="telegram"><span class="ui-icon icon-send" aria-hidden="true"></span><span>Telegram</span></button>
+              <button class="ghost-button" type="button" data-menu-action="vitamins"><span class="ui-icon icon-pill" aria-hidden="true"></span><span>Vitamins</span></button>
+            </div>
           </div>
         </section>
 
         <footer class="account-sync-footer" aria-label="Account and sync">
           <span class="sync-status" id="syncStatus">Local mode</span>
           <button class="mini-button" id="manualRefreshButton" type="button" aria-label="Refresh local page">Refresh</button>
-          <span class="version-chip" id="appVersion">v0.76</span>
+          <span class="version-chip" id="appVersion">v0.77</span>
           <button class="mini-button hidden" id="signOutButton" type="button" disabled>Sign out</button>
         </footer>
 
@@ -534,9 +558,9 @@
       </div>
     </section>
 
-    <script src="supabase-config.js?v=0.76"></script>
+    <script src="supabase-config.js?v=0.77"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js?v=0.76"></script>
-    <script src="privacy-guard.js?v=0.76"></script>
+    <script src="app.js?v=0.77"></script>
+    <script src="privacy-guard.js?v=0.77"></script>
   </body>
 </html>

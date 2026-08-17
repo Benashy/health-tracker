@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.76";
+const APP_VERSION = "v0.77";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -35,7 +35,8 @@ const REMINDER_MILESTONES_SCREENING = [90, 60, 30, 14, 7, 0];
 const REMINDER_MILESTONES_COLONOSCOPY = [120, 90, 60, 30, 14, 7, 0];
 const IMPORT_REVIEW_PAGE_SIZE = 10;
 const SCHEDULE_PAGE_SIZE = 8;
-const RESULTS_CARD_FILTERS = new Set(["latest", "cautions", "warnings", "due"]);
+const RESULTS_PAGE_SIZE = 20;
+const RESULTS_CARD_FILTERS = new Set(["latest", "cautions", "warnings", "due", "all"]);
 const NEAR_LIMIT_RATIO = 0.02;
 const TRACKING_ACTIVE = "active";
 const TRACKING_NOT_TRACKED = "not_tracked";
@@ -394,6 +395,7 @@ const state = {
   pendingImport: null,
   pendingImportPage: 1,
   schedulePage: 1,
+  resultsPage: 1,
 };
 
 const telegramSetupState = {
@@ -512,6 +514,7 @@ const markerSummary = document.querySelector("#markerSummary");
 const resultsCardGrid = document.querySelector("#resultsCardGrid");
 const scheduleSection = document.querySelector(".schedule-section");
 const schedulePanel = document.querySelector("#schedulePanel");
+const scheduleSharedNote = document.querySelector("#scheduleSharedNote");
 const reminderPlanner = document.querySelector("#reminderPlanner");
 const schedulePagination = document.querySelector("#schedulePagination");
 const schedulePrevButton = document.querySelector("#schedulePrevButton");
@@ -555,6 +558,7 @@ const trendViewPanel = document.querySelector("#trendViewPanel");
 const resultsViewPanel = document.querySelector("#resultsViewPanel");
 const mobileMenuPanel = document.querySelector("#mobileMenuPanel");
 const mobileActionBar = document.querySelector("#mobileActionBar");
+const primaryNavigation = document.querySelector("#primaryNavigation");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const exportChatGptButton = document.querySelector("#exportChatGptButton");
 const exportReviewPackButton = document.querySelector("#exportReviewPackButton");
@@ -1417,14 +1421,17 @@ function renderProfiles() {
         const count = state.results.filter((result) => result.profile_id === profile.id).length;
         return `
           <article class="profile-card ${state.activeProfileId === profile.id ? "active" : ""}" data-profile-id="${escapeHtml(profile.id)}">
-            <div class="profile-card-top">
+            <div class="profile-identity">
               <strong>${escapeHtml(profile.name)}</strong>
-              <button class="mini-button" type="button" data-edit-profile="${escapeHtml(profile.id)}">Edit</button>
+              <span>Personal health dashboard</span>
             </div>
-            <span>Date of birth: ${profile.date_of_birth ? formatDate(profile.date_of_birth) : "not set"}</span>
-            <span>Age: ${profile.date_of_birth ? calculateAge(profile.date_of_birth) : "-"}</span>
-            <span>Height: ${profile.height_cm ? `${escapeHtml(profile.height_cm)} cm` : "not set"}</span>
-            <span>${count} measurements</span>
+            <dl class="profile-stats">
+              <div><dt>Date of birth</dt><dd>${profile.date_of_birth ? formatDate(profile.date_of_birth) : "Not set"}</dd></div>
+              <div><dt>Age</dt><dd>${profile.date_of_birth ? calculateAge(profile.date_of_birth) : "-"}</dd></div>
+              <div><dt>Height</dt><dd>${profile.height_cm ? `${escapeHtml(profile.height_cm)} cm` : "Not set"}</dd></div>
+              <div><dt>Measurements</dt><dd>${count}</dd></div>
+            </dl>
+            <button class="mini-button profile-edit-button" type="button" data-edit-profile="${escapeHtml(profile.id)}"><span class="ui-icon icon-pencil" aria-hidden="true"></span><span>Edit</span></button>
           </article>
         `;
       })
@@ -1618,11 +1625,12 @@ function renderEntryAssist() {
         reference_upper_limit: savedRange.high,
       })
     : "set on first entry";
+  const referenceSummary = savedRange ? rangeText : `${rangeLabel} ${rangeText}`;
 
   entryAssist.innerHTML = `
     <div>
       <strong>${escapeHtml(getDisplayGroupForMetric(selectedMetric.name))}</strong>
-      <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(rangeLabel)} ${escapeHtml(rangeText)}</span>
+      <span>${escapeHtml(selectedMetric.cadence)} · ${escapeHtml(referenceSummary)}</span>
     </div>
   `;
 }
@@ -2481,6 +2489,7 @@ function render() {
   renderSummarySelection();
   renderResultsSurface(results);
   renderMobileActions(dueCount);
+  renderPrimaryNavigation(dueCount);
   renderMobileLayout();
 }
 
@@ -2669,15 +2678,35 @@ function renderResultsSurface(results) {
   const showDueCards = state.filter === "due" && dueItems.length > 0;
   const showResultCards = !showDueCards && RESULTS_CARD_FILTERS.has(state.filter) && results.length > 0;
   const showCards = showDueCards || showResultCards;
+  const totalPages = state.filter === "all" ? Math.max(1, Math.ceil(results.length / RESULTS_PAGE_SIZE)) : 1;
+  state.resultsPage = Math.min(Math.max(1, state.resultsPage), totalPages);
+  const pageStart = (state.resultsPage - 1) * RESULTS_PAGE_SIZE;
+  const visiblePageResults = state.filter === "all" ? results.slice(pageStart, pageStart + RESULTS_PAGE_SIZE) : results;
 
   emptyState.classList.toggle("hidden", showCards || results.length > 0);
   if (resultsCardGrid) {
     resultsCardGrid.classList.toggle("hidden", !showCards);
-    resultsCardGrid.innerHTML = showDueCards ? renderDueCheckCards(dueItems) : showResultCards ? renderResultCards(results) : "";
+    resultsCardGrid.innerHTML = showDueCards
+      ? renderDueCheckCards(dueItems)
+      : showResultCards
+        ? `${renderResultsPagination(results.length, pageStart, visiblePageResults.length, totalPages)}${renderResultCards(visiblePageResults)}`
+        : "";
   }
   if (markerSummary) markerSummary.classList.toggle("hidden", showCards || results.length === 0);
-  tableWrap.classList.toggle("hidden", showCards || results.length === 0);
-  resultsBody.innerHTML = renderResultRows(results);
+  tableWrap.classList.add("hidden");
+  resultsBody.innerHTML = renderResultRows(visiblePageResults);
+}
+
+function renderResultsPagination(totalItems, startIndex, visibleCount, totalPages) {
+  if (state.filter !== "all" || totalPages <= 1) return "";
+  const endIndex = startIndex + visibleCount;
+  return `
+    <nav class="results-pagination" aria-label="Archive pages">
+      <button class="mini-button" type="button" data-results-page="previous" ${state.resultsPage <= 1 ? "disabled" : ""} aria-label="Previous archive page"><span class="ui-icon icon-chevron-down icon-rotate-90" aria-hidden="true"></span></button>
+      <span>${startIndex + 1}-${endIndex} of ${totalItems}</span>
+      <button class="mini-button" type="button" data-results-page="next" ${state.resultsPage >= totalPages ? "disabled" : ""} aria-label="Next archive page"><span class="ui-icon icon-chevron-down icon-rotate-minus-90" aria-hidden="true"></span></button>
+    </nav>
+  `;
 }
 
 function renderResultRows(results) {
@@ -2734,13 +2763,17 @@ function renderResultCards(results) {
 
   return groups
     .map(
-      (group) => `
-        <section class="result-card-section">
-          <h3>${escapeHtml(group.group)}</h3>
-          <div class="result-card-list">
+      (group, index) => `
+        <details class="result-compact-group" ${index === 0 ? "open" : ""}>
+          <summary>
+            <span>${escapeHtml(group.group)}</span>
+            <small>${group.results.length} ${group.results.length === 1 ? "metric" : "metrics"}</small>
+            <span class="ui-icon icon-chevron-down" aria-hidden="true"></span>
+          </summary>
+          <div class="result-compact-list">
             ${group.results.map(renderResultCard).join("")}
           </div>
-        </section>
+        </details>
       `,
     )
     .join("");
@@ -2750,35 +2783,38 @@ function renderResultCard(result) {
   const statusClass = getStatusClass(result.status_vs_range);
   const due = getDueStatus(getProfile(result.profile_id), getMetric(result.metric, result.profile_id));
   const range = formatRangeOrTarget(result);
-  const status = renderStatusPill(result, statusClass);
   const value = formatValue(result.result_value, result.unit);
   const change = `${formatChange(result.absolute_change_since_previous_test, result)} (${formatPercent(result.percentage_change_since_previous_test, result)})`;
   const previous = formatValue(result.previous_result, result.unit);
 
   return `
-    <article class="result-card ${statusClass}">
-      <div class="result-card-top">
-        <div>
-          <span>${formatDate(result.sample_date)}</span>
+    <details class="result-compact-item ${statusClass}">
+      <summary>
+        <span class="result-row-identity">
           <strong>${escapeHtml(result.metric)}</strong>
+          <small>${formatDate(result.sample_date)}</small>
+        </span>
+        <strong class="result-row-value">${escapeHtml(value)}</strong>
+        <span class="status-pill ${statusClass}">${escapeHtml(result.status_vs_range)}</span>
+        <span class="due-pill ${due.state}">${escapeHtml(due.label)}</span>
+        <span class="result-row-trend">${escapeHtml(result.trend_direction)}</span>
+        <span class="ui-icon icon-chevron-down result-row-chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="result-compact-detail">
+        <dl>
+          <div><dt>Reference or target</dt><dd>${range}</dd></div>
+          <div><dt>Previous</dt><dd>${escapeHtml(previous)}</dd></div>
+          <div><dt>Change</dt><dd>${escapeHtml(change)}</dd></div>
+          <div><dt>Trend</dt><dd>${escapeHtml(result.trend_direction)}</dd></div>
+          <div><dt>Due</dt><dd><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></dd></div>
+        </dl>
+        <div class="result-compact-actions">
+          ${isWarningStatus(result.status_vs_range) ? `<button class="mini-button" type="button" data-warning-id="${escapeHtml(result.id)}"><span class="ui-icon icon-info" aria-hidden="true"></span><span>Why flagged?</span></button>` : ""}
+          <button class="mini-button" type="button" data-context-metric="${escapeHtml(result.metric)}"><span class="ui-icon icon-info" aria-hidden="true"></span><span>Metric context</span></button>
+          <button class="delete-button compact-delete" type="button" data-id="${escapeHtml(result.id)}" aria-label="Delete result"><span class="ui-icon icon-trash-2" aria-hidden="true"></span><span>Delete</span></button>
         </div>
-        ${status}
       </div>
-      <div class="result-card-value">
-        <strong>${escapeHtml(value)}</strong>
-        <span>${range}</span>
-      </div>
-      <dl class="result-card-meta">
-        <div><dt>Due</dt><dd><span class="due-pill ${due.state}">${escapeHtml(due.label)}</span></dd></div>
-        <div><dt>Previous</dt><dd>${escapeHtml(previous)}</dd></div>
-        <div><dt>Change</dt><dd>${escapeHtml(change)}</dd></div>
-        <div><dt>Trend</dt><dd>${escapeHtml(result.trend_direction)}</dd></div>
-      </dl>
-      <div class="result-card-actions">
-        <button class="info-button" type="button" data-context-metric="${escapeHtml(result.metric)}">Info</button>
-        <button class="delete-button" type="button" data-id="${escapeHtml(result.id)}" aria-label="Delete result">Delete</button>
-      </div>
-    </article>
+    </details>
   `;
 }
 
@@ -3073,56 +3109,72 @@ function renderTrends() {
     .join("");
 
   trendPanel.innerHTML = `
-    <article class="trend-card trend-controls">
-      <strong>Range</strong>
+    <section class="trend-toolbar" aria-label="Trend range">
       <div class="segmented-control" role="group" aria-label="Trend range">
         ${renderTrendRangeButton("6m", "6 months")}
         ${renderTrendRangeButton("1y", "1 year")}
         ${renderTrendRangeButton("2y", "2 years")}
         ${renderTrendRangeButton("all", "All time")}
       </div>
-      <em>${scopedResults.length} of ${allScopedResults.length} results shown</em>
+      <span>${scopedResults.length} of ${allScopedResults.length} results shown</span>
+    </section>
+    <article class="trend-chart-primary">
+      <div class="trend-chart-heading">
+        <div>
+          <span>Trend</span>
+          <strong>${escapeHtml(latest.metric)}</strong>
+        </div>
+        <button class="icon-text-button" type="button" data-context-metric="${escapeHtml(latest.metric)}"><span class="ui-icon icon-info" aria-hidden="true"></span><span>Metric context</span></button>
+      </div>
+      ${chart || "<div class=\"trend-chart-empty\"><strong>Chart starts with two results</strong><span>Add another numeric measurement to show the trend.</span></div>"}
     </article>
-    <article class="trend-card">
-      <strong>Latest <button class="info-button inline-info" type="button" data-context-metric="${escapeHtml(latest.metric)}">Info</button></strong>
-      <span>${escapeHtml(latest.person_name)} · ${escapeHtml(formatValue(latest.result_value, latest.unit))}</span>
-      <em>${formatDate(latest.sample_date)} · ${escapeHtml(latest.status_vs_range)}</em>
-    </article>
-    <article class="trend-card">
-      <strong>Change</strong>
-      <span class="${changeClass}">${previous ? `${formatChange(latest.absolute_change_since_previous_test, latest)} (${formatPercent(latest.percentage_change_since_previous_test, latest)})` : "-"}</span>
-      <em>${previous ? `Since ${formatDate(previous.sample_date)}` : "First result"}</em>
-    </article>
-    <article class="trend-card">
-      <strong>${rangeLabel}</strong>
-      <span>${escapeHtml(rangeText)}</span>
-      <em>${escapeHtml(latest.cadence)}</em>
-    </article>
-    <article class="trend-card">
-      <strong>Year-on-year</strong>
-      <span class="${yearComparison ? getTrendClass(compareTrend(latest, yearComparison)) : ""}">${yearComparison ? formatYearComparison(latest, yearComparison) : "-"}</span>
-      <em>${yearComparison ? `Versus ${formatDate(yearComparison.sample_date)}` : "Needs a similar result about 12 months earlier"}</em>
-    </article>
-    <article class="trend-card">
-      <strong>Average</strong>
-      <span>${average === null ? "-" : escapeHtml(formatValue(roundChange(average), latest.unit))}</span>
-      <em>${numericResults.length ? `Across selected range` : "Not numeric"}</em>
-    </article>
-    <article class="trend-card">
-      <strong>Lowest</strong>
-      <span>${low ? escapeHtml(formatValue(low.result_value, low.unit)) : "-"}</span>
-      <em>${low ? `${escapeHtml(low.person_name)} · ${formatDate(low.sample_date)}` : "Not numeric"}</em>
-    </article>
-    <article class="trend-card">
-      <strong>Highest</strong>
-      <span>${high ? escapeHtml(formatValue(high.result_value, high.unit)) : "-"}</span>
-      <em>${high ? `${escapeHtml(high.person_name)} · ${formatDate(high.sample_date)}` : "Not numeric"}</em>
-    </article>
-    <article class="trend-card trend-chart">
-      <strong>Chart</strong>
-      ${chart || "<span>-</span><em>Add at least two numeric results.</em>"}
-    </article>
-    <article class="trend-card trend-history">
+    <section class="trend-primary-stats" aria-label="Key trend statistics">
+      <article class="trend-stat-card">
+        <span>Latest</span>
+        <strong>${escapeHtml(formatValue(latest.result_value, latest.unit))}</strong>
+        <small>${formatDate(latest.sample_date)} · ${escapeHtml(latest.status_vs_range)}</small>
+      </article>
+      <article class="trend-stat-card">
+        <span>Change</span>
+        <strong class="${changeClass}">${previous ? `${formatChange(latest.absolute_change_since_previous_test, latest)} (${formatPercent(latest.percentage_change_since_previous_test, latest)})` : "-"}</strong>
+        <small>${previous ? `Since ${formatDate(previous.sample_date)}` : "First result"}</small>
+      </article>
+      <article class="trend-stat-card">
+        <span>${rangeLabel}</span>
+        <strong>${escapeHtml(rangeText)}</strong>
+        <small>${escapeHtml(latest.cadence)}</small>
+      </article>
+    </section>
+    <details class="trend-more">
+      <summary>
+        <span>More statistics</span>
+        <small>Year-on-year, average, lowest and highest</small>
+        <span class="ui-icon icon-chevron-down" aria-hidden="true"></span>
+      </summary>
+      <div class="trend-secondary-grid">
+        <article class="trend-stat-card">
+          <span>Year-on-year</span>
+          <strong class="${yearComparison ? getTrendClass(compareTrend(latest, yearComparison)) : ""}">${yearComparison ? formatYearComparison(latest, yearComparison) : "-"}</strong>
+          <small>${yearComparison ? `Versus ${formatDate(yearComparison.sample_date)}` : "Needs a similar result about 12 months earlier"}</small>
+        </article>
+        <article class="trend-stat-card">
+          <span>Average</span>
+          <strong>${average === null ? "-" : escapeHtml(formatValue(roundChange(average), latest.unit))}</strong>
+          <small>${numericResults.length ? "Across selected range" : "Not numeric"}</small>
+        </article>
+        <article class="trend-stat-card">
+          <span>Lowest</span>
+          <strong>${low ? escapeHtml(formatValue(low.result_value, low.unit)) : "-"}</strong>
+          <small>${low ? `${escapeHtml(low.person_name)} · ${formatDate(low.sample_date)}` : "Not numeric"}</small>
+        </article>
+        <article class="trend-stat-card">
+          <span>Highest</span>
+          <strong>${high ? escapeHtml(formatValue(high.result_value, high.unit)) : "-"}</strong>
+          <small>${high ? `${escapeHtml(high.person_name)} · ${formatDate(high.sample_date)}` : "Not numeric"}</small>
+        </article>
+      </div>
+    </details>
+    <article class="trend-history">
       <strong>Recent history</strong>
       <ul>${timeline}</ul>
     </article>
@@ -3264,11 +3316,11 @@ function renderSchedule() {
             <strong>${escapeHtml(item.metric.name)}</strong>
             <span>${escapeHtml(item.profile.name)} · ${escapeHtml(getScheduleGroup(item.metric).label)} · ${escapeHtml(item.metric.cadence)}</span>
             <em>${escapeHtml(item.due.label)} · tap to enter</em>
-            <small>Telegram snooze buttons only pause reminder messages. This check stays due until entered.</small>
           </article>
         `)
         .join("")
     : renderCalmScheduleCard();
+  scheduleSharedNote?.classList.toggle("hidden", visibleItems.length === 0);
   renderReminderPlanner();
 }
 
@@ -3882,11 +3934,11 @@ function renderMobileActions(dueCount) {
     return;
   }
   const actions = [
-    { key: "home", label: "Home", count: dueCount },
-    { key: "menu", label: "Menu" },
-    { key: "add", label: "Add", primary: true },
-    { key: "trends", label: "Trends" },
-    { key: "results", label: "Results" },
+    { key: "home", label: "Home", icon: "house", count: dueCount },
+    { key: "menu", label: "Menu", icon: "menu" },
+    { key: "add", label: "Add", icon: "plus", primary: true },
+    { key: "trends", label: "Trends", icon: "chart-line" },
+    { key: "results", label: "Results", icon: "list" },
   ];
   mobileActionBar.classList.toggle("has-due", dueCount > 0);
   mobileActionBar.innerHTML = actions
@@ -3895,8 +3947,35 @@ function renderMobileActions(dueCount) {
       const classes = [isActive ? "active" : "", action.primary && isActive ? "primary" : ""]
         .filter(Boolean)
         .join(" ");
-      const label = `${escapeHtml(action.label)}${action.count ? `<span class="mobile-tab-badge">${escapeHtml(action.count)}</span>` : ""}`;
-      return `<button class="${classes}" type="button" data-mobile-action="${escapeHtml(action.key)}">${label}</button>`;
+      const label = `<span class="mobile-tab-label"><span class="ui-icon icon-${action.icon}" aria-hidden="true"></span><span>${escapeHtml(action.label)}</span></span>${action.count ? `<span class="mobile-tab-badge">${escapeHtml(action.count)}</span>` : ""}`;
+      return `<button class="${classes}" type="button" data-mobile-action="${escapeHtml(action.key)}" ${isActive ? 'aria-current="page"' : ""}>${label}</button>`;
+    })
+    .join("");
+}
+
+function renderPrimaryNavigation(dueCount) {
+  if (!primaryNavigation) return;
+  if (!cloudState.user) {
+    primaryNavigation.innerHTML = "";
+    return;
+  }
+  const selectedView = state.mobileView === "menu" ? "home" : state.mobileView;
+  const actions = [
+    { key: "home", label: "Home", icon: "house", count: dueCount },
+    { key: "add", label: "Add measurement", icon: "plus" },
+    { key: "trends", label: "Trends", icon: "chart-line" },
+    { key: "results", label: "Results", icon: "list" },
+  ];
+  primaryNavigation.innerHTML = actions
+    .map((action) => {
+      const isActive = selectedView === action.key;
+      return `
+        <button class="${isActive ? "active" : ""}" type="button" data-primary-action="${action.key}" ${isActive ? 'aria-current="page"' : ""}>
+          <span class="ui-icon icon-${action.icon}" aria-hidden="true"></span>
+          <span>${escapeHtml(action.label)}</span>
+          ${action.count ? `<span class="primary-nav-badge">${escapeHtml(action.count)}</span>` : ""}
+        </button>
+      `;
     })
     .join("");
 }
@@ -3908,11 +3987,14 @@ function isMobileLayout() {
 function setMobileOnlyHidden(element, isHidden) {
   if (!element) return;
   element.classList.toggle("mobile-view-hidden", isHidden);
+  element.classList.toggle("app-view-hidden", isHidden);
+  element.setAttribute("aria-hidden", isHidden ? "true" : "false");
 }
 
 function renderMobileLayout() {
   const mobile = isMobileLayout();
   const signedIn = Boolean(cloudState.user);
+  if (!mobile && state.mobileView === "menu") state.mobileView = "home";
   const selectedView = signedIn ? state.mobileView || "home" : "home";
   const allMobileSections = [
     profileSection,
@@ -3928,9 +4010,13 @@ function renderMobileLayout() {
     mobileMenuPanel,
   ];
 
-  if (!mobile || !signedIn) {
-    allMobileSections.forEach((section) => setMobileOnlyHidden(section, false));
+  if (!signedIn) {
+    allMobileSections.forEach((section) => {
+      section?.classList.remove("mobile-view-hidden");
+      section?.classList.remove("app-view-hidden");
+    });
     contentGrid?.classList.remove("mobile-single-view");
+    contentGrid?.classList.remove("app-single-view");
     resultsPanel?.classList.remove("mobile-tab-surface");
     return;
   }
@@ -3953,6 +4039,7 @@ function renderMobileLayout() {
   setMobileOnlyHidden(resultsViewPanel, !onResults);
   setMobileOnlyHidden(mobileMenuPanel, !onMenu);
   contentGrid?.classList.toggle("mobile-single-view", onAdd || onTrends || onResults);
+  contentGrid?.classList.toggle("app-single-view", onAdd || onTrends || onResults);
   resultsPanel?.classList.toggle("mobile-tab-surface", onTrends || onResults);
 }
 
@@ -3965,12 +4052,14 @@ function setMobileView(view, options = {}) {
   }
   const allowedViews = new Set(["home", "add", "trends", "results", "menu"]);
   state.mobileView = allowedViews.has(view) ? view : "home";
-  renderMobileActions(getDueCount());
+  const dueCount = getDueCount();
+  renderMobileActions(dueCount);
+  renderPrimaryNavigation(dueCount);
   renderMobileLayout();
 
-  if (!isMobileLayout() || options.scroll === false) return;
+  if (options.scroll === false) return;
   const target = {
-    home: snapshotSection ?? profileSection,
+    home: profileSection ?? snapshotSection,
     add: form,
     trends: resultsPanel,
     results: resultsPanel,
@@ -4002,6 +4091,7 @@ function renderSummary() {
 
 function setFilter(filter, summaryKey = filter) {
   state.filter = filter;
+  state.resultsPage = 1;
   state.activeSummaryFilter = summaryKey;
   document.querySelectorAll(".filter-button").forEach((item) => {
     item.classList.toggle("active", item.dataset.filter === filter);
@@ -4012,7 +4102,9 @@ function setFilter(filter, summaryKey = filter) {
 
 function renderSummarySelection() {
   document.querySelectorAll("[data-summary-filter]").forEach((item) => {
-    item.classList.toggle("active", (item.dataset.summaryKey ?? item.dataset.summaryFilter) === state.activeSummaryFilter);
+    const isActive = (item.dataset.summaryKey ?? item.dataset.summaryFilter) === state.activeSummaryFilter;
+    item.classList.toggle("active", isActive);
+    item.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 }
 
@@ -4069,12 +4161,12 @@ function focusMetricEntry(profileId, metricName) {
   syncRangeDefaults();
   syncSourceDefaults();
   renderQuickMetrics();
-  if (isMobileLayout()) setMobileView("add", { scroll: false, focusValue: false });
+  setMobileView("add", { scroll: false, focusValue: false });
   focusEntryPanel();
 }
 
 function focusEntryPanel() {
-  if (isMobileLayout()) setMobileView("add", { scroll: false });
+  setMobileView("add", { scroll: false });
   form.scrollIntoView({ behavior: "smooth", block: "start" });
   focusCurrentEntryControl();
 }
@@ -4089,13 +4181,13 @@ function focusCurrentEntryControl() {
 }
 
 function focusDuePanel() {
-  if (isMobileLayout()) state.mobileView = "home";
+  state.mobileView = "home";
   setFilter("due");
   schedulePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function focusCurrentResults() {
-  if (isMobileLayout()) state.mobileView = "results";
+  state.mobileView = "results";
   setFilter("latest");
   resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -4155,7 +4247,7 @@ function handleMenuAction(action) {
 function activateSummaryFilter(card) {
   const nextFilter = card.dataset.summaryFilter;
   const summaryKey = card.dataset.summaryKey ?? nextFilter;
-  if (isMobileLayout()) state.mobileView = nextFilter === "due" ? "home" : "results";
+  state.mobileView = nextFilter === "due" ? "home" : "results";
   setFilter(nextFilter, summaryKey);
   if (isMobileLayout() && nextFilter === "due") {
     schedulePanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -5083,7 +5175,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.76").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.77").catch(() => {});
   });
 }
 
@@ -5302,6 +5394,12 @@ mobileActionBar.addEventListener("click", (event) => {
   handleActionShortcut(button.dataset.mobileAction);
 });
 
+primaryNavigation?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-primary-action]");
+  if (!button) return;
+  handleActionShortcut(button.dataset.primaryAction);
+});
+
 if (mobileMenuPanel) {
   mobileMenuPanel.addEventListener("click", (event) => {
     const button = event.target.closest("[data-menu-action]");
@@ -5344,7 +5442,7 @@ markerSummary.addEventListener("click", (event) => {
   if (!card) return;
   state.activeTrendKey = card.dataset.summaryMetric;
   trendMetricInput.value = card.dataset.summaryMetric;
-  if (isMobileLayout()) state.mobileView = "trends";
+  state.mobileView = "trends";
   setFilter("latest");
   renderTrends();
 });
@@ -5356,7 +5454,7 @@ markerSummary.addEventListener("keydown", (event) => {
   event.preventDefault();
   state.activeTrendKey = card.dataset.summaryMetric;
   trendMetricInput.value = card.dataset.summaryMetric;
-  if (isMobileLayout()) state.mobileView = "trends";
+  state.mobileView = "trends";
   setFilter("latest");
   renderTrends();
 });
@@ -5389,6 +5487,14 @@ schedulePanel.addEventListener("keydown", (event) => {
 });
 
 function handleResultsAction(event, container) {
+  const pageButton = event.target.closest("[data-results-page]");
+  if (pageButton) {
+    state.resultsPage += pageButton.dataset.resultsPage === "next" ? 1 : -1;
+    render();
+    resultsViewPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
   const dueEntryButton = event.target.closest("[data-schedule-profile]");
   if (dueEntryButton && !event.target.closest("[data-id]")) {
     focusMetricEntry(dueEntryButton.dataset.scheduleProfile, dueEntryButton.dataset.scheduleMetric);
