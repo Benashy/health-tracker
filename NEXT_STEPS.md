@@ -385,8 +385,20 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
    - Consider linking Ben's eye-test due date to sit roughly one month before the pilot medical renewal when dates change.
 
 8. Complete the separate security and privacy phase.
-   - Treat `PRIVACY_SECURITY_AUDIT.md` as the scope and review each change before implementation.
-   - This remains separate from the v0.81 reliability, usability and recovery work as requested.
+   - Treat `PRIVACY_SECURITY_AUDIT.md` as the starting scope and review each change before implementation.
+   - Enable leaked-password protection in Supabase Auth and confirm that public account creation remains unavailable.
+   - Reconfirm that only Ben and Angelika can authenticate, and that magic links cannot silently create additional users.
+   - Review session persistence, sign-out, expired-session handling and trusted-device behaviour on desktop, iPhone and iPad.
+   - Re-audit Row Level Security, grants and ownership across every health-data and Telegram table, function and RPC, confirming that each user can access only their own records.
+   - Review the Telegram Edge Function, webhook and scheduled-reminder authentication boundaries, including Vault-backed secrets and callback handling.
+   - Confirm that no service-role key, Telegram token, webhook secret, health data or private report URL is present in browser code, GitHub history, build output, logs or error messages.
+   - Add appropriate browser protections where compatible with GitHub Pages, including a carefully tested Content Security Policy and protection against unintended framing.
+   - Add automated dependency and secret scanning to the release checks, with alerts that are proportionate for a private two-user app.
+   - Move Ben's hard-coded Vitamins schedule into private per-user Supabase data as part of the privacy work in item 2.
+   - Before document upload is introduced, design private Supabase Storage buckets and policies, then complete a separate storage-security test using both accounts.
+   - Review backup credentials, local configuration permissions and Dropbox outputs so private keys stay on the Mac and health backups are not accidentally shared.
+   - Re-run the Supabase security and performance advisors after the changes, test both authorised accounts and an unauthorised account, and record the final evidence in `PRIVACY_SECURITY_AUDIT.md`.
+   - Keep this phase separate from the completed v0.81 reliability, usability and recovery work, as requested.
 
 ## Standing Design Rules
 
