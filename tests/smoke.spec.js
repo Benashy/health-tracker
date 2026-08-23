@@ -4,12 +4,12 @@ test("signed-out dashboard is private, stable and responsive", async ({ page }) 
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/index.html?v=0.81", { waitUntil: "networkidle" });
+  await page.goto("/index.html?v=0.82", { waitUntil: "networkidle" });
   await expect(page.locator("body")).not.toHaveClass(/app-booting/);
   await expect(page.getByRole("heading", { name: "Health Dashboard" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
-  await expect(page.locator("#appVersion")).toHaveText("v0.81");
+  await expect(page.locator("#appVersion")).toHaveText("v0.82");
 
   await expect(page.locator(".topbar-actions")).toBeHidden();
   await expect(page.locator("#primaryNavigation")).toBeHidden();
@@ -24,7 +24,7 @@ test("signed-out dashboard is private, stable and responsive", async ({ page }) 
 });
 
 test("versioned shell assets load", async ({ request }) => {
-  for (const path of ["/app.js?v=0.81", "/styles.css?v=0.81", "/app-icon.svg?v=0.81", "/manifest.webmanifest?v=0.81"]) {
+  for (const path of ["/app.js?v=0.82", "/styles.css?v=0.82", "/app-icon.svg?v=0.82", "/manifest.webmanifest?v=0.82"]) {
     const response = await request.get(path);
     expect(response.ok(), `${path} should load`).toBeTruthy();
   }

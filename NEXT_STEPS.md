@@ -10,9 +10,15 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.81`.
+- The app is now on `v0.82`.
 - The app is usable for early real-world testing, with focused Home, Add, Trends and Results workspaces, compact grouped results, paginated history, import review, AI review export, current snapshot, metric context notes, and a cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## Completed In v0.82
+
+- Added a durable Telegram reply after a snooze has been saved successfully, confirming 1-day, 3-day, 7-day and next-cycle actions.
+- Kept failed, expired and conflicting snooze actions as alerts so Telegram never confirms an action that was not recorded.
+- Kept the original reminder visible while removing its used snooze buttons, and linked the confirmation reply back to that reminder.
 
 ## Completed In v0.81
 

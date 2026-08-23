@@ -1084,12 +1084,15 @@ function applySnoozeCallback(data: Record<string, unknown>, callbackData: string
 
   const count = dueDates.size ? selectedItems.length : 0;
   if (!count) return { count: 0, label: "That check cannot be snoozed to a cycle." };
-  if (selection.mode === "all") return { count, label: `Snoozed ${count} due check${count === 1 ? "" : "s"} for ${selection.days} days.` };
+  if (selection.mode === "all") {
+    const scope = count === 1 ? "" : ` for ${count} due checks`;
+    return { count, label: `${selection.days}-day snooze activated${scope}.` };
+  }
 
   const group = getDueReminderGroups(selectedItems)[0];
   return {
     count,
-    label: `Snoozed ${group?.label ?? "checks"} to the next cycle (${group?.cycleLabel ?? "cycle"}).`,
+    label: `Next-cycle snooze activated for ${group?.label ?? "these checks"} (${group?.cycleLabel ?? "cycle"}).`,
   };
 }
 
@@ -1252,9 +1255,20 @@ async function handleTelegramCallbackWebhook(callback: TelegramCallbackQuery) {
 
   await telegramApi("answerCallbackQuery", {
     callback_query_id: callbackId,
-    text: result.label,
+    text: saved ? "Snooze saved." : result.label,
     show_alert: false,
   });
+
+  if (saved) {
+    await telegramApi("sendMessage", {
+      chat_id: chatId,
+      text: result.label,
+      disable_web_page_preview: true,
+      ...(messageId
+        ? { reply_parameters: { message_id: messageId, allow_sending_without_reply: true } }
+        : {}),
+    });
+  }
 }
 
 async function handleTelegramWebhook(req: Request, update: TelegramUpdate) {
