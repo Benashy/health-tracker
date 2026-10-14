@@ -19,4 +19,4 @@ These files are the reviewable source of truth. Do not paste browser keys, servi
 5. Apply to production, then run a read/write test as each permitted user without inspecting the other user's data.
 6. Record the applied change and recovery route.
 
-The current v0.82 release changes no database schema. Telegram snooze conflict protection is implemented in the Edge Function using the dashboard row's existing `updated_at` value.
+The current v0.83 release changes no database schema. Telegram snooze conflict protection is implemented in the Edge Function using the dashboard row's existing `updated_at` value.

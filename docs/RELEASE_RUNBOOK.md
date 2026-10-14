@@ -14,7 +14,7 @@
 1. Commit with a concise release description.
 2. Push `main` to GitHub.
 3. Wait for the GitHub Actions quality check and GitHub Pages deployment to finish.
-4. Verify the live URL with the release query string, for example `https://benashy.github.io/health-tracker/?v=0.82`.
+4. Verify the live URL with the release query string, for example `https://benashy.github.io/health-tracker/?v=0.83`.
 5. Check the signed-out screen on desktop and iPhone before signing in.
 6. Sign in to one account and verify cloud refresh, one harmless measurement workflow and the footer version. Do not create test health data in the other account.
 
