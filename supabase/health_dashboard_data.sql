@@ -12,6 +12,9 @@ revoke delete, truncate, references, trigger on table public.health_dashboard_da
 grant usage on schema public to authenticated;
 grant select, insert, update on public.health_dashboard_data to authenticated;
 
+-- Server-side reminders, snoozes and backups also need explicit Data API access.
+grant select, update on public.health_dashboard_data to service_role;
+
 drop policy if exists "Approved users can read their own health dashboard data" on public.health_dashboard_data;
 drop policy if exists "Approved users can insert their own health dashboard data" on public.health_dashboard_data;
 drop policy if exists "Approved users can update their own health dashboard data" on public.health_dashboard_data;

@@ -84,9 +84,16 @@ revoke delete, truncate, references, trigger on table public.health_dashboard_da
 
 grant usage on schema public to authenticated;
 grant select, insert, update on public.health_dashboard_data to authenticated;
+grant select, update on public.health_dashboard_data to service_role;
 ```
 
 The deployable SQL lives in `supabase/health_dashboard_data.sql`; that file is the source of truth for the approved-email policies.
+
+From 30 October 2026, newly created tables in `public` require explicit Data API grants, including for `service_role`. Existing tables retain their current grants. See the [Supabase notice](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically).
+
+The server-role grant above covers scheduled Telegram reminder reads, Telegram snooze updates and backup reads. The server key stays private. Browser users retain only their existing approved-account, owner-scoped access, and anonymous users receive no table access.
+
+Use the complete canonical SQL when creating a fresh project or rebuilding the table. The table-creation example earlier in this document is not a complete setup on its own. Refer to `supabase/SCHEMA_RUNBOOK.md` for grant checks; do not run a production migration solely because of this notice.
 
 ## Sync And Conflict Protection
 
