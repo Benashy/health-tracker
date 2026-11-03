@@ -10,13 +10,15 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - GitHub Pages is live: `https://benashy.github.io/health-tracker/`.
 - Supabase login and per-user cloud saving are in place.
 - Ben and Angelika both have separate accounts and initial profile details.
-- The app is now on `v0.83`.
+- The app is now on `v0.84`.
 - The app is usable for early real-world testing, with focused Home, Add, Trends and Results workspaces, compact grouped results, paginated history, import review, AI review export, current snapshot, metric context notes, and a cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
 
-## v0.84 Release In Progress
+## Completed In v0.84
 
-- Ben approved setup on 3 November 2026. Telegram entry for weight, waist circumference and paired blood pressure is being released as v0.84. Existing users default to off, each account opts in separately, and a confirmation is required before saving.
+- Released on 3 November 2026 after Ben approved setup: guided Telegram entry for weight, waist circumference and paired blood pressure. Existing users default to off, each account opts in separately, and a confirmation is required before saving.
+- Installed and verified the server-only session table, explicit permissions and expiry cleanup. Deployed Edge Function version 18 and verified the actual source bundle.
+- All 29 entry tests, eight local browser checks, GitHub quality checks and eight checks against the published desktop/iPhone site passed. Both accounts' health-data fingerprints and timestamps matched the pre-release check; no test readings were added.
 - Review `docs/TELEGRAM_MEASUREMENT_ENTRY.md` for scope, tests and release verification. A genuine reading through each user's own Telegram app remains the final user acceptance check; never enter invented test readings into their live health history.
 
 ## Completed In v0.83

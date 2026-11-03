@@ -1,6 +1,6 @@
 # Telegram measurement entry
 
-Status: approved for setup by Ben on 3 November 2026, with release v0.84 in progress. Prepared and tested locally on 2 November without live database changes or Telegram messages. Release verification is recorded below after deployment.
+Status: v0.84 released on 3 November 2026 after Ben approved setup. Prepared and tested locally on 2 November. Entry remains off for each existing account until that person enables it. Release verification is recorded below; a genuine reading from Telegram remains the user acceptance test.
 
 ## Initial scope
 
@@ -77,7 +77,10 @@ The setup was approved on 3 November 2026. Entry must stay off by default, and c
 - Edge Function version 18 is active. All four deployed source files were read back and matched the release files exactly. Existing custom webhook/scheduler authentication and `verify_jwt=false` were retained.
 - Live webhook status, a reminder dry run and an unknown-chat entry check returned HTTP 200. The dry run sent zero messages. Requests without scheduler/webhook credentials returned HTTP 401.
 - The security advisor reports no new warning-level issue for this feature. Its information-only notice about a table having no RLS policies is intentional: browser access is revoked and only the server can use it. The existing leaked-password-protection recommendation remains on the separate security to-do list; Auth settings were not changed.
-- Pending: GitHub quality checks, live desktop/iPhone checks and final data-integrity comparison. A real Telegram reading remains user acceptance testing after each account opts in. No paid test project or separate test bot was created.
+- Release commit: `a22ef85e834805d7db4dbf5bd2be27add0b1c296`. Both [GitHub quality checks](https://github.com/Benashy/health-tracker/actions/runs/41611854718) and [Pages deployment](https://github.com/Benashy/health-tracker/actions/runs/41611854043) succeeded.
+- All 29 entry tests and eight local Chromium/iPhone WebKit checks passed again for the release. A further eight tests against the actual published v0.84 site passed, including the signed-out privacy checks and both profiles' synthetic opt-in/opt-out controls. The published iPhone screenshot was visually checked.
+- Direct anonymous Data API requests to health data and entry sessions returned HTTP 401/permission denied. The before/after fingerprints and timestamps matched for both accounts. No user health records were created, edited or deleted; both entry opt-ins remained off.
+- Remaining: each account's explicit opt-in and a genuine reading through that person's Telegram app. This is not a claim that real-device Telegram entry was tested. No paid test project or separate test bot was created.
 
 The browser suite can also inspect the actual release without a local server:
 
