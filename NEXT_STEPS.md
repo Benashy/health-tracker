@@ -1,6 +1,6 @@
 # Health Tracker Outstanding To-Do List
 
-Last updated: 2026-10-14
+Last updated: 2026-11-03
 
 When Ben asks "what items are outstanding?", read this file first and use it as the current project to-do list.
 
@@ -13,6 +13,11 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 - The app is now on `v0.83`.
 - The app is usable for early real-world testing, with focused Home, Add, Trends and Results workspaces, compact grouped results, paginated history, import review, AI review export, current snapshot, metric context notes, and a cautious actionability layer.
 - A live Supabase privacy/security audit has been completed and recorded in `PRIVACY_SECURITY_AUDIT.md`.
+
+## v0.84 Release In Progress
+
+- Ben approved setup on 3 November 2026. Telegram entry for weight, waist circumference and paired blood pressure is being released as v0.84. Existing users default to off, each account opts in separately, and a confirmation is required before saving.
+- Review `docs/TELEGRAM_MEASUREMENT_ENTRY.md` for scope, tests and release verification. A genuine reading through each user's own Telegram app remains the final user acceptance check; never enter invented test readings into their live health history.
 
 ## Completed In v0.83
 
@@ -356,6 +361,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 ## Current Outstanding Work
 
 1. Polish Telegram due reminders after real-world testing.
+   - Complete real-user acceptance of v0.84 Telegram measurement entry after each account explicitly opts in. Use a genuine weight, waist or blood-pressure reading and confirm it appears after a dashboard refresh; do not create invented health records.
    - Health Tracker now has a dedicated Telegram bot created through BotFather, so reminders stay in their own Telegram chat.
    - Use one Telegram bot/chat per project going forward, but keep the underlying reminder architecture reusable so other personal apps can adopt the same pattern quickly.
    - Do not put the Telegram bot token in GitHub Pages, browser JavaScript, or any public file.

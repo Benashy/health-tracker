@@ -738,6 +738,35 @@ legend {
   align-content: start;
 }
 
+.telegram-entry-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.telegram-entry-setting input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0;
+  flex: 0 0 20px;
+  accent-color: var(--accent);
+}
+
+.telegram-entry-setting span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.telegram-entry-setting small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .telegram-ok {
   color: var(--ok);
 }

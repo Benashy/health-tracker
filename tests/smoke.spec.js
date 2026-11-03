@@ -4,12 +4,12 @@ test("signed-out dashboard is private, stable and responsive", async ({ page }) 
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/index.html?v=0.83", { waitUntil: "networkidle" });
+  await page.goto("./index.html?v=0.84", { waitUntil: "networkidle" });
   await expect(page.locator("body")).not.toHaveClass(/app-booting/);
   await expect(page.getByRole("heading", { name: "Health Dashboard" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
-  await expect(page.locator("#appVersion")).toHaveText("v0.83");
+  await expect(page.locator("#appVersion")).toHaveText("v0.84");
 
   await expect(page.locator(".topbar-actions")).toBeHidden();
   await expect(page.locator("#primaryNavigation")).toBeHidden();
@@ -17,6 +17,7 @@ test("signed-out dashboard is private, stable and responsive", async ({ page }) 
   await expect(page.locator("#mobileActionBar")).toBeHidden();
   await expect(page.locator("#importReviewModal")).toBeHidden();
   await expect(page.locator("#telegramModal")).toBeHidden();
+  await expect(page.locator("#telegramEntrySetting")).toBeHidden();
 
   const horizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
@@ -24,7 +25,7 @@ test("signed-out dashboard is private, stable and responsive", async ({ page }) 
 });
 
 test("versioned shell assets load", async ({ request }) => {
-  for (const path of ["/app.js?v=0.83", "/styles.css?v=0.83", "/app-icon.svg?v=0.83", "/manifest.webmanifest?v=0.83"]) {
+  for (const path of ["./app.js?v=0.84", "./styles.css?v=0.84", "./app-icon.svg?v=0.84", "./manifest.webmanifest?v=0.84"]) {
     const response = await request.get(path);
     expect(response.ok(), `${path} should load`).toBeTruthy();
   }

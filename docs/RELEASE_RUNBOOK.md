@@ -7,14 +7,14 @@
 3. Run `pnpm test`.
 4. Confirm `APP_VERSION`, the visible version, HTML query strings, manifest URLs and service-worker cache all use the same release number.
 5. For data-model changes, verify that older dashboard JSON is migrated and that newer unknown versions are rejected.
-6. For Telegram changes, verify the local Edge Function source and deploy it after the frontend commit is available on GitHub.
+6. For Telegram changes, verify the Edge Function source, preserve its previous bundle for rollback and deploy its backend before publishing frontend controls that depend on it. Upload all relative modules and the Deno configuration together. A wrapper importing an immutable GitHub commit additionally requires that commit to be available first.
 
 ## Publish
 
 1. Commit with a concise release description.
 2. Push `main` to GitHub.
 3. Wait for the GitHub Actions quality check and GitHub Pages deployment to finish.
-4. Verify the live URL with the release query string, for example `https://benashy.github.io/health-tracker/?v=0.83`.
+4. Verify the live URL with the release query string, for example `https://benashy.github.io/health-tracker/?v=0.84`.
 5. Check the signed-out screen on desktop and iPhone before signing in.
 6. Sign in to one account and verify cloud refresh, one harmless measurement workflow and the footer version. Do not create test health data in the other account.
 

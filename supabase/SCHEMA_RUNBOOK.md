@@ -8,6 +8,8 @@ The project uses one private JSON dashboard row per authenticated user, plus ser
 - `telegram_reminder_schedule.sql`: Telegram pairing, reminder state, protected scheduler helpers and Cron setup
 - `functions/health-tracker-telegram/index.ts`: Telegram pairing, test messages, scheduled reminders and snooze callbacks
 
+The v0.84 Telegram entry setup, approved on 3 November 2026, adds `telegram_measurement_entry.sql`: a private, server-only temporary-session table and an expired-session cleanup job. It has explicit grants and RLS. See `../docs/TELEGRAM_MEASUREMENT_ENTRY.md` for deployment evidence and verification requirements.
+
 These files are the reviewable source of truth. Do not paste browser keys, service-role keys, Telegram tokens, Vault values or private user data into migrations, logs or GitHub issues.
 
 ## Explicit Data API grants

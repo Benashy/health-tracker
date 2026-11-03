@@ -1,4 +1,4 @@
-const APP_VERSION = "v0.83";
+const APP_VERSION = "v0.84";
 const STORAGE_KEY = "blood-results-tracker:v3";
 const LEGACY_STORAGE_KEYS = ["blood-results-tracker:v1", "blood-results-tracker:v2"];
 const PROFILE_STORAGE_KEY = "health-dashboard-profiles:v1";
@@ -553,6 +553,8 @@ const telegramTestButton = document.querySelector("#telegramTestButton");
 const telegramDueTestButton = document.querySelector("#telegramDueTestButton");
 const telegramPauseButton = document.querySelector("#telegramPauseButton");
 const telegramDisconnectButton = document.querySelector("#telegramDisconnectButton");
+const telegramEntrySetting = document.querySelector("#telegramEntrySetting");
+const telegramEntryInput = document.querySelector("#telegramEntryInput");
 const telegramReminderGroups = document.querySelector("#telegramReminderGroups");
 const vitaminsModal = document.querySelector("#vitaminsModal");
 const vitaminsPanel = document.querySelector("#vitaminsPanel");
@@ -811,6 +813,7 @@ function normaliseTelegramSettings(settings = {}) {
     test_sent_at: settings?.test_sent_at ?? settings?.testSentAt ?? "",
     due_test_sent_at: settings?.due_test_sent_at ?? settings?.dueTestSentAt ?? "",
     enabled: chatId ? explicitEnabled !== false : false,
+    measurement_entry_enabled: Boolean(chatId) && settings?.measurement_entry_enabled === true,
     paused_at: settings?.paused_at ?? settings?.pausedAt ?? "",
     last_reminder_sent_date: settings?.last_reminder_sent_date ?? settings?.lastReminderSentDate ?? "",
     last_reminder_signature: settings?.last_reminder_signature ?? settings?.lastReminderSignature ?? "",
@@ -1310,6 +1313,7 @@ function setEditingAvailability() {
   });
   if (entrySubmitButton) entrySubmitButton.disabled = disabled || state.entrySaveLocked;
   if (trackingToggleButton) trackingToggleButton.disabled = disabled;
+  if (telegramEntryInput) telegramEntryInput.disabled = disabled || telegramSetupState.busy || !getTelegramSettings().chat_id;
   importChatGptButton.disabled = disabled;
   if (restoreBackupButton) restoreBackupButton.disabled = disabled;
   if (confirmBackupRestoreButton) confirmBackupRestoreButton.disabled = disabled;
@@ -3616,7 +3620,34 @@ function renderTelegramPanel() {
   telegramDueTestButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
   if (telegramPauseButton) telegramPauseButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
   if (telegramDisconnectButton) telegramDisconnectButton.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  if (telegramEntrySetting) telegramEntrySetting.classList.toggle("hidden", !showConnected);
+  if (telegramEntryInput) {
+    telegramEntryInput.checked = settings.measurement_entry_enabled;
+    telegramEntryInput.disabled = telegramSetupState.busy || !settings.chat_id || isReadOnlyMode();
+  }
   renderTelegramReminderGroups();
+}
+
+async function toggleTelegramMeasurementEntry() {
+  if (!assertCanEdit()) return;
+  const settings = getTelegramSettings();
+  if (!settings.chat_id || telegramSetupState.busy) return;
+  state.settings.telegram = normaliseTelegramSettings({ ...settings, measurement_entry_enabled: Boolean(telegramEntryInput?.checked) });
+  telegramSetupState.busy = true;
+  telegramSetupState.error = "";
+  telegramSetupState.status = "Saving Telegram entry setting...";
+  saveSettings();
+  renderTelegramPanel();
+  try {
+    const saved = await flushCloudSaveNow();
+    if (!saved) throw new Error("Could not confirm the setting was saved. Refresh before using Telegram entry.");
+    telegramSetupState.status = state.settings.telegram.measurement_entry_enabled ? "Telegram entry enabled." : "Telegram entry disabled.";
+  } catch (error) {
+    telegramSetupState.error = error.message;
+  } finally {
+    telegramSetupState.busy = false;
+    renderTelegramPanel();
+  }
 }
 
 function renderTelegramReminderGroups() {
@@ -5647,7 +5678,7 @@ function registerServiceWorker() {
   if (window.location.protocol === "file:") return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js?v=0.83").catch(() => {});
+    navigator.serviceWorker.register("./service-worker.js?v=0.84").catch(() => {});
   });
 }
 
@@ -5800,6 +5831,7 @@ if (telegramTestButton) telegramTestButton.addEventListener("click", sendTelegra
 if (telegramDueTestButton) telegramDueTestButton.addEventListener("click", sendTelegramDueTestMessage);
 if (telegramPauseButton) telegramPauseButton.addEventListener("click", toggleTelegramReminders);
 if (telegramDisconnectButton) telegramDisconnectButton.addEventListener("click", disconnectTelegramReminders);
+if (telegramEntryInput) telegramEntryInput.addEventListener("change", toggleTelegramMeasurementEntry);
 if (telegramModal) {
   telegramModal.addEventListener("click", (event) => {
     if (event.target === telegramModal) closeTelegramPanel();

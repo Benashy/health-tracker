@@ -1,3 +1,6 @@
+import { createMeasurementEntryHandler } from "./measurement-entry.mjs";
+import { reminderEntryRows } from "./measurement-model.mjs";
+
 const TELEGRAM_BOT_TOKEN = Deno.env.get("HEALTH_TRACKER_TELEGRAM_BOT_TOKEN") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const REMINDER_TIME_ZONE = "Europe/Lisbon";
@@ -28,12 +31,18 @@ type TelegramMessage = {
   date?: number;
   text?: string;
   chat?: TelegramChat;
+  from?: { id: number | string; is_bot?: boolean };
+  reply_to_message?: TelegramMessage;
+  forward_origin?: unknown;
+  forward_date?: number;
+  is_automatic_forward?: boolean;
 };
 
 type TelegramCallbackQuery = {
   id?: string;
   message?: TelegramMessage;
   data?: string;
+  from?: { id: number | string; is_bot?: boolean };
 };
 
 type TelegramUpdate = {
@@ -372,7 +381,7 @@ async function getTelegramWebhookSecret() {
   return secret;
 }
 
-async function telegramApi(method: string, payload: Record<string, unknown> = {}) {
+async function telegramApi(method: string, payload: Record<string, unknown> = {}, signal?: AbortSignal) {
   if (!TELEGRAM_BOT_TOKEN) {
     return { ok: false, description: "Telegram token is not configured." };
   }
@@ -381,6 +390,7 @@ async function telegramApi(method: string, payload: Record<string, unknown> = {}
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
   const data = await response.json().catch(() => ({ ok: false, description: "Telegram returned a non-JSON response." }));
   if (!response.ok) {
@@ -522,6 +532,7 @@ async function updateDashboardData(
   data: Record<string, unknown>,
   expectedUpdatedAt: string,
   nextUpdatedAt: string,
+  signal?: AbortSignal,
 ) {
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/health_dashboard_data?user_id=eq.${encodeURIComponent(userId)}&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}&select=updated_at`,
@@ -535,6 +546,7 @@ async function updateDashboardData(
       data,
       updated_at: nextUpdatedAt,
     }),
+    signal,
     },
   );
   if (!response.ok) {
@@ -548,6 +560,82 @@ async function getDashboardRowForTelegramChat(chatId: string) {
   const rows = await getAllDashboardRows();
   return rows.find((row) => getTelegramSettings(row.data).chatId === chatId) ?? null;
 }
+
+const ENTRY_SESSION_TABLE = "health_dashboard_telegram_entry_sessions";
+
+async function getMeasurementEntryAccount(chatId: string) {
+  if (!/^[1-9]\d*$/.test(chatId)) return null;
+  const query = new URLSearchParams({
+    select: "user_id,data,updated_at",
+    "data->settings->telegram->>chat_id": `eq.${chatId}`,
+    limit: "2",
+  });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/health_dashboard_data?${query}`, {
+    headers: getAdminHeaders(), signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error("Could not check the Telegram account connection.");
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length !== 1) return null;
+  const row = rows[0] as DashboardRow;
+  const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(row.user_id)}`, {
+    headers: getAdminHeaders(), signal: AbortSignal.timeout(8000),
+  });
+  if (authResponse.status === 404) return null;
+  if (!authResponse.ok) throw new Error("Could not verify the linked account.");
+  const user = await authResponse.json();
+  const email = String(user.email ?? "").toLowerCase();
+  if (String(user.id) !== row.user_id || !APPROVED_EMAILS.has(email) || !user.email_confirmed_at || (user.banned_until && Date.parse(user.banned_until) > Date.now())) return null;
+  const profileId = email === "ben_ashurst@me.com" ? "ben" : "angelika";
+  const profiles = getDashboardProfiles(row.data);
+  if (profiles.length !== 1 || profiles[0].id !== profileId) return null;
+  const settings = row.data.settings as Record<string, unknown> | undefined;
+  const telegram = settings?.telegram as Record<string, unknown> | undefined;
+  return {
+    userId: row.user_id, chatId, profileId, profile: profiles[0],
+    data: row.data, updatedAt: row.updated_at, linkedAt: String(telegram?.linked_at ?? ""),
+  };
+}
+
+async function loadMeasurementEntrySession(userId: string) {
+  const query = new URLSearchParams({ select: "*", user_id: `eq.${userId}`, limit: "1" });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${ENTRY_SESSION_TABLE}?${query}`, {
+    headers: getAdminHeaders(), signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error("Could not load the Telegram entry.");
+  const rows = await response.json();
+  if (!rows[0]) return null;
+  const { state, ...metadata } = rows[0];
+  return { ...state, ...metadata };
+}
+
+async function saveMeasurementEntrySession(session: Record<string, unknown>, previous: Record<string, unknown> | null) {
+  const { user_id, session_id, revision, expires_at, updated_at, ...state } = session;
+  const query = previous ? new URLSearchParams({
+    user_id: `eq.${previous.user_id}`, session_id: `eq.${previous.session_id}`, revision: `eq.${previous.revision}`,
+  }) : null;
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${ENTRY_SESSION_TABLE}${query ? `?${query}` : ""}`, {
+    method: previous ? "PATCH" : "POST",
+    headers: { ...getAdminHeaders(), Prefer: "return=representation" },
+    body: JSON.stringify({ user_id, session_id, revision, expires_at, updated_at, state }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (response.status === 409) return false;
+  if (!response.ok) throw new Error("Could not save the Telegram entry state.");
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length === 1;
+}
+
+const measurementEntryHandler = createMeasurementEntryHandler({
+  loadAccount: getMeasurementEntryAccount,
+  loadSession: loadMeasurementEntrySession,
+  saveSession: saveMeasurementEntrySession,
+  saveDashboard: (account: { userId: string; updatedAt: string }, data: Record<string, unknown>) => updateDashboardData(
+    account.userId, data, account.updatedAt,
+    new Date(Math.max(Date.now(), Date.parse(account.updatedAt) + 1)).toISOString(),
+    AbortSignal.timeout(8000),
+  ),
+  telegram: (method: string, payload: Record<string, unknown>) => telegramApi(method, payload, AbortSignal.timeout(8000)),
+});
 
 function extractPairingCode(text: unknown) {
   const match = normalisePairingCode(text).match(/HT-[A-Z0-9]{6}/);
@@ -990,7 +1078,11 @@ function buildDueMessage(data: Record<string, unknown>, options: { scheduledOnly
     "",
     `Open dashboard: ${DASHBOARD_URL}`,
   ].join("\n");
-  return { dueCount: dueItems.length, message, replyMarkup: buildSnoozeReplyMarkup(dueItems) };
+  const snoozeMarkup = buildSnoozeReplyMarkup(dueItems);
+  return {
+    dueCount: dueItems.length, message,
+    replyMarkup: { inline_keyboard: [...reminderEntryRows(data, dueItems), ...(snoozeMarkup?.inline_keyboard ?? [])] },
+  };
 }
 
 function getReminderLocalTime(now = new Date()) {
@@ -1201,17 +1293,20 @@ async function handleSendScheduledReminders(req: Request, body: Record<string, u
 
 async function handleTelegramMessageWebhook(message: TelegramMessage) {
   const code = extractPairingCode(message.text);
-  if (!code || !message.chat || message.chat.type !== "private") return;
-
-  await upsertPairingCode(code, message.chat);
-  await telegramApi("sendMessage", {
-    chat_id: String(message.chat.id),
-    text: "Pairing code received. Return to Health Dashboard and tap Check code.",
-    disable_web_page_preview: true,
-  });
+  if (code && message.chat?.type === "private") {
+    await upsertPairingCode(code, message.chat);
+    await telegramApi("sendMessage", {
+      chat_id: String(message.chat.id),
+      text: "Pairing code received. Return to Health Dashboard and tap Check code.",
+      disable_web_page_preview: true,
+    });
+    return;
+  }
+  await measurementEntryHandler.handleMessage(message);
 }
 
 async function handleTelegramCallbackWebhook(callback: TelegramCallbackQuery) {
+  if (await measurementEntryHandler.handleCallback(callback)) return;
   const callbackId = String(callback.id ?? "");
   const callbackData = String(callback.data ?? "");
   const chatId = callback.message?.chat?.id === undefined ? "" : String(callback.message.chat.id);
