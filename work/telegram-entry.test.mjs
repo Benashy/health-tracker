@@ -113,12 +113,16 @@ test("entry is opt-in, including for existing linked users and restored string v
   assert.equal(entryEnabled(account().data), true);
 });
 
-test("reminder entry buttons include only tracked basic checks that are due", () => {
+test("reminders offer entry only for due and tracked weight and waist", () => {
   const user = account();
-  const due = ["Weight", "Waist circumference", "Blood pressure diastolic", "LDL"].map((name) => ({ metric: { name } }));
-  assert.equal(reminderEntryRows(user.data, due).length, 3);
-  user.data.settings.metric_tracking_by_profile = { ben: { "Blood pressure systolic": "not_tracked" } };
-  assert.equal(reminderEntryRows(user.data, due).length, 2);
+  const due = ["Weight", "Waist circumference", "Blood pressure systolic", "Blood pressure diastolic", "VO2 max"].map((name) => ({ metric: { name } }));
+  const weight = [{ text: "Enter weight", callback_data: "htm:start:weight" }];
+  const waist = [{ text: "Enter waist circumference", callback_data: "htm:start:waist" }];
+  assert.deepEqual(reminderEntryRows(user.data, due), [weight, waist]);
+  assert.deepEqual(reminderEntryRows(user.data, due.slice(1)), [waist]);
+  assert.deepEqual(reminderEntryRows(user.data, due.slice(2)), []);
+  user.data.settings.metric_tracking_by_profile = { ben: { "Waist circumference": "not_tracked" } };
+  assert.deepEqual(reminderEntryRows(user.data, due), [weight]);
   user.data.settings.telegram.measurement_entry_enabled = false;
   assert.deepEqual(reminderEntryRows(user.data, due), []);
 });
@@ -430,8 +434,8 @@ async function edgeHarness(run) {
   let handler;
   let outgoingId = 600;
   h.adminRejected = false;
-  h.request = async (body, secret = "webhook-test") => handler(new Request("https://entry-function.invalid", {
-    method: "POST", headers: { "Content-Type": "application/json", "x-telegram-bot-api-secret-token": secret }, body: JSON.stringify(body),
+  h.request = async (body, secret = "webhook-test", headers = {}) => handler(new Request("https://entry-function.invalid", {
+    method: "POST", headers: { "Content-Type": "application/json", "x-telegram-bot-api-secret-token": secret, ...headers }, body: JSON.stringify(body),
   }));
   const json = (body, status = 200) => Response.json(body, { status });
   globalThis.Deno = {
@@ -451,6 +455,7 @@ async function edgeHarness(run) {
     assert.equal(url.host, "entry-database.invalid", "Tests must never reach a real service");
     assert.equal(init.headers.apikey, "TEST_ONLY_NON_SECRET");
     if (url.pathname.endsWith("/rpc/health_tracker_telegram_webhook_secret_matches")) return json(body.provided_secret === "webhook-test");
+    if (url.pathname.endsWith("/rpc/health_tracker_cron_secret_matches")) return json(body.provided_secret === "cron-test");
     if (url.pathname.startsWith("/auth/v1/admin/users/")) {
       const user = [...h.accounts.values()].find((item) => item.userId === url.pathname.split("/").at(-1));
       if (!user || h.adminRejected) return json({ error: "Not found" }, 404);
@@ -459,7 +464,7 @@ async function edgeHarness(run) {
     if (url.pathname === "/rest/v1/health_dashboard_data") {
       if (method === "GET") {
         const chatId = url.searchParams.get("data->settings->telegram->>chat_id")?.slice(3);
-        const rows = [...h.accounts.values()].filter((user) => user.data.settings.telegram.chat_id === chatId);
+        const rows = [...h.accounts.values()].filter((user) => !chatId || user.data.settings.telegram.chat_id === chatId);
         return json(rows.map((user) => ({ user_id: user.userId, data: clone(user.data), updated_at: user.updatedAt })));
       }
       assert.equal(method, "PATCH");
@@ -467,6 +472,11 @@ async function edgeHarness(run) {
       if (!user || `eq.${user.updatedAt}` !== url.searchParams.get("updated_at")) return json([]);
       user.data = clone(body.data); user.updatedAt = body.updated_at; h.writes++;
       return json([{ updated_at: user.updatedAt }]);
+    }
+    if (url.pathname === "/rest/v1/health_dashboard_telegram_reminder_state") {
+      if (method === "GET") return json([]);
+      assert.equal(method, "POST");
+      return new Response(null, { status: 204 });
     }
     if (url.pathname === "/rest/v1/health_dashboard_telegram_entry_sessions") {
       if (method === "GET") return json([...rawSessions.values()].filter((row) => `eq.${row.user_id}` === url.searchParams.get("user_id")));
@@ -500,6 +510,22 @@ async function edgeHarness(run) {
     else globalThis.Deno = originalDeno;
   }
 }
+
+test("scheduled reminders keep Snooze and only offer weight and waist entry", async () => edgeHarness(async (h) => {
+  h.accounts.get("10001").data.schedule_state.snoozes = {};
+  h.accounts.get("10002").data.settings.telegram.enabled = false;
+  const response = await h.request({ action: "send_scheduled_reminders", force: true }, "webhook-test", { "x-health-tracker-cron-secret": "cron-test" });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).sent, 1);
+  assert.equal(h.sent.length, 1);
+  const { payload } = h.sent[0];
+  assert.match(payload.text, /Blood pressure systolic/);
+  assert.match(payload.text, /VO2 max/i);
+  const labels = payload.reply_markup.inline_keyboard.flat().map((button) => button.text);
+  assert.deepEqual(labels.filter((label) => label.startsWith("Enter ")), ["Enter weight", "Enter waist circumference"]);
+  assert.deepEqual(labels.filter((label) => label.startsWith("Snooze all ")), ["Snooze all 1d", "Snooze all 3d", "Snooze all 7d"]);
+  assert.equal(h.writes, 0);
+}));
 
 test("the real Edge Function wires webhook, session storage and atomic dashboard recording", async () => edgeHarness(async (h) => {
   const start = { id: "start-edge", data: "htm:start:bp", from: { id: 10001 }, message: { message_id: 20, chat: { id: 10001, type: "private" } } };

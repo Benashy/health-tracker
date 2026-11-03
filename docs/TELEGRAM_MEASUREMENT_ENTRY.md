@@ -12,7 +12,7 @@ Each account must enable `Enter readings in Telegram` in its own Telegram settin
 
 ## Intended flow
 
-1. A due reminder offers an entry button for each supported, tracked metric that is due. `/record` also opens the three choices; `/weight`, `/waist` and `/bp` are shortcuts.
+1. New reminders offer **Enter weight** and **Enter waist circumference** alongside Snooze when the relevant tracked measurements are due and Telegram entry is enabled. Blood pressure and VO2 max have no reminder entry buttons. The separate `/record` menu and shortcuts are unchanged.
 2. The bot asks for the reading with Telegram's reply interface. Weight and waist accept decimal points or decimal commas. Pressure accepts a pair such as `120/80`.
 3. The bot shows the reading, units and date. The default date is today in Europe/Lisbon, explicitly displayed in the confirmation. `Change date` accepts DD/MM/YYYY or YYYY-MM-DD, including historical dates but not future dates.
 4. The user can change the value, change the date, cancel, or save. If a reading already exists on that day, the button explicitly offers to save another reading. Existing readings are not replaced.
@@ -74,7 +74,7 @@ The setup was approved on 3 November 2026. Entry must stay off by default, and c
 
 - The new session table and expiry-cleanup job are installed. Browser roles have no access, RLS is enabled, and the server role has only SELECT/INSERT/UPDATE/DELETE. Default server privileges were explicitly revoked before granting these operations.
 - A server-role insert/update/delete test and a stale-revision rejection test passed inside a rolled-back transaction; no session or health reading was left behind.
-- Edge Function version 18 is active. All four deployed source files were read back and matched the release files exactly. Existing custom webhook/scheduler authentication and `verify_jwt=false` were retained.
+- The initial v0.84 backend was Edge Function version 18. All four deployed source files were read back and matched the release files exactly. Existing custom webhook/scheduler authentication and `verify_jwt=false` were retained.
 - Live webhook status, a reminder dry run and an unknown-chat entry check returned HTTP 200. The dry run sent zero messages. Requests without scheduler/webhook credentials returned HTTP 401.
 - The security advisor reports no new warning-level issue for this feature. Its information-only notice about a table having no RLS policies is intentional: browser access is revoked and only the server can use it. The existing leaked-password-protection recommendation remains on the separate security to-do list; Auth settings were not changed.
 - Release commit: `a22ef85e834805d7db4dbf5bd2be27add0b1c296`. Both [GitHub quality checks](https://github.com/Benashy/health-tracker/actions/runs/41611854718) and [Pages deployment](https://github.com/Benashy/health-tracker/actions/runs/41611854043) succeeded.
@@ -89,6 +89,8 @@ HEALTH_TRACKER_TEST_BASE_URL=https://benashy.github.io/health-tracker/ pnpm run 
 ```
 
 Signed-in UI checks use synthetic accounts and intercepted storage, never real user sessions or database writes. They do not prove a real Telegram reading was saved.
+
+Reminder-button follow-up, 3 November 2026: Edge Function version 19 is live. It changes only the reminder entry filter; the dashboard, metric due logic, Snooze, and separate command entry are unchanged. The 30-test suite passed, including a mixed scheduled reminder that retains Snooze and lists due blood pressure and VO2 max without adding entry buttons for either. The deployed bundle matched the tested files, and the live scheduler dry run sent zero messages.
 
 Rollback reference: the previous backend was Edge Function version 17, with `index.ts` importing `https://raw.githubusercontent.com/Benashy/health-tracker/79613773491402e41a52e2458917f547bcb300ac/supabase/functions/health-tracker-telegram/index.ts`. Preserve the existing `deno.json` and explicitly set `import_map_path` to `deno.json` when restoring this wrapper. Omitting the import-map path can retain an invalid path from the previous deployment.
 

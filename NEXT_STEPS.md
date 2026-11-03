@@ -16,6 +16,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Completed In v0.84
 
+- Telegram reminder follow-up: Edge Function v19 offers direct entry for due weight and waist circumference only, alongside the existing Snooze controls. Blood pressure and VO2 max reminders and dashboard entry remain unchanged.
 - Released on 3 November 2026 after Ben approved setup: guided Telegram entry for weight, waist circumference and paired blood pressure. Existing users default to off, each account opts in separately, and a confirmation is required before saving.
 - Installed and verified the server-only session table, explicit permissions and expiry cleanup. Deployed Edge Function version 18 and verified the actual source bundle.
 - All 29 entry tests, eight local browser checks, GitHub quality checks and eight checks against the published desktop/iPhone site passed. Both accounts' health-data fingerprints and timestamps matched the pre-release check; no test readings were added.

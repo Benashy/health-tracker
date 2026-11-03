@@ -35,6 +35,7 @@ export function reminderEntryRows(data, dueItems) {
   if (!entryEnabled(data) || !Array.isArray(data.profiles) || data.profiles.length !== 1) return [];
   const names = new Set(dueItems.map((item) => item.metric.name));
   return availableChoices(data, data.profiles[0].id)
+    .filter((choice) => choice.key === "weight" || choice.key === "waist")
     .filter((choice) => choice.metrics.some((name) => names.has(name)))
     .map((choice) => [{ text: `Enter ${choice.label.toLowerCase()}`, callback_data: `${ENTRY_PREFIX}:start:${choice.key}` }]);
 }
