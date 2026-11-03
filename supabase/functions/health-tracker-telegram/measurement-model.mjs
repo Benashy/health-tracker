@@ -132,6 +132,29 @@ export function dashboardMeasurements(data) {
 
 function rowDate(row) { return row.sample_date || row.test_date || ""; }
 
+export function latestSavedReading(account, key, now = new Date()) {
+  if (key !== "weight" && key !== "waist") return null;
+  const name = entryChoice(key).metrics[0];
+  const unit = METRICS[name].unit;
+  let latest = null;
+  for (const row of dashboardMeasurements(account.data)) {
+    if (row?.profile_id !== account.profileId || row.metric !== name || row.unit !== unit) continue;
+    if (typeof row.result_value !== "number" && typeof row.result_value !== "string") continue;
+    const value = numberOrNull(row.result_value);
+    if (value === null || value <= 0) continue;
+    let date;
+    try {
+      date = parseEntryDate(rowDate(row), now);
+    } catch (error) {
+      if (!(error instanceof EntryValidationError)) throw error;
+      continue;
+    }
+    // New measurements are appended, so use the later row on a same-day tie.
+    if (!latest || date >= latest.date) latest = { value, unit, date };
+  }
+  return latest;
+}
+
 export function entryContext(account, key, date) {
   const choice = availableChoices(account.data, account.profileId).find((item) => item.key === key);
   if (!choice) throw new EntryValidationError("This metric is not tracked. Enable it in the dashboard first.");

@@ -16,6 +16,7 @@ When Ben asks "what items are outstanding?", read this file first and use it as 
 
 ## Completed In v0.84
 
+- Telegram entry follow-up: Edge Function v22 shows the latest saved weight or waist reading, with unit and date, only in the opted-in user's private value prompt. Reminders contain no readings. All 32 entry tests and a live no-send scheduler check passed.
 - Telegram reminder follow-up: Edge Function v19 offers direct entry for due weight and waist circumference only, alongside the existing Snooze controls. Blood pressure and VO2 max reminders and dashboard entry remain unchanged.
 - Released on 3 November 2026 after Ben approved setup: guided Telegram entry for weight, waist circumference and paired blood pressure. Existing users default to off, each account opts in separately, and a confirmation is required before saving.
 - Installed and verified the server-only session table, explicit permissions and expiry cleanup. Deployed Edge Function version 18 and verified the actual source bundle.

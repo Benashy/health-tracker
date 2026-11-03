@@ -2,7 +2,7 @@ import {
   ENTRY_PREFIX, ENTRY_TTL_MS, SAVE_LEASE_MS, EntryValidationError,
   availableChoices, entryChoice, entryEnabled, entryToday, parseEntryDate,
   parseEntryValue, entryContext, formatEntryDate, entryReadingText,
-  applyEntryToDashboard, dashboardMeasurements, measurementIds,
+  applyEntryToDashboard, dashboardMeasurements, latestSavedReading, measurementIds,
 } from "./measurement-model.mjs";
 
 function privateActor(chat, sender) {
@@ -39,9 +39,15 @@ export function createMeasurementEntryHandler(deps) {
     return next;
   }
 
-  async function prompt(session, date = false, errorText = "") {
+  async function prompt(account, session, date = false, errorText = "") {
     const text = date ? "Enter the measurement date as DD/MM/YYYY, for example 02/11/2026." : entryChoice(session.entry_key).prompt;
-    const messageId = await send(session.chat_id, `${errorText ? `${errorText}\n\n` : ""}${text}\n\nSend /cancel to cancel.`, {
+    const latest = !date && sameAccount(account, session) ? latestSavedReading(account, session.entry_key, now()) : null;
+    const message = [
+      errorText, text,
+      latest ? `Last saved: ${latest.value} ${latest.unit} on ${formatEntryDate(latest.date)}.` : "",
+      "Send /cancel to cancel.",
+    ].filter(Boolean).join("\n\n");
+    const messageId = await send(session.chat_id, message, {
       reply_markup: { force_reply: true, input_field_placeholder: date ? "DD/MM/YYYY" : session.entry_key === "bp" ? "120/80" : session.entry_key === "weight" ? "82.5" : "92" },
     });
     return persist(session, { prompt_message_id: messageId });
@@ -79,7 +85,7 @@ export function createMeasurementEntryHandler(deps) {
       return send(account.chatId, "Your last reading is being saved. Please wait a moment before starting another.");
     }
     if (previous?.last_event_id === eventId && sameAccount(account, previous)) {
-      if (previous.stage === "awaiting_value" && !previous.prompt_message_id) return prompt(previous);
+      if (previous.stage === "awaiting_value" && !previous.prompt_message_id) return prompt(account, previous);
       return;
     }
     const session = {
@@ -91,7 +97,7 @@ export function createMeasurementEntryHandler(deps) {
       expires_at: new Date(now().getTime() + ENTRY_TTL_MS).toISOString(), updated_at: now().toISOString(), save_started_at: null,
     };
     if (!await deps.saveSession(session, previous)) throw new EntryValidationError("Another entry started. Send /record to choose again.");
-    return prompt(session);
+    return prompt(account, session);
   }
 
   async function cancel(account, session) {
@@ -158,7 +164,7 @@ export function createMeasurementEntryHandler(deps) {
       if (!session || !sameAccount(account, session)) return false;
       if (session.last_event_id === `message:${message.message_id}`) {
         if (session.stage === "confirming" && !session.prompt_message_id) await confirmation(session);
-        else if (["awaiting_value", "awaiting_date"].includes(session.stage) && !session.prompt_message_id) await prompt(session, session.stage === "awaiting_date");
+        else if (["awaiting_value", "awaiting_date"].includes(session.stage) && !session.prompt_message_id) await prompt(account, session, session.stage === "awaiting_date");
         return true;
       }
       if (!Number.isFinite(Date.parse(session.expires_at)) || Date.parse(session.expires_at) <= now().getTime()) {
@@ -179,7 +185,7 @@ export function createMeasurementEntryHandler(deps) {
       if (active && sameAccount(account, active) && ["awaiting_value", "awaiting_date"].includes(active.stage)
         && active.prompt_message_id === Number(message.reply_to_message?.message_id)) {
         const retry = await persist(active, { prompt_message_id: null, last_event_id: `message:${message.message_id}` });
-        await prompt(retry, active.stage === "awaiting_date", error.message);
+        await prompt(account, retry, active.stage === "awaiting_date", error.message);
       } else await send(account.chatId, error.message);
     }
     return true;
@@ -214,7 +220,7 @@ export function createMeasurementEntryHandler(deps) {
       else if (action === "cancel") await cancel(account, session);
       else {
         session = await persist(session, { stage: action === "date" ? "awaiting_date" : "awaiting_value", prompt_message_id: null, ...(action === "value" ? { values: [], context_signature: "" } : {}) });
-        await prompt(session, action === "date");
+        await prompt(account, session, action === "date");
       }
     } catch (error) {
       if (!(error instanceof EntryValidationError)) {

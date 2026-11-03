@@ -13,7 +13,7 @@ Each account must enable `Enter readings in Telegram` in its own Telegram settin
 ## Intended flow
 
 1. New reminders offer **Enter weight** and **Enter waist circumference** alongside Snooze when the relevant tracked measurements are due and Telegram entry is enabled. Blood pressure and VO2 max have no reminder entry buttons. The separate `/record` menu and shortcuts are unchanged.
-2. The bot asks for the reading with Telegram's reply interface. Weight and waist accept decimal points or decimal commas. Pressure accepts a pair such as `120/80`.
+2. The bot asks for the reading with Telegram's reply interface. After an opted-in user opens a weight or waist value prompt, it shows the latest usable saved reading with its unit and measurement date, when available. Saved values are never included in the reminder itself. First readings, blood-pressure prompts and date prompts are unchanged. Weight and waist accept decimal points or decimal commas. Pressure accepts a pair such as `120/80`.
 3. The bot shows the reading, units and date. The default date is today in Europe/Lisbon, explicitly displayed in the confirmation. `Change date` accepts DD/MM/YYYY or YYYY-MM-DD, including historical dates but not future dates.
 4. The user can change the value, change the date, cancel, or save. If a reading already exists on that day, the button explicitly offers to save another reading. Existing readings are not replaced.
 5. Only after a successful cloud write does the bot confirm that the reading was saved. A used confirmation cannot create the reading again.
@@ -90,7 +90,9 @@ HEALTH_TRACKER_TEST_BASE_URL=https://benashy.github.io/health-tracker/ pnpm run 
 
 Signed-in UI checks use synthetic accounts and intercepted storage, never real user sessions or database writes. They do not prove a real Telegram reading was saved.
 
-Reminder-button follow-up, 3 November 2026: Edge Function version 19 is live. It changes only the reminder entry filter; the dashboard, metric due logic, Snooze, and separate command entry are unchanged. The 30-test suite passed, including a mixed scheduled reminder that retains Snooze and lists due blood pressure and VO2 max without adding entry buttons for either. The deployed bundle matched the tested files, and the live scheduler dry run sent zero messages.
+Reminder-button follow-up, 3 November 2026: Edge Function version 19 introduced the weight and waist reminder entry filter. The dashboard, metric due logic, Snooze, and separate command entry were unchanged. The 30-test suite passed, including a mixed scheduled reminder that retains Snooze and lists due blood pressure and VO2 max without adding entry buttons for either. The deployed bundle matched the tested files, and the live scheduler dry run sent zero messages.
+
+Last-reading follow-up, 3 November 2026: Edge Function version 22 is live after Ben approved deployment. The 32-test suite passed, including last-reading selection, per-account prompt isolation, and no saved values in reminders. The deployed bundle matched the tested files, and the live scheduler dry run sent zero messages. No frontend release, account changes or data migration were needed.
 
 Rollback reference: the previous backend was Edge Function version 17, with `index.ts` importing `https://raw.githubusercontent.com/Benashy/health-tracker/79613773491402e41a52e2458917f547bcb300ac/supabase/functions/health-tracker-telegram/index.ts`. Preserve the existing `deno.json` and explicitly set `import_map_path` to `deno.json` when restoring this wrapper. Omitting the import-map path can retain an invalid path from the previous deployment.
 

@@ -5,7 +5,7 @@ import path from "node:path";
 import Module from "node:module";
 import {
   EntryValidationError, entryEnabled, parseEntryValue, parseEntryDate, entryToday,
-  entryContext, applyEntryToDashboard, reminderEntryRows,
+  entryContext, applyEntryToDashboard, latestSavedReading, reminderEntryRows,
 } from "../supabase/functions/health-tracker-telegram/measurement-model.mjs";
 import { createMeasurementEntryHandler } from "../supabase/functions/health-tracker-telegram/measurement-entry.mjs";
 
@@ -125,6 +125,57 @@ test("reminders offer entry only for due and tracked weight and waist", () => {
   assert.deepEqual(reminderEntryRows(user.data, due), [weight]);
   user.data.settings.telegram.measurement_entry_enabled = false;
   assert.deepEqual(reminderEntryRows(user.data, due), []);
+});
+
+test("the latest saved reading matches the profile, metric, unit and measurement date", () => {
+  const user = account();
+  const weight = { profile_id: "ben", metric: "Weight", unit: "kg" };
+  user.data.measurements = [
+    { ...weight, result_value: 82, sample_date: "2026-11-01" },
+    { ...weight, result_value: 81, sample_date: "2026-10-01" },
+    { ...weight, result_value: "82.4", test_date: "2026-11-01" },
+    { ...weight, result_value: 200, unit: "lb", sample_date: "2026-11-02" },
+    { ...weight, result_value: 70, profile_id: "angelika", sample_date: "2026-11-02" },
+    { ...weight, result_value: 85, sample_date: "2026-11-03" },
+    { ...weight, result_value: 84, sample_date: "2026-02-30" },
+    { ...weight, result_value: "invalid", sample_date: "2026-11-02" },
+    { ...weight, result_value: null, sample_date: "2026-11-02" },
+  ];
+  assert.deepEqual(latestSavedReading(user, "weight", new Date(NOW)), { value: 82.4, unit: "kg", date: "2026-11-01" });
+  assert.equal(latestSavedReading(user, "waist", new Date(NOW)), null);
+  assert.equal(latestSavedReading(user, "bp", new Date(NOW)), null);
+});
+
+test("private value prompts show the account's last saved reading without writing a measurement", async () => {
+  const h = harness();
+  h.accounts.get("10001").data.measurements = [
+    { profile_id: "ben", metric: "Weight", result_value: 82.4, unit: "kg", sample_date: "2026-11-01" },
+    { profile_id: "ben", metric: "Waist circumference", result_value: 91.2, unit: "cm", sample_date: "2026-11-01" },
+  ];
+  h.accounts.get("10002").data.measurements = [
+    { profile_id: "angelika", metric: "Waist circumference", result_value: 79.4, unit: "cm", sample_date: "2026-10-31" },
+  ];
+  await h.start("weight");
+  let prompt = h.sent.at(-1).payload;
+  assert.match(prompt.text, /Last saved: 82\.4 kg on 1 Nov 2026\./);
+  assert.doesNotMatch(prompt.text, /91\.2|79\.4/);
+  assert.equal(prompt.chat_id, "10001");
+  assert.equal(prompt.protect_content, true);
+  assert.equal(prompt.reply_markup.force_reply, true);
+
+  await h.start("waist", "10002");
+  prompt = h.sent.at(-1).payload;
+  assert.match(prompt.text, /Last saved: 79\.4 cm on 31 Oct 2026\./);
+  assert.doesNotMatch(prompt.text, /82\.4|91\.2/);
+  assert.equal(prompt.chat_id, "10002");
+  assert.equal(prompt.protect_content, true);
+
+  await h.handler.handleMessage(h.message("not a number"));
+  assert.match(h.sent.at(-1).payload.text, /Last saved: 82\.4 kg on 1 Nov 2026\./);
+  await h.handler.handleMessage(h.message("83"));
+  await h.handler.handleCallback(h.button("date"));
+  assert.doesNotMatch(h.sent.at(-1).payload.text, /Last saved:/);
+  assert.equal(h.writes, 0);
 });
 
 test("weight is a draft until confirmed and produces an honest saved receipt", async () => {
@@ -513,6 +564,10 @@ async function edgeHarness(run) {
 
 test("scheduled reminders keep Snooze and only offer weight and waist entry", async () => edgeHarness(async (h) => {
   h.accounts.get("10001").data.schedule_state.snoozes = {};
+  h.accounts.get("10001").data.measurements = [
+    { profile_id: "ben", metric: "Weight", result_value: 82.37, unit: "kg", sample_date: "2020-01-01" },
+    { profile_id: "ben", metric: "Waist circumference", result_value: 91.64, unit: "cm", sample_date: "2020-01-01" },
+  ];
   h.accounts.get("10002").data.settings.telegram.enabled = false;
   const response = await h.request({ action: "send_scheduled_reminders", force: true }, "webhook-test", { "x-health-tracker-cron-secret": "cron-test" });
   assert.equal(response.status, 200);
@@ -521,6 +576,7 @@ test("scheduled reminders keep Snooze and only offer weight and waist entry", as
   const { payload } = h.sent[0];
   assert.match(payload.text, /Blood pressure systolic/);
   assert.match(payload.text, /VO2 max/i);
+  assert.doesNotMatch(payload.text, /Last saved:|82\.37|91\.64/);
   const labels = payload.reply_markup.inline_keyboard.flat().map((button) => button.text);
   assert.deepEqual(labels.filter((label) => label.startsWith("Enter ")), ["Enter weight", "Enter waist circumference"]);
   assert.deepEqual(labels.filter((label) => label.startsWith("Snooze all ")), ["Snooze all 1d", "Snooze all 3d", "Snooze all 7d"]);
